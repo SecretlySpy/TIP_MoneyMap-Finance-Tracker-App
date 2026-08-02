@@ -7,6 +7,8 @@ const config = getDefaultConfig(__dirname);
 // their source geometry committed and editable as ordinary design assets.
 config.transformer.babelTransformerPath = require.resolve("react-native-svg-transformer/expo");
 config.resolver.assetExts = config.resolver.assetExts.filter((extension) => extension !== "svg");
-config.resolver.sourceExts = [...config.resolver.sourceExts, "svg"];
+// Prefer plain JS/JSX sources after the TypeScript → JavaScript migration.
+const sourceExts = new Set([...config.resolver.sourceExts, "svg", "jsx", "js"]);
+config.resolver.sourceExts = [...sourceExts];
 
 module.exports = withNativeWind(config, { input: "./global.css" });
