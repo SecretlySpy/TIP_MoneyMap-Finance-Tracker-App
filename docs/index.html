@@ -1,102 +1,590 @@
 <!DOCTYPE html>
+<!--
+  GitHub Pages site for TIP_MoneyMap-Finance-Tracker-App — local setup and testing guide.
+  
+  This page is the team's onboarding guide: it explains how to install the toolchain,
+  configure the project, run it locally, and verify that it works.
+  
+  Deliberately self-contained. The palette and type scale mirror the Finance Tracker
+  branding (using the primary green accent).
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MoneyMap Finance Tracker</title>
-  <meta name="description" content="Static MoneyMap project overview and quick start guide.">
+  <title>MoneyMap — Local Setup &amp; Testing Guide</title>
+  <meta name="description" content="Step-by-step guide for setting up and testing the MoneyMap Finance Tracker locally.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
   <style>
     :root {
-      color-scheme: light;
-      color: #111111;
-      background: #f4f4f2;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.7;
-      text-rendering: optimizeLegibility;
-      font-variant-east-asian: full-width;
+      --color-base: #F7F9F8;
+      --color-ink: #0F1413;
+      --color-accent: #3DBF9A;
+      --color-surface-raised: #FFFFFF;
+      --color-muted: #6B7572;
+      --color-border: #E2E8E5;
+      --color-danger: #D64545;
+      --color-success: #1E9E6A;
+
+      --font-display: 'Anton', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --space-2xl: 3rem;
+      --space-3xl: 4rem;
+
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-pill: 9999px;
+      --container-max: 940px;
     }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      font-size: 16px;
+      scroll-behavior: smooth;
+      scroll-padding-top: 5rem;
+      -webkit-text-size-adjust: 100%;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
     body {
-      margin: 0;
-      padding: 0;
-      min-height: 100vh;
-      background: #f4f4f2;
-      color: #111;
+      background: var(--color-base);
+      color: var(--color-ink);
+      font-family: var(--font-body);
+      line-height: 1.65;
     }
-    .page {
-      max-width: 920px;
+
+    .container {
+      max-width: var(--container-max);
       margin: 0 auto;
-      padding: 2rem 1.25rem 4rem;
+      padding: 0 var(--space-lg);
     }
-    a { color: #0b6af2; text-decoration: none; }
-    a:hover, a:focus-visible { text-decoration: underline; }
-    h1, h2, h3, h4, h5, h6 { margin-top: 2.25rem; margin-bottom: 1rem; line-height: 1.15; }
-    h1 { font-size: clamp(2rem, 3vw, 3rem); }
-    h2 { font-size: clamp(1.5rem, 2.6vw, 2.2rem); }
-    p { margin-bottom: 1.25rem; }
-    ul, ol { margin: 0 0 1.25rem 1.5rem; }
-    li { margin-bottom: 0.75rem; }
-    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #e8e7e5; padding: 0.2rem 0.35rem; border-radius: 4px; }
-    pre {
-      overflow: auto;
-      padding: 1rem;
-      background: #1d1f21;
-      color: #f8f8f2;
-      border-radius: 0.75rem;
-      margin: 1rem 0;
+
+    a { color: inherit; }
+
+    p { margin-bottom: var(--space-md); }
+    p:last-child { margin-bottom: 0; }
+
+    strong { font-weight: 600; }
+
+    /* --- Barcode strip motif --- */
+    .barcode {
+      height: 8px;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--color-ink) 0 3px,
+        transparent 3px 6px,
+        var(--color-ink) 6px 8px,
+        transparent 8px 14px
+      );
     }
-    pre code { color: inherit; background: transparent; padding: 0; }
-    blockquote {
-      margin: 1.5rem 0;
-      padding-left: 1rem;
-      border-left: 4px solid #0b6af2;
-      color: #333;
+
+    /* --- Masthead --- */
+    .masthead {
+      background: var(--color-ink);
+      color: var(--color-base);
+      padding: var(--space-3xl) 0 var(--space-2xl);
     }
-    .hero {
-      padding: 3rem 0 1.5rem;
-      border-bottom: 1px solid rgba(17, 17, 17, 0.08);
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      margin-bottom: var(--space-md);
     }
-    .hero p { max-width: 68ch; margin-top: 1rem; font-size: 1.05rem; color: #3e444a; }
-    .hero .meta { margin-top: 0.75rem; font-size: 0.95rem; color: #5c6369; }
+
+    .wordmark {
+      font-family: var(--font-display);
+      font-size: clamp(2.5rem, 8vw, 4rem);
+      line-height: 1;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .wordmark span { color: var(--color-accent); }
+
+    .masthead h2 {
+      font-family: var(--font-display);
+      font-weight: 400;
+      font-size: clamp(1.25rem, 3.5vw, 1.75rem);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      margin-top: var(--space-sm);
+      color: #E8ECEA;
+    }
+
+    .tagline {
+      margin-top: var(--space-lg);
+      max-width: 56ch;
+      font-size: 1.0625rem;
+      color: #E8ECEA;
+    }
+
+    .stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      margin-top: var(--space-xl);
+      list-style: none;
+    }
+
+    .stack li {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.3rem 0.7rem;
+      border: 1px solid #2E3835;
+      border-radius: var(--radius-pill);
+      color: #E8ECEA;
+    }
+
+    /* --- Sticky section nav --- */
+    .tocbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(247, 249, 248, 0.94);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .tocbar nav {
+      display: flex;
+      flex-wrap: wrap;
+      column-gap: var(--space-md);
+      row-gap: 0.15rem;
+      padding: var(--space-sm) var(--space-lg);
+      max-width: var(--container-max);
+      margin: 0 auto;
+    }
+
+    .tocbar a {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      text-decoration: none;
+      color: var(--color-muted);
+      padding: var(--space-xs) 0;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tocbar a:hover { color: var(--color-ink); border-bottom-color: var(--color-accent); }
+
+    @media (max-width: 767px) {
+      .tocbar {
+        position: static;
+        backdrop-filter: none;
+        background: var(--color-base);
+      }
+
+      .tocbar nav {
+        column-gap: var(--space-xs);
+        row-gap: var(--space-xs);
+        padding: var(--space-sm) var(--space-lg) var(--space-md);
+      }
+
+      .tocbar a {
+        padding: 0.3rem 0.55rem;
+        border-radius: var(--radius-pill);
+        background: var(--color-surface-raised);
+        border: 1px solid var(--color-border);
+        border-bottom-width: 1px;
+      }
+
+      html { scroll-padding-top: 1rem; }
+    }
+
+    /* --- Sections --- */
+    main { padding-top: var(--space-2xl); }
+    section { margin-bottom: var(--space-3xl); }
+
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-md);
+      margin-bottom: var(--space-md);
+      padding-bottom: var(--space-sm);
+      border-bottom: 2px solid var(--color-ink);
+    }
+
+    .step-num {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: var(--color-ink);
+      background: var(--color-accent);
+      padding: 0.2rem 0.55rem;
+      border-radius: var(--radius-sm);
+      white-space: nowrap;
+    }
+
+    h2.section-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.35rem, 4vw, 1.75rem);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      font-weight: 400;
+    }
+
+    h3 {
+      font-size: 1.0625rem;
+      font-weight: 600;
+      margin: var(--space-xl) 0 var(--space-sm);
+    }
+
+    /* --- Callouts --- */
+    .note {
+      border-left: 4px solid var(--color-ink);
+      background: var(--color-surface-raised);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      padding: var(--space-md) var(--space-lg);
+      margin: var(--space-lg) 0;
+      font-size: 0.9375rem;
+    }
+
+    .note--tip     { border-left-color: var(--color-success); }
+    .note--warn    { border-left-color: var(--color-danger); }
+    .note--accent  { border-left-color: var(--color-accent); }
+
+    .note__label {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: var(--space-xs);
+    }
+
+    /* --- Code blocks --- */
+    .code {
+      position: relative;
+      margin: var(--space-md) 0;
+    }
+
+    .code pre {
+      background: var(--color-ink);
+      color: #E8ECEA;
+      border-radius: var(--radius-md);
+      padding: var(--space-lg);
+      padding-right: 5.5rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      line-height: 1.75;
+      tab-size: 2;
+    }
+
+    .code .c  { color: #9AA5A1; }   /* comment */
+    .code .p  { color: var(--color-accent); }  /* prompt / highlight */
+    .code .o  { color: #4A90D9; }   /* output */
+
+    code:not(pre code) {
+      font-family: var(--font-mono);
+      font-size: 0.875em;
+      background: #E9EEEB;
+      padding: 0.1em 0.35em;
+      border-radius: var(--radius-sm);
+      word-break: break-word;
+    }
+
+    /* --- OS switcher (pure CSS) --- */
+    .osroot > input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .ostabs {
+      z-index: 15;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+      background: var(--color-base);
+      padding: var(--space-md) 0;
+      margin-bottom: var(--space-md);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .ostabs span {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      align-self: center;
+      margin-right: var(--space-sm);
+    }
+
+    .ostabs label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 0.4rem 0.9rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-pill);
+      background: var(--color-surface-raised);
+      cursor: pointer;
+      transition: all 150ms ease;
+      user-select: none;
+    }
+
+    .ostabs label:hover { border-color: var(--color-ink); }
+
+    .only-win, .only-mac, .only-linux { display: none; }
+
+    #os-win:checked   ~ * .only-win,
+    #os-mac:checked   ~ * .only-mac,
+    #os-linux:checked ~ * .only-linux { display: block; }
+
+    .only-win-i, .only-mac-i, .only-linux-i { display: none; }
+
+    #os-win:checked   ~ * .only-win-i,
+    #os-mac:checked   ~ * .only-mac-i,
+    #os-linux:checked ~ * .only-linux-i { display: inline; }
+
+    #os-win:checked   ~ .ostabs label[for="os-win"],
+    #os-mac:checked   ~ .ostabs label[for="os-mac"],
+    #os-linux:checked ~ .ostabs label[for="os-linux"] {
+      background: var(--color-ink);
+      color: var(--color-base);
+      border-color: var(--color-ink);
+    }
+
+    .osroot > input[type="radio"]:focus-visible ~ .ostabs label { outline: 2px dashed var(--color-muted); outline-offset: 2px; }
+
+    /* --- Doc cards --- */
+    .docs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: var(--space-md);
+      list-style: none;
+    }
+
+    .doc {
+      display: block;
+      background: var(--color-surface-raised);
+      border: 2px dashed var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-lg);
+      text-decoration: none;
+      transition: border-color 150ms ease, transform 150ms ease;
+    }
+
+    .doc:hover, .doc:focus-visible { border-color: var(--color-ink); transform: translateY(-2px); }
+
+    .doc__label {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: var(--space-sm);
+    }
+
+    .doc__title { font-weight: 600; font-size: 1.0625rem; margin-bottom: 0.35rem; }
+    .doc__desc  { font-size: 0.875rem; color: var(--color-muted); line-height: 1.5; }
+
+    /* --- Footer --- */
+    footer {
+      border-top: 1px solid var(--color-border);
+      padding: var(--space-xl) 0 var(--space-2xl);
+      font-size: 0.875rem;
+      color: var(--color-muted);
+    }
+
+    footer a { color: var(--color-ink); text-decoration-color: var(--color-border); text-underline-offset: 3px; }
+    footer a:hover { text-decoration-color: var(--color-ink); }
+
+    :focus-visible { outline: 3px solid var(--color-accent); outline-offset: 2px; }
+
     @media (max-width: 640px) {
-      .page { padding: 1.5rem 1rem 2.5rem; }
+      .section-head { flex-direction: column; gap: var(--space-xs); }
     }
   </style>
 </head>
 <body>
-  <main class="page">
-    <div class="hero">
-      <h1>MoneyMap Finance Tracker</h1>
-      <p>An Android-first, offline-first personal finance tracker for students, built with React Native and Expo.</p>
-      <p class="meta">Static project documentation generated from README.md.</p>
+
+  <header class="masthead">
+    <div class="container">
+      <p class="eyebrow">Local Setup &amp; Testing Guide</p>
+      <h1 class="wordmark">Money<span>Map</span></h1>
+      <h2>Run the project on your own machine</h2>
+      <p class="tagline">
+        MoneyMap is an offline-first, hybrid finance tracking app for students. This guide takes you from a completely fresh computer to a working React Native application running locally on your Android emulator.
+      </p>
+      <ul class="stack">
+        <li>React Native</li>
+        <li>Expo</li>
+        <li>SQLCipher</li>
+        <li>NativeWind</li>
+        <li>Zustand</li>
+      </ul>
+      <p class="tagline" style="font-size:0.875rem;">
+        Last verified against the core architecture: Android build setup, UI tokens, SQLite databases, and basic component fidelity.
+      </p>
     </div>
-    <h2>Current milestone</h2>
-<p>
-Tasks 1 and 2 of the project plan are complete. MoneyMap has the strict Expo development-build shell plus an encrypted SQLCipher database, deterministic OpenSSL runtime packaging, atomic migration, idempotent first-launch seed, strict domain models, and typed CRUD repositories for accounts, categories, transactions, budgets, and recurring rules.
-</p>
-<p>
-The approved Figma UI has also been reproduced as a fixture-driven visual integration layer: dashboard, transaction entry, history and empty history, budgets, settings, dark dashboard, app lock, recurring reminders, and Smart Tips. This does <strong>not</strong> mark later functional tasks complete—database writes, persistent settings, notifications, biometrics, imports, and Smart Tips networking remain governed by the strict dependency order. See <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/ui-fidelity-implementation.md">the UI fidelity implementation record</a> and <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/local-environment-audit.md">local environment audit</a>.
-</p>
-<p>
-Task 3 remains the next functional milestone: repository change subscriptions and persistent Zustand-backed settings, followed by feature-by-feature replacement of visual fixtures.
-</p>
-<h2>Quick start</h2>
-<ol>
-<li>Install Node.js 22 LTS, JDK 21, and the Android SDK with an API 35 Google APIs x86_64 image.</li>
-<li>Open the repository in Visual Studio Code and accept the recommended <strong>React Native Tools</strong> extension.</li>
-<li>Run <code>npm install</code>, <code>npm run typecheck</code>, and <code>npm test</code>.</li>
-<li>Press <code>Ctrl+Shift+B</code> or choose <strong>Terminal → Run Build Task → MoneyMap: Run on Android emulator</strong>.</li>
-<li>The task opens the official Google Android Emulator, starts Metro, builds and installs the dev client, and opens MoneyMap. It never selects BlueStacks.</li>
-<li>On the development client&#39;s first launch only, select <strong>Continue</strong>, then close the developer menu to reveal the Dashboard.</li>
-<li>Replace the placeholder EAS project ID in <code>app.json</code> after running <code>eas init</code>.</li>
-</ol>
-<p>
-Use <strong>MoneyMap: Quick launch installed build</strong> after JavaScript-only changes, <strong>MoneyMap: Android environment status</strong> for diagnostics, and <strong>MoneyMap: Stop Android emulator</strong> for a graceful shutdown. The emulator display is a native window beside VS Code; tasks and the Hermes debugger are integrated into the editor. Expo Go is not supported because SQLCipher is native.
-</p>
-<p>
-See <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/Tech%20Stack%20Setup%20Guide.md">Tech Stack Setup Guide.md</a> for full platform-specific instructions.
-</p>
+  </header>
+
+  <div class="tocbar">
+    <nav>
+      <a href="#overview">Overview</a>
+      <a href="#prerequisites">Prerequisites</a>
+      <a href="#install">Install</a>
+      <a href="#run">Run</a>
+      <a href="#docs">Documentation</a>
+    </nav>
+  </div>
+
+  <main class="container">
+    <div class="osroot">
+      <input type="radio" name="os" id="os-win" checked>
+      <input type="radio" name="os" id="os-mac">
+      <input type="radio" name="os" id="os-linux">
+
+      <div class="ostabs">
+        <span>Select your OS:</span>
+        <label for="os-win">Windows</label>
+        <label for="os-mac">macOS</label>
+        <label for="os-linux">Linux</label>
+      </div>
+
+      <section id="overview">
+        <div class="section-head">
+          <span class="step-num">01</span>
+          <h2 class="section-title">Overview</h2>
+        </div>
+        <p>
+          MoneyMap Finance Tracker is an Android-first personal finance tracker. It leverages React Native and Expo for its UI layer, and uses a local encrypted SQLCipher database for offline-first data storage.
+        </p>
+        <div class="note note--accent">
+          <span class="note__label">Status</span>
+          Tasks 1 and 2 of the project plan are complete. The app features the strict Expo development-build shell, an encrypted SQLCipher database, atomic migrations, strict domain models, and the complete Figma UI replicated with high fidelity.
+        </div>
+      </section>
+
+      <section id="prerequisites">
+        <div class="section-head">
+          <span class="step-num">02</span>
+          <h2 class="section-title">Prerequisites</h2>
+        </div>
+        <p>
+          Before attempting to run this project, ensure you have the following installed on your <span class="only-win-i">Windows</span><span class="only-mac-i">Mac</span><span class="only-linux-i">Linux</span> machine:
+        </p>
+        <ul class="checks">
+          <li><strong>Node.js 22 LTS</strong></li>
+          <li><strong>JDK 21</strong></li>
+          <li><strong>Android SDK</strong> with an API 34+ Google APIs x86_64 image</li>
+        </ul>
+        <p>
+          If you plan to develop, we recommend opening the repository in <strong>Visual Studio Code</strong> and accepting the recommended <strong>React Native Tools</strong> extension.
+        </p>
+      </section>
+
+      <section id="install">
+        <div class="section-head">
+          <span class="step-num">03</span>
+          <h2 class="section-title">Installation</h2>
+        </div>
+        <p>Clone the repository and install all Node dependencies.</p>
+        <div class="code">
+          <pre><code><span class="c"># Clone the repository</span>
+<span class="p">git clone https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App.git</span>
+<span class="p">cd TIP_MoneyMap-Finance-Tracker-App</span>
+
+<span class="c"># Install dependencies</span>
+<span class="p">npm install</span></code></pre>
+        </div>
+      </section>
+
+      <section id="run">
+        <div class="section-head">
+          <span class="step-num">04</span>
+          <h2 class="section-title">Run Locally</h2>
+        </div>
+        <p>
+          Because MoneyMap relies on native modules (specifically <code>@op-engineering/op-sqlite</code>), it <strong>cannot</strong> be run using Expo Go. You must compile it natively for Android.
+        </p>
+        <p>
+          <span class="only-win">Open your Android emulator via Android Studio Device Manager, then run:</span>
+          <span class="only-mac">Open your Android emulator via Android Studio Device Manager (or run `emulator -avd [name]`), then run:</span>
+          <span class="only-linux">Open your Android emulator via Android Studio Device Manager, then run:</span>
+        </p>
+        <div class="code">
+          <pre><code><span class="c"># Start the native build process</span>
+<span class="p">npm run android</span></code></pre>
+        </div>
+        <div class="note note--tip">
+          <span class="note__label">Debugging Emulator Issues</span>
+          If you encounter an ADB connection error on Windows (e.g. <code>Error: could not connect to TCP port 5554</code>), you can restart the ADB server by running <code>adb kill-server</code> before attempting the build again.
+        </div>
+      </section>
+
+      <section id="docs">
+        <div class="section-head">
+          <span class="step-num">05</span>
+          <h2 class="section-title">Documentation</h2>
+        </div>
+        <p>Review the team documentation below for architectural decisions, UI records, and environment setups.</p>
+        <ul class="docs">
+          <li>
+            <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/ui-fidelity-implementation.md" class="doc">
+              <span class="doc__label">Record</span>
+              <div class="doc__title">UI Fidelity Implementation</div>
+              <div class="doc__desc">Detailed record of the UI implementation mirroring the Figma spec.</div>
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/local-environment-audit.md" class="doc">
+              <span class="doc__label">Audit</span>
+              <div class="doc__title">Local Environment Audit</div>
+              <div class="doc__desc">Checks and balances for local setup and configuration.</div>
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/Tech%20Stack%20Setup%20Guide.md" class="doc">
+              <span class="doc__label">Guide</span>
+              <div class="doc__title">Tech Stack Setup Guide</div>
+              <div class="doc__desc">Platform-specific installation instructions for macOS, Windows, and Linux.</div>
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/task-02-database-plan.md" class="doc">
+              <span class="doc__label">Plan</span>
+              <div class="doc__title">Task 02 Database Plan</div>
+              <div class="doc__desc">Schema and repository planning for the offline SQLite implementation.</div>
+            </a>
+          </li>
+        </ul>
+      </section>
+
+    </div>
   </main>
+  
+  <footer class="container">
+    <p>
+      &copy; 2026 MoneyMap Team. <br>
+      This project relies on <a href="https://reactnative.dev/">React Native</a>, <a href="https://expo.dev/">Expo</a>, and <a href="https://github.com/op-engineering/op-sqlite">op-sqlite</a>.
+    </p>
+  </footer>
+
 </body>
 </html>
