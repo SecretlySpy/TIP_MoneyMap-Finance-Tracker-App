@@ -1,9 +1,15 @@
 import { AppState } from "react-native";
 import { create } from "zustand";
 import { clearPin, hasStoredPin, setPin, tryLocalAuthentication, verifyPin, } from "../services/appLock";
+import { getReminderPermissionStatus, syncBillReminderNotifications, } from "../services/notificationScheduler";
 import { DEFAULT_PREFERENCES, loadPreferences, savePreferences, } from "../services/preferences";
 let preferencesPromise = null;
 let appStateSubscriptionAttached = false;
+/** Optional finance snapshot supplier registered by financeStore to avoid a circular import. */
+let financeSnapshotProvider = null;
+export function registerFinanceSnapshotProvider(provider) {
+    financeSnapshotProvider = provider;
+}
 function preferencesFromState(state) {
     return {
         appLockEnabled: state.appLockEnabled,
@@ -16,11 +22,35 @@ function preferencesFromState(state) {
 async function persist(state) {
     await savePreferences(preferencesFromState(state));
 }
+/**
+ * Rebuild OS local notifications from the current finance + preference snapshot.
+ * @param {{ requestPermissionIfNeeded?: boolean }} [options]
+ */
+export async function syncRemindersFromStores(options = {}) {
+    const ui = useUiStore.getState();
+    const snapshot = financeSnapshotProvider ? financeSnapshotProvider() : null;
+    const rules = snapshot?.recurringRules ?? [];
+    const categoriesById = new Map((snapshot?.categories ?? []).map((category) => [category.id, category]));
+    const result = await syncBillReminderNotifications({
+        rules,
+        categoriesById,
+        remindersEnabled: ui.remindersEnabled,
+        currencySymbol: ui.currencySymbol,
+        requestPermissionIfNeeded: options.requestPermissionIfNeeded === true,
+    });
+    useUiStore.setState({
+        notificationPermissionDenied: result.permissionDenied,
+        notificationHint: result.errorMessage,
+    });
+    return result;
+}
 export const useUiStore = create((set, get) => ({
     ...DEFAULT_PREFERENCES,
     hasPin: false,
     isLocked: false,
     preferencesReady: false,
+    notificationPermissionDenied: false,
+    notificationHint: null,
     ensurePreferencesLoaded: async () => {
         if (get().preferencesReady) {
             return;
@@ -38,6 +68,17 @@ export const useUiStore = create((set, get) => ({
                 isLocked: preferences.appLockEnabled && pinExists,
                 preferencesReady: true,
             });
+            if (preferences.remindersEnabled) {
+                const permission = await getReminderPermissionStatus();
+                set({
+                    notificationPermissionDenied: !permission.granted && permission.status !== "undetermined",
+                    notificationHint: !permission.granted && permission.status !== "undetermined"
+                        ? "Notification permission is off. Enable it in system settings to get bill alerts."
+                        : null,
+                });
+                // Cold start: schedule if already permitted; never prompt here.
+                void syncRemindersFromStores({ requestPermissionIfNeeded: false });
+            }
             if (!appStateSubscriptionAttached) {
                 appStateSubscriptionAttached = true;
                 // Lock only on true backgrounding. Android "inactive" fires for share sheets and
@@ -77,16 +118,21 @@ export const useUiStore = create((set, get) => ({
         await persist(get());
     },
     setRemindersEnabled: async (enabled) => {
-        set({ remindersEnabled: enabled });
+        set({ remindersEnabled: enabled, notificationHint: null });
         await persist(get());
-    },
-    setSmartTipsEnabled: async (enabled) => {
-        set({ smartTipsEnabled: enabled });
-        await persist(get());
+        // Prompt only when the user turns reminders on — never on cold start.
+        await syncRemindersFromStores({ requestPermissionIfNeeded: enabled });
     },
     setCurrencySymbol: async (symbol) => {
         const next = symbol.trim().slice(0, 4) || "₱";
         set({ currencySymbol: next });
+        await persist(get());
+        if (get().remindersEnabled) {
+            void syncRemindersFromStores({ requestPermissionIfNeeded: false });
+        }
+    },
+    setSmartTipsEnabled: async (enabled) => {
+        set({ smartTipsEnabled: enabled });
         await persist(get());
     },
     setThemePreference: async (theme) => {

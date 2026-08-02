@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { initializeDatabase } from "../db/client";
 import { AccountRepository, BudgetRepository, CategoryRepository, RecurringRepository, TransactionRepository, } from "../db/repositories";
 import { accountChipLabel, toMonthYear, } from "../domain/services/financeView";
+import { runRecurringCatchUp } from "../services/recurringCatchUp";
+import { registerFinanceSnapshotProvider, syncRemindersFromStores } from "./uiStore";
 const DEFAULT_ACCOUNTS = [
     { name: "Cash", type: "CASH" },
     { name: "Card", type: "CARD" },
@@ -110,6 +112,8 @@ export const useFinanceStore = create((set, get) => ({
             try {
                 const database = await initializeDatabase();
                 databaseRef = database;
+                // Post any due recurring rules before the first UI snapshot (idempotent).
+                await runRecurringCatchUp(database);
                 const snapshot = await loadSnapshot(database);
                 set({
                     ...snapshot,
@@ -117,6 +121,7 @@ export const useFinanceStore = create((set, get) => ({
                     errorMessage: null,
                     revision: get().revision + 1,
                 });
+                void syncRemindersFromStores({ requestPermissionIfNeeded: false });
             }
             catch (error) {
                 const message = error instanceof Error ? error.message : "Failed to load finance data.";
@@ -139,6 +144,7 @@ export const useFinanceStore = create((set, get) => ({
             errorMessage: null,
             revision: get().revision + 1,
         });
+        void syncRemindersFromStores({ requestPermissionIfNeeded: false });
     },
     addTransaction: async (input) => {
         await get().ensureHydrated();
@@ -258,46 +264,115 @@ export const useFinanceStore = create((set, get) => ({
         return updated;
     },
     updateBudgetLimit: async (input) => get().addBudget(input),
-    importCsvRows: async (rows) => {
+    /**
+     * Bulk-insert already-validated import rows inside one transaction.
+     * Auto-creates missing categories and account types. Returns a summary object
+     * (or a number for older callers that only read the created count).
+     * @param {Array<{ dateEpochMillis: number, type: string, amountMinor: number, categoryName: string, accountType: string, note: string|null }>} rows
+     * @param {{ skipped?: Array<{ rowNumber: number, reason: string }> }} [meta]
+     */
+    importCsvRows: async (rows, meta = {}) => {
         await get().ensureHydrated();
         const database = databaseRef;
         if (database === null) {
             throw new Error("Database is not ready.");
         }
+        const skipped = Array.isArray(meta.skipped) ? meta.skipped : [];
         if (rows.length === 0) {
-            return 0;
+            return { created: 0, skipped: skipped.length, skippedRows: skipped };
         }
-        const categoryRepo = new CategoryRepository(database);
-        const transactionRepo = new TransactionRepository(database);
-        let createdCount = 0;
-        for (const row of rows) {
-            let category = get().categories.find((item) => item.name.toLowerCase() === row.categoryName.toLowerCase() && item.type === row.type);
-            if (category === undefined) {
-                category = await categoryRepo.create({
-                    name: row.categoryName,
-                    icon: "pricetag",
-                    colorHex: row.type === "INCOME" ? "#15803D" : "#64748B",
-                    type: row.type,
-                    isCustom: true,
-                });
-                set({
-                    categories: [...get().categories, category],
-                });
+
+        const accountDefaults = {
+            CASH: "Cash",
+            CARD: "Card",
+            EWALLET: "E-wallet",
+        };
+
+        await database.transaction(async (tx) => {
+            const categoryCache = new Map(
+                get().categories.map((category) => [`${category.type}:${category.name.toLowerCase()}`, category]),
+            );
+            const accountCache = new Map(
+                get().accounts.filter((account) => !account.isArchived).map((account) => [account.type, account]),
+            );
+
+            const insertReturningId = async (statement, parameters) => {
+                const result = await tx.execute(statement, parameters);
+                if (result.insertId !== undefined && Number.isSafeInteger(result.insertId) && result.insertId > 0) {
+                    return result.insertId;
+                }
+                const idResult = await tx.execute("SELECT last_insert_rowid() AS id");
+                const id = Number(idResult.rows[0]?.id);
+                if (!Number.isSafeInteger(id) || id <= 0) {
+                    throw new Error("Import could not read inserted row ids.");
+                }
+                return id;
+            };
+
+            for (const row of rows) {
+                const categoryKey = `${row.type}:${row.categoryName.toLowerCase()}`;
+                let category = categoryCache.get(categoryKey);
+                if (category === undefined) {
+                    const categoryId = await insertReturningId(
+                        `INSERT INTO categories (name, icon, color_hex, type, is_custom)
+             VALUES (?, ?, ?, ?, ?)`,
+                        [
+                            row.categoryName,
+                            "pricetag",
+                            row.type === "INCOME" ? "#15803D" : "#64748B",
+                            row.type,
+                            1,
+                        ],
+                    );
+                    category = {
+                        id: categoryId,
+                        name: row.categoryName,
+                        icon: "pricetag",
+                        colorHex: row.type === "INCOME" ? "#15803D" : "#64748B",
+                        type: row.type,
+                        isCustom: true,
+                    };
+                    categoryCache.set(categoryKey, category);
+                }
+
+                let account = accountCache.get(row.accountType);
+                if (account === undefined) {
+                    const accountId = await insertReturningId(
+                        `INSERT INTO accounts (name, type, starting_balance_minor, is_archived)
+             VALUES (?, ?, ?, 0)`,
+                        [accountDefaults[row.accountType] ?? row.accountType, row.accountType, 0],
+                    );
+                    account = {
+                        id: accountId,
+                        name: accountDefaults[row.accountType] ?? row.accountType,
+                        type: row.accountType,
+                        startingBalanceMinor: 0,
+                        isArchived: false,
+                    };
+                    accountCache.set(row.accountType, account);
+                }
+
+                await tx.execute(
+                    `INSERT INTO transactions (
+              amount_minor, type, category_id, account_id, date_epoch_millis, note, recurring_rule_id
+            ) VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+                    [
+                        row.amountMinor,
+                        row.type,
+                        category.id,
+                        account.id,
+                        row.dateEpochMillis,
+                        row.note,
+                    ],
+                );
             }
-            const account = findAccount(get().accounts, row.accountType);
-            await transactionRepo.create({
-                amountMinor: row.amountMinor,
-                type: row.type,
-                categoryId: category.id,
-                accountId: account.id,
-                dateEpochMillis: row.dateEpochMillis,
-                note: row.note,
-                recurringRuleId: null,
-            });
-            createdCount += 1;
-        }
+        });
+
         await get().refresh();
-        return createdCount;
+        const summary = { created: rows.length, skipped: skipped.length, skippedRows: skipped };
+        // Number-like for callers that only display the created count.
+        summary.valueOf = () => rows.length;
+        return summary;
     },
     restoreBackup: async (backup) => {
         await get().ensureHydrated();
@@ -439,3 +514,10 @@ export function mapsFromState(state) {
         categoriesById: new Map(state.categories.map((category) => [category.id, category])),
     };
 }
+registerFinanceSnapshotProvider(() => {
+    const state = useFinanceStore.getState();
+    return {
+        recurringRules: state.recurringRules,
+        categories: state.categories,
+    };
+});

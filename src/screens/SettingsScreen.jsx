@@ -44,6 +44,8 @@ export function SettingsScreen({ navigation }) {
     const theme = useTheme(themePreference);
     const appLockEnabled = useUiStore((state) => state.appLockEnabled);
     const remindersEnabled = useUiStore((state) => state.remindersEnabled);
+    const notificationPermissionDenied = useUiStore((state) => state.notificationPermissionDenied);
+    const notificationHint = useUiStore((state) => state.notificationHint);
     const smartTipsEnabled = useUiStore((state) => state.smartTipsEnabled);
     const currencySymbol = useUiStore((state) => state.currencySymbol);
     const hasPin = useUiStore((state) => state.hasPin);
@@ -126,7 +128,7 @@ export function SettingsScreen({ navigation }) {
         <SettingsRow emoji="📤" label="Export as CSV" onPress={() => void handleExportCsv()} trailing={trailingText("›")}/>
         <SettingsRow emoji="💾" label="Backup data" onPress={() => void handleBackup()} trailing={trailingText("›")}/>
         <SettingsRow emoji="♻️" label="Restore from backup" onPress={() => navigation.navigate("PasteImport", { mode: "backup" })} trailing={trailingText("›")}/>
-        <SettingsRow emoji="📥" label={"Import data (CSV/\nExcel)"} onPress={() => navigation.navigate("Import")} trailing={trailingText("›")}/>
+        <SettingsRow emoji="📥" label={"Import data\n(CSV / Excel)"} onPress={() => navigation.navigate("Import")} trailing={trailingText("›")}/>
       </SettingsSection>
 
       <SettingsSection title="PREFERENCES">
@@ -145,6 +147,11 @@ export function SettingsScreen({ navigation }) {
             tabNavigation?.navigate("Home", { screen: "SmartTips" });
         }} trailing={<Toggle enabled={smartTipsEnabled} label="Budget-based tips" onChange={(enabled) => void setSmartTipsEnabled(enabled)}/>}/>
         <SettingsRow emoji="🔔" label={"Recurring bill\nreminders"} onPress={() => tabNavigation?.navigate("Budgets", { screen: "Recurring" })} trailing={<Toggle enabled={remindersEnabled} label="Recurring bill reminders" onChange={(enabled) => void setRemindersEnabled(enabled)}/>}/>
+        {remindersEnabled && (notificationPermissionDenied || notificationHint) ? (
+          <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small, marginTop: theme.spacing.sm }}>
+            {notificationHint ?? "Notification permission is off. Bill alerts stay in-app only until you allow notifications."}
+          </Text>
+        ) : null}
       </SettingsSection>
 
       <View accessible accessibilityRole="summary" style={{

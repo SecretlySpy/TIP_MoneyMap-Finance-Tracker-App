@@ -16,6 +16,8 @@ export function RecurringScreen({ navigation }) {
     const theme = useTheme(useUiStore((state) => state.themePreference));
     const currencySymbol = useUiStore((state) => state.currencySymbol);
     const remindersEnabled = useUiStore((state) => state.remindersEnabled);
+    const notificationPermissionDenied = useUiStore((state) => state.notificationPermissionDenied);
+    const notificationHint = useUiStore((state) => state.notificationHint);
     const categories = useFinanceStore((state) => state.categories);
     const recurringRules = useFinanceStore((state) => state.recurringRules);
     const addRecurringBill = useFinanceStore((state) => state.addRecurringBill);
@@ -72,7 +74,9 @@ export function RecurringScreen({ navigation }) {
       </View>
 
       {!remindersEnabled ? (<Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
-          In-app reminders are off. Enable them in Settings to surface upcoming bills on the Dashboard.
+          Bill reminders are off. Enable them in Settings to schedule local notifications and surface upcoming bills on the Dashboard.
+        </Text>) : notificationPermissionDenied || notificationHint ? (<Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
+          {notificationHint ?? "Notification permission denied. Upcoming bills still show in the app; OS alerts stay off until you allow notifications."}
         </Text>) : null}
 
       {reminder !== null && remindersEnabled ? (<View accessible accessibilityRole="summary" style={{

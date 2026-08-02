@@ -4,7 +4,10 @@ An Android-first, offline-first personal finance tracker for students, built wit
 
 ## Current milestone
 
-Tasks 1 and 2 of the project plan are complete. MoneyMap has the strict Expo development-build shell plus an encrypted SQLCipher database, deterministic OpenSSL runtime packaging, atomic migration, idempotent first-launch seed, strict domain models, and typed CRUD repositories for accounts, categories, transactions, budgets, and recurring rules.
+Tasks 1–9 and 12 are complete, plus partial work on later milestones. MoneyMap has the Expo development-build shell, encrypted SQLCipher database, repositories, live screens on real data, CSV export/backup/import, and PIN app lock. **Task 14 (biometrics)** is complete: `expo-local-authentication` is installed, wired through `appLock.js` / `AppLockScreen`, and gated by `appLockEnabled` + stored PIN (biometric failure falls back to PIN).
+**Task 10 (recurring catch-up)** is complete: pure planner + `runRecurringCatchUp` posts due rules exactly once per period (multi-period and month-boundary safe), runs on app open after DB init, and registers an `expo-background-task` worker.
+**Task 11 (bill reminders)** is complete: local `expo-notifications` schedules per active rule (lead days before `nextRun`), resyncs on toggle/CRUD/catch-up, prompts for `POST_NOTIFICATIONS` only when enabling reminders, deep-links taps to Recurring, and degrades gracefully when permission is denied.
+**Task 13 (Excel import)** is complete: CSV and `.xlsx` share one grid → column-map → validate → transactional bulk-insert pipeline; bad rows are skipped and reported; missing categories/accounts are auto-created.
 
 The approved Figma UI has also been reproduced as a fixture-driven visual integration layer: dashboard, transaction entry, history and empty history, budgets, settings, dark dashboard, app lock, recurring reminders, and Smart Tips. This does **not** mark later functional tasks complete—database writes, persistent settings, notifications, biometrics, imports, and Smart Tips networking remain governed by the strict dependency order. See [the UI fidelity implementation record](./docs/ui-fidelity-implementation.md) and [local environment audit](./docs/local-environment-audit.md).
 

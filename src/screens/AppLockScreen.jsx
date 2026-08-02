@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { ScreenContainer } from "../components/ScreenContainer";
-import { isValidPin } from "../services/appLock";
+import { canUseBiometrics, isValidPin } from "../services/appLock";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 const lockKeypad = [
@@ -11,7 +11,7 @@ const lockKeypad = [
     ["7", "8", "9"],
     ["👆", "0", "⌫"],
 ];
-// PIN setup/unlock with optional biometric affordance when the native module is present.
+// PIN setup/unlock with optional biometric affordance when hardware is enrolled.
 export function AppLockScreen({ navigation }) {
     const theme = useTheme(useUiStore((state) => state.themePreference));
     const hasPin = useUiStore((state) => state.hasPin);
@@ -26,11 +26,31 @@ export function AppLockScreen({ navigation }) {
     const [pendingPin, setPendingPin] = useState("");
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
+    const [biometricsAvailable, setBiometricsAvailable] = useState(false);
+    const autoBiometricAttempted = useRef(false);
+    const busyRef = useRef(false);
+    const setBusySafe = (value) => {
+        busyRef.current = value;
+        setBusy(value);
+    };
     useEffect(() => {
         setMode(hasPin ? "unlock" : "create");
         setPin("");
         setPendingPin("");
         setError(null);
+        autoBiometricAttempted.current = false;
+    }, [hasPin]);
+    useEffect(() => {
+        let cancelled = false;
+        void (async () => {
+            const available = hasPin ? await canUseBiometrics() : false;
+            if (!cancelled) {
+                setBiometricsAvailable(available);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
     }, [hasPin]);
     const title = mode === "create" ? "Create a 4-digit PIN" : mode === "confirm" ? "Confirm your PIN" : "Enter your PIN to unlock";
     const canLeaveWithoutUnlock = !isLocked || !appLockEnabled || !hasPin;
@@ -41,33 +61,46 @@ export function AppLockScreen({ navigation }) {
             navigation.goBack();
         }
     };
-    const handleBiometric = async () => {
-        if (busy) {
+    const handleBiometric = useCallback(async ({ silentUnavailable = false } = {}) => {
+        if (busyRef.current) {
             return;
         }
-        setBusy(true);
+        setBusySafe(true);
         setError(null);
         try {
             const result = await unlockWithBiometrics();
             if (result === "success") {
-                finishUnlock();
+                if (navigation.canGoBack()) {
+                    navigation.goBack();
+                }
                 return;
             }
             if (result === "unavailable") {
-                setError("Biometrics are unavailable. Enter your PIN.");
+                setBiometricsAvailable(false);
+                if (!silentUnavailable) {
+                    setError("Biometrics are unavailable. Enter your PIN.");
+                }
                 return;
             }
             setError("Biometric unlock failed. Try your PIN.");
         }
         finally {
-            setBusy(false);
+            setBusySafe(false);
         }
-    };
-    const handleCompletePin = async (nextPin) => {
-        if (busy) {
+    }, [navigation, unlockWithBiometrics]);
+    // Cold-start / re-lock: offer biometrics once when unlock is required and hardware is ready.
+    useEffect(() => {
+        if (mode !== "unlock" || !hasPin || !isLocked || !biometricsAvailable || autoBiometricAttempted.current) {
             return;
         }
-        setBusy(true);
+        autoBiometricAttempted.current = true;
+        void handleBiometric({ silentUnavailable: true });
+    }, [biometricsAvailable, handleBiometric, hasPin, isLocked, mode]);
+    const handleCompletePin = async (nextPin) => {
+        if (busyRef.current) {
+            return;
+        }
+        setBusySafe(true);
         setError(null);
         try {
             if (mode === "create") {
@@ -102,11 +135,11 @@ export function AppLockScreen({ navigation }) {
             setPin("");
         }
         finally {
-            setBusy(false);
+            setBusySafe(false);
         }
     };
     const handleKey = (key) => {
-        if (busy) {
+        if (busyRef.current) {
             return;
         }
         if (key === "⌫") {
@@ -115,7 +148,11 @@ export function AppLockScreen({ navigation }) {
             return;
         }
         if (key === "👆") {
-            void handleBiometric();
+            if (biometricsAvailable) {
+                void handleBiometric();
+            } else {
+                setError("Biometrics are unavailable. Enter your PIN.");
+            }
             return;
         }
         setPin((current) => {
@@ -185,11 +222,11 @@ export function AppLockScreen({ navigation }) {
           </View>))}
       </View>
 
-      {hasPin ? (<Pressable accessibilityRole="button" hitSlop={theme.spacing.md} onPress={() => void handleBiometric()} style={{ marginTop: theme.spacing.xxl }}>
+      {hasPin && biometricsAvailable ? (<Pressable accessibilityRole="button" hitSlop={theme.spacing.md} onPress={() => void handleBiometric()} style={{ marginTop: theme.spacing.xxl }}>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
             Use fingerprint instead
           </Text>
-        </Pressable>) : canLeaveWithoutUnlock ? (<Pressable accessibilityRole="button" hitSlop={theme.spacing.md} onPress={() => {
+        </Pressable>) : !hasPin && canLeaveWithoutUnlock ? (<Pressable accessibilityRole="button" hitSlop={theme.spacing.md} onPress={() => {
                 void setAppLockEnabled(false);
                 navigation.goBack();
             }} style={{ marginTop: theme.spacing.xxl }}>

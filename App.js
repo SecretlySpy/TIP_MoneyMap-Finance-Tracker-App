@@ -9,11 +9,20 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { DatabaseGate } from "./src/components/DatabaseGate";
+import { navigateToRecurringReminders, navigationRef } from "./src/navigation/navigationRef";
 import { RootNavigator } from "./src/navigation/RootNavigator";
+import {
+    configureNotificationHandler,
+    subscribeReminderNotificationResponses,
+} from "./src/services/notificationScheduler";
 import { useUiStore } from "./src/store/uiStore";
+import { defineRecurringCatchUpTask, registerRecurringCatchUpTask } from "./src/tasks/recurringTask";
 import { useTheme } from "./src/theme/tokens";
 // Keep the native launch surface visible until the three bundled Roboto weights are ready.
 void SplashScreen.preventAutoHideAsync();
+// Background catch-up must be defined at module scope before registration.
+defineRecurringCatchUpTask();
+void configureNotificationHandler();
 function MoneyMapApp() {
     const themePreference = useUiStore((state) => state.themePreference);
     const theme = useTheme(themePreference);
@@ -30,8 +39,19 @@ function MoneyMapApp() {
             text: theme.colors.text,
         },
     };
+    useEffect(() => {
+        let remove = null;
+        void subscribeReminderNotificationResponses(() => {
+            navigateToRecurringReminders();
+        }).then((subscription) => {
+            remove = subscription;
+        });
+        return () => {
+            remove?.remove?.();
+        };
+    }, []);
     return (<DatabaseGate>
-      <NavigationContainer theme={navigationTheme}>
+      <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <StatusBar style={theme.mode === "dark" ? "light" : "dark"}/>
         <RootNavigator />
       </NavigationContainer>
@@ -46,6 +66,9 @@ export default function App() {
             void SplashScreen.hideAsync();
         }
     }, [fontError, fontsLoaded]);
+    useEffect(() => {
+        void registerRecurringCatchUpTask();
+    }, []);
     if (!fontsLoaded && fontError === null) {
         return null;
     }

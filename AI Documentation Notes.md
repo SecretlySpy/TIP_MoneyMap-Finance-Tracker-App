@@ -1420,3 +1420,145 @@
 - **Data Analysis Notes**: No `typecheck` script (JS migration). Expo Go unsupported due to native SQLCipher.
 - **Responsive & Accessibility Notes**: Test scripts cover UI fidelity static contracts and component a11y-related cases.
 - **Security Notes**: `allowBackup: false` in app.json; SecureStore holds DB key; release Gemini key via EAS secrets only.
+
+# Module / File: src/services/appLock.js
+## Function: tryLocalAuthentication / canUseBiometrics
+- **Purpose**: Unlock MoneyMap via system biometrics with silent PIN fallback when hardware or enrollment is missing.
+- **Inputs**:
+  - none for canUseBiometrics; authenticateAsync options are fixed inside tryLocalAuthentication.
+- **Outputs**: `canUseBiometrics` → `Promise<boolean>`; `tryLocalAuthentication` → `Promise<"success"|"failed"|"unavailable">`.
+- **Dependencies**: `expo-local-authentication`, `expo-secure-store` (PIN path), `expo-crypto` (PIN hash).
+- **Behavior**: hasHardwareAsync → isEnrolledAsync → authenticateAsync; any throw or missing capability yields unavailable so UI stays on PIN.
+- **Side Effects**: Shows OS biometric prompt when enrolled; never mutates preferences.
+- **DSA Used**: O(1) SecureStore key lookups for PIN path; constant-time string compare of digests.
+- **Data Analysis Notes**: PIN is 4 digits; salt is 16 random bytes hex-encoded.
+- **Responsive & Accessibility Notes**: AppLockScreen offers fingerprint key + "Use fingerprint instead" only when biometricsAvailable.
+- **Security Notes**: disableDeviceFallback true so device PIN does not replace in-app PIN; DB key remains in SecureStore separate from app lock PIN.
+
+# Module / File: src/screens/AppLockScreen.jsx
+## Function: AppLockScreen
+- **Purpose**: PIN create/confirm/unlock UI with one-shot auto biometric prompt on cold lock.
+- **Inputs**:
+  - `navigation` (React Navigation): pop after setup from Settings.
+- **Outputs**: JSX lock surface; unlock clears `isLocked` via uiStore.
+- **Dependencies**: uiStore, canUseBiometrics, appLock PIN helpers, theme tokens.
+- **Behavior**: Auto-prompts biometrics once when locked+enrolled; failures leave PIN pad active; cancel setup disables lock when not gated.
+- **Side Effects**: Calls unlockWithBiometrics / setupPin / setAppLockEnabled.
+- **DSA Used**: Fixed 4-slot PIN buffer; O(1) keypad map.
+- **Data Analysis Notes**: None.
+- **Responsive & Accessibility Notes**: Key labels for fingerprint/delete; PIN digit progress accessibilityLabel.
+- **Security Notes**: Root navigator replaces Main with AppLock when isLocked; AppState background re-locks when enabled.
+
+# Module / File: src/domain/services/recurringCatchUp.js
+## Function: planRecurringCatchUp / advanceNextRunEpochMillis
+- **Purpose**: Pure planner for overdue recurring posts and next-run advancement.
+- **Inputs**:
+  - `rule` (`RecurringRule`-like): isActive, frequency, nextRunEpochMillis
+  - `nowEpochMillis` (`number`): catch-up horizon
+- **Outputs**: `{ posts: [{ runEpochMillis }], nextRunEpochMillis, skippedInactive }`
+- **Dependencies**: none (pure)
+- **Behavior**: While nextRun ≤ now, enqueue a post and advance by DAILY/WEEKLY/MONTHLY (month-end clamp).
+- **Side Effects**: none
+- **DSA Used**: O(k) loop bounded by 366 posts/rule; O(1) calendar arithmetic
+- **Data Analysis Notes**: Multi-day downtime expands to k posts; month boundary Jan 31 → Feb 28/29
+- **Responsive & Accessibility Notes**: n/a
+- **Security Notes**: No I/O; amounts unchanged (integer minor units preserved by caller)
+
+# Module / File: src/services/recurringCatchUp.js
+## Function: runRecurringCatchUp
+- **Purpose**: Persist planned posts and advance rules idempotently.
+- **Inputs**:
+  - `database`: SQLite handle
+  - `options.nowEpochMillis` (`number`, optional)
+- **Outputs**: `{ rulesProcessed, transactionsCreated, transactionsSkippedDuplicate }`
+- **Dependencies**: RecurringRepository, TransactionRepository, planRecurringCatchUp
+- **Behavior**: For each active rule, insert missing (ruleId, runEpoch) txs then set nextRun to plan.nextRunEpochMillis.
+- **Side Effects**: Writes transactions + recurring_rules
+- **DSA Used**: Per-run existence SELECT; O(rules × posts)
+- **Data Analysis Notes**: Re-run yields zero creates once nextRun is future
+- **Responsive & Accessibility Notes**: Invoked before first UI snapshot in financeStore.ensureHydrated
+- **Security Notes**: On-device only; no network
+
+# Module / File: src/tasks/recurringTask.js
+## Function: defineRecurringCatchUpTask / registerRecurringCatchUpTask
+- **Purpose**: Register expo-background-task worker for recurring catch-up when OS allows.
+- **Inputs**: none
+- **Outputs**: registration boolean
+- **Dependencies**: expo-background-task, expo-task-manager, initializeDatabase, runRecurringCatchUp
+- **Behavior**: defineTask once; register if BackgroundTaskStatus.Available
+- **Side Effects**: OS background registration; DB writes when worker runs
+- **DSA Used**: n/a
+- **Data Analysis Notes**: minimumInterval 12 hours; on-open catch-up remains source of truth after downtime
+- **Responsive & Accessibility Notes**: n/a
+- **Security Notes**: Uses same SQLCipher DB as foreground; failures return Failed without crashing UI
+
+# Module / File: src/services/reminders.js
+## Function: buildReminderNotificationPlan
+- **Purpose**: Pure planner for local OS bill reminder notifications from recurring rules.
+- **Inputs**:
+  - `rules` (`RecurringRule[]`): active rules with reminder fields
+  - `categoriesById` (`Map`): category lookup for bill names
+  - `options` (`object`): nowEpochMillis, currencySymbol, remindersEnabled
+- **Outputs**: Ordered plan entries with identifier, fire time, triggerMode date|asap, title/body, deep-link data
+- **Dependencies**: buildRecurringBills, formatMinor
+- **Behavior**: Fire at 09:00 local on dueDay−leadDays; ASAP if already inside lead window; skip past-due and disabled
+- **Side Effects**: none
+- **DSA Used**: O(n) scan; identifiers encode ruleId+nextRun for idempotent reschedule across month boundaries
+- **Data Analysis Notes**: Amounts stay minor units until formatMinor at copy boundary
+- **Responsive & Accessibility Notes**: n/a (OS notification text)
+- **Security Notes**: Local only; payload carries ruleId + screen, no account secrets
+
+# Module / File: src/services/notificationScheduler.js
+## Function: syncBillReminderNotifications
+- **Purpose**: Cancel prior MoneyMap schedules and apply the pure plan via expo-notifications.
+- **Inputs**:
+  - rules, categoriesById, remindersEnabled, currencySymbol, requestPermissionIfNeeded
+- **Outputs**: `{ scheduled, cancelled, permissionGranted, permissionDenied, errorMessage }`
+- **Dependencies**: expo-notifications (dynamic import), buildReminderNotificationPlan
+- **Behavior**: Never prompts on cold start unless requestPermissionIfNeeded; toggle-off cancels all; permission denial is non-fatal
+- **Side Effects**: OS notification channel + scheduled locals; deep-link listener via subscribeReminderNotificationResponses
+- **DSA Used**: Full replace of prefixed identifiers O(s + p)
+- **Data Analysis Notes**: n/a
+- **Responsive & Accessibility Notes**: Settings/Recurring show amber permission hint when denied
+- **Security Notes**: No FCM/push; POST_NOTIFICATIONS only when user enables reminders
+
+# Module / File: src/domain/services/importParser.js
+## Function: parseImportGrid / parseImportFile / xlsxToGrid / csvTextToGrid
+- **Purpose**: Single CSV/XLSX → validated import-row pipeline; row failures are skipped and reported.
+- **Inputs**:
+  - grid or file content (`csv text` | `xlsx base64`)
+  - optional column mappings (`ImportColumnMappings`)
+- **Outputs**: `{ rows, skipped, headers, dataRowCount }` with integer minor-unit amounts
+- **Dependencies**: papaparse, SheetJS/xlsx, parseDecimalToMinor
+- **Behavior**: Detect headers, map columns, parse date/amount/type/account; never throws on bad rows
+- **Side Effects**: none
+- **DSA Used**: O(n) row scan; first-match header map O(h)
+- **Data Analysis Notes**: Excel serial dates supported; amounts always positive minor units; type from column or default EXPENSE
+- **Responsive & Accessibility Notes**: n/a
+- **Security Notes**: Local file parse only; no network
+
+# Module / File: src/services/importFile.js
+## Function: pickAndParseImportFile
+- **Purpose**: Document picker + format detect + shared parse for ImportScreen.
+- **Inputs**: user-selected file URI
+- **Outputs**: fileName, format, grid, mappings, preview parse result
+- **Dependencies**: expo-document-picker, expo-file-system/legacy (xlsx base64), importParser
+- **Behavior**: Accepts csv/xlsx MIME types; reads text or base64; returns null on cancel
+- **Side Effects**: Reads local file into memory
+- **DSA Used**: n/a
+- **Data Analysis Notes**: n/a
+- **Responsive & Accessibility Notes**: Import UI shows skip summary before confirm
+- **Security Notes**: copyToCacheDirectory; no upload
+
+# Module / File: src/store/financeStore.js
+## Function: importCsvRows
+- **Purpose**: Transactional bulk insert of validated import rows with auto category/account create.
+- **Inputs**: rows[], optional skipped meta
+- **Outputs**: `{ created, skipped, skippedRows }` (valueOf → created for legacy numeric use)
+- **Dependencies**: SQL transaction, categories/accounts/transactions tables
+- **Behavior**: One DB transaction for all inserts; refresh after commit; partial failure rolls back all
+- **Side Effects**: Writes DB; refreshes Zustand snapshot
+- **DSA Used**: Map caches for category/account O(1) lookup during import
+- **Data Analysis Notes**: Money remains integer minor units
+- **Responsive & Accessibility Notes**: n/a
+- **Security Notes**: On-device only

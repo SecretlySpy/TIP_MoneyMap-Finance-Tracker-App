@@ -12,7 +12,9 @@
       "allowBackup": false,
       "permissions": [
         "INTERNET",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT"
       ]
     },
     "plugins": [
@@ -43,6 +45,20 @@
           "dark": {
             "backgroundColor": "#0D1412"
           }
+        }
+      ],
+      "expo-background-task",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow MoneyMap to use Face ID to unlock the app."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2563EB",
+          "defaultChannel": "moneymap-reminders"
         }
       ]
     ],
