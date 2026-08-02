@@ -199,7 +199,10 @@ export function getTheme(mode: ThemeMode): MoneyMapTheme {
 }
 
 // Every UI component uses this hook so system light/dark changes update in one pass.
-export function useTheme(): MoneyMapTheme {
+export function useTheme(preference: "system" | ThemeMode = "system"): MoneyMapTheme {
   const colorScheme = useColorScheme();
+  if (preference === "light" || preference === "dark") {
+    return themes[preference];
+  }
   return themes[colorScheme === "dark" ? "dark" : "light"];
 }

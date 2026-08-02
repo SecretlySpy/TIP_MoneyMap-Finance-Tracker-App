@@ -6,28 +6,35 @@ import { AppText as Text } from "../components/AppText";
 import { DashedButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
+import { TextPromptModal } from "../components/TextPromptModal";
 import {
   buildRecurringBills,
   categoriesForType,
   nextReminderPreview,
 } from "../domain/services/financeView";
-import { formatMinor } from "../domain/services/money";
+import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import type { BudgetsStackParamList } from "../navigation/routes";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
+import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 
 type RecurringProps = NativeStackScreenProps<BudgetsStackParamList, "Recurring">;
 
-const DEFAULT_BILL_AMOUNT_MINOR = 100_000;
 const DEFAULT_LEAD_DAYS = 7;
 
-// The recurring list mirrors Figma frame 38:134 without scheduling notifications yet.
+type PromptStep = "name" | "amount" | null;
+
+// Recurring list with offline add flow; OS push notifications remain optional later.
 export function RecurringScreen({ navigation }: RecurringProps) {
-  const theme = useTheme();
+  const theme = useTheme(useUiStore((state) => state.themePreference));
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
+  const remindersEnabled = useUiStore((state) => state.remindersEnabled);
   const categories = useFinanceStore((state) => state.categories);
   const recurringRules = useFinanceStore((state) => state.recurringRules);
   const addRecurringBill = useFinanceStore((state) => state.addRecurringBill);
   const [adding, setAdding] = useState(false);
+  const [step, setStep] = useState<PromptStep>(null);
+  const [draftName, setDraftName] = useState("");
 
   const { categoriesById } = useMemo(() => mapsFromState({ accounts: [], categories }), [categories]);
 
@@ -38,7 +45,7 @@ export function RecurringScreen({ navigation }: RecurringProps) {
 
   const reminder = useMemo(() => nextReminderPreview(bills), [bills]);
 
-  const handleAddBill = async () => {
+  const handleAmountConfirm = async (value: string) => {
     if (adding) {
       return;
     }
@@ -49,27 +56,23 @@ export function RecurringScreen({ navigation }: RecurringProps) {
       Alert.alert("No categories", "Add an expense category before creating a recurring bill.");
       return;
     }
-
-    const existingNames = new Set(bills.map((bill) => bill.name.toLowerCase()));
-    const baseName = preferred.name === "Bills" ? "Monthly bill" : preferred.name;
-    let name = baseName;
-    let suffix = 2;
-    while (existingNames.has(name.toLowerCase())) {
-      name = `${baseName} ${suffix}`;
-      suffix += 1;
-    }
-
     setAdding(true);
     try {
+      const amountMinor = parseDecimalToMinor(value.replace(/[₱$,]/g, "") || "0");
+      if (amountMinor <= 0) {
+        throw new Error("Enter a positive bill amount.");
+      }
+      const name = draftName.trim() || preferred.name;
       await addRecurringBill({
-        amountMinor: DEFAULT_BILL_AMOUNT_MINOR,
+        amountMinor,
         categoryName: preferred.name,
         leadDays: DEFAULT_LEAD_DAYS,
         name,
       });
+      setStep(null);
+      setDraftName("");
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Could not add recurring bill.";
-      Alert.alert("Add bill failed", message);
+      Alert.alert("Add bill failed", error instanceof Error ? error.message : "Could not add recurring bill.");
     } finally {
       setAdding(false);
     }
@@ -93,7 +96,13 @@ export function RecurringScreen({ navigation }: RecurringProps) {
         </Text>
       </View>
 
-      {reminder !== null ? (
+      {!remindersEnabled ? (
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
+          In-app reminders are off. Enable them in Settings to surface upcoming bills on the Dashboard.
+        </Text>
+      ) : null}
+
+      {reminder !== null && remindersEnabled ? (
         <View
           accessible
           accessibilityRole="summary"
@@ -114,8 +123,9 @@ export function RecurringScreen({ navigation }: RecurringProps) {
               {reminder.title}
             </Text>
             <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-              Set aside {formatMinor(reminder.detailAmountMinor, { showCents: false })} by {reminder.dueLabel} — save{" "}
-              {formatMinor(reminder.dailyMinor, { showCents: false })}/day to be ready.
+              Set aside {formatMinor(reminder.detailAmountMinor, { currencySymbol, showCents: false })} by{" "}
+              {reminder.dueLabel} — save {formatMinor(reminder.dailyMinor, { currencySymbol, showCents: false })}/day to
+              be ready.
             </Text>
           </View>
         </View>
@@ -154,7 +164,7 @@ export function RecurringScreen({ navigation }: RecurringProps) {
                 </Text>
               </View>
               <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.listName }}>
-                {formatMinor(bill.amountMinor, { showCents: false })}
+                {formatMinor(bill.amountMinor, { currencySymbol, showCents: false })}
               </Text>
             </View>
             <View
@@ -177,9 +187,36 @@ export function RecurringScreen({ navigation }: RecurringProps) {
         ))
       )}
 
-      <DashedButton disabled={adding} onPress={() => void handleAddBill()}>
+      <DashedButton disabled={adding} onPress={() => setStep("name")}>
         {adding ? "Adding…" : "＋ Add recurring bill"}
       </DashedButton>
+
+      <TextPromptModal
+        confirmLabel="Next"
+        message="Name shown on the bills list."
+        onCancel={() => {
+          setStep(null);
+          setDraftName("");
+        }}
+        onConfirm={(value) => {
+          setDraftName(value.trim() || "Monthly bill");
+          setStep("amount");
+        }}
+        placeholder="Internet"
+        title="Bill name"
+        visible={step === "name"}
+      />
+      <TextPromptModal
+        confirmLabel="Save bill"
+        initialValue="1000.00"
+        keyboardType="decimal-pad"
+        message={`Amount for ${draftName || "this bill"}`}
+        onCancel={() => setStep(null)}
+        onConfirm={(value) => void handleAmountConfirm(value)}
+        placeholder="1000.00"
+        title="Bill amount"
+        visible={step === "amount"}
+      />
     </ScreenContainer>
   );
 }

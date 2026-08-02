@@ -1,6 +1,7 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TabIcon, type TabIconName } from "../components/TabIcon";
@@ -9,9 +10,13 @@ import { BudgetsScreen } from "../screens/BudgetsScreen";
 import { DashboardScreen } from "../screens/DashboardScreen";
 import { EntryScreen } from "../screens/EntryScreen";
 import { HistoryScreen } from "../screens/HistoryScreen";
+import { ManageAccountsScreen } from "../screens/ManageAccountsScreen";
+import { ManageCategoriesScreen } from "../screens/ManageCategoriesScreen";
+import { PasteImportScreen } from "../screens/PasteImportScreen";
 import { RecurringScreen } from "../screens/RecurringScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { SmartTipsScreen } from "../screens/SmartTipsScreen";
+import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 import type {
   BudgetsStackParamList,
@@ -60,6 +65,9 @@ function SettingsNavigator() {
   return (
     <SettingsStack.Navigator screenOptions={{ headerShown: false }}>
       <SettingsStack.Screen name="SettingsOverview" component={SettingsScreen} />
+      <SettingsStack.Screen name="ManageCategories" component={ManageCategoriesScreen} />
+      <SettingsStack.Screen name="ManageAccounts" component={ManageAccountsScreen} />
+      <SettingsStack.Screen name="PasteImport" component={PasteImportScreen} />
     </SettingsStack.Navigator>
   );
 }
@@ -71,9 +79,8 @@ const tabIcons: Record<keyof MainTabParamList, TabIconName> = {
   Settings: "settings",
 };
 
-// The four-tab shell uses exact exported Figma icon geometry and screen-aware visibility.
 function MainTabs() {
-  const theme = useTheme();
+  const theme = useTheme(useUiStore((state) => state.themePreference));
   const insets = useSafeAreaInsets();
 
   return (
@@ -114,12 +121,30 @@ function MainTabs() {
   );
 }
 
-// App Lock sits above navigation; the approved UI screens remain grouped under tabs.
+// App Lock sits above navigation when enabled; unlocked sessions reach the tab shell.
 export function RootNavigator() {
+  const isLocked = useUiStore((state) => state.isLocked);
+  const preferencesReady = useUiStore((state) => state.preferencesReady);
+  const ensurePreferencesLoaded = useUiStore((state) => state.ensurePreferencesLoaded);
+
+  useEffect(() => {
+    void ensurePreferencesLoaded();
+  }, [ensurePreferencesLoaded]);
+
+  if (!preferencesReady) {
+    return null;
+  }
+
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
-      <RootStack.Screen name="Main" component={MainTabs} />
-      <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
+      {isLocked ? (
+        <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
+      ) : (
+        <>
+          <RootStack.Screen name="Main" component={MainTabs} />
+          <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
+        </>
+      )}
     </RootStack.Navigator>
   );
 }

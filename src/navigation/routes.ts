@@ -17,6 +17,9 @@ export type BudgetsStackParamList = {
 
 export type SettingsStackParamList = {
   SettingsOverview: undefined;
+  ManageCategories: undefined;
+  ManageAccounts: undefined;
+  PasteImport: { mode: "csv" | "backup" };
 };
 
 export type MainTabParamList = {

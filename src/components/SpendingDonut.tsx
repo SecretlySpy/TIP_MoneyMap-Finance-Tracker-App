@@ -2,6 +2,7 @@ import { View } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
 
 import { formatMinor } from "../domain/services/money";
+import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 import { AppText as Text } from "./AppText";
 
@@ -18,7 +19,8 @@ interface SpendingDonutProps {
 
 // A circular O(n) accumulation maps category percentages to non-overlapping arcs.
 export function SpendingDonut({ segments, totalMinor }: SpendingDonutProps) {
-  const theme = useTheme();
+  const theme = useTheme(useUiStore((state) => state.themePreference));
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
   const radius = 50;
   const center = theme.sizes.donut / 2;
   const circumference = 2 * Math.PI * radius;
@@ -54,7 +56,7 @@ export function SpendingDonut({ segments, totalMinor }: SpendingDonutProps) {
           style={{ alignItems: "center", bottom: 0, justifyContent: "center", left: 0, position: "absolute", right: 0, top: 0 }}
         >
           <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.listName }}>
-            {formatMinor(totalMinor, { showCents: false })}
+            {formatMinor(totalMinor, { currencySymbol, showCents: false })}
           </Text>
         </View>
       </View>

@@ -1,6 +1,7 @@
 import { View } from "react-native";
 
 import { formatMinor } from "../domain/services/money";
+import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 import { AppText as Text } from "./AppText";
 import { ProgressBar } from "./ProgressBar";
@@ -9,6 +10,7 @@ import { SectionCard } from "./SectionCard";
 export type BudgetState = "normal" | "warning" | "over";
 
 export interface BudgetCardProps {
+  readonly currencySymbol?: string;
   readonly emoji: string;
   readonly limitMinor: number;
   readonly name: string;
@@ -24,8 +26,18 @@ function statusText(percent: number, state: BudgetState): string {
 }
 
 // Budget state selects one semantic color while reported percentages remain unclamped.
-export function BudgetCard({ emoji, limitMinor, name, percent, spentMinor, state }: BudgetCardProps) {
-  const theme = useTheme();
+export function BudgetCard({
+  currencySymbol,
+  emoji,
+  limitMinor,
+  name,
+  percent,
+  spentMinor,
+  state,
+}: BudgetCardProps) {
+  const theme = useTheme(useUiStore((store) => store.themePreference));
+  const preferredCurrency = useUiStore((store) => store.currencySymbol);
+  const symbol = currencySymbol ?? preferredCurrency;
   const stateColor =
     state === "warning"
       ? theme.colors.warning
@@ -43,7 +55,8 @@ export function BudgetCard({ emoji, limitMinor, name, percent, spentMinor, state
           {name}
         </Text>
         <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
-          {formatMinor(spentMinor, { showCents: false })} / {formatMinor(limitMinor, { showCents: false })}
+          {formatMinor(spentMinor, { currencySymbol: symbol, showCents: false })} /{" "}
+          {formatMinor(limitMinor, { currencySymbol: symbol, showCents: false })}
         </Text>
       </View>
       <ProgressBar color={stateColor} percent={percent} />

@@ -18,19 +18,25 @@ import {
 } from "../domain/services/financeView";
 import { formatMinor } from "../domain/services/money";
 import type { HomeStackParamList, MainTabParamList } from "../navigation/routes";
+import { computeDueReminders, formatReminderMessage } from "../services/reminders";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
+import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 
 type DashboardProps = NativeStackScreenProps<HomeStackParamList, "Dashboard">;
 
 // The Dashboard is a faithful flexible translation of Figma frame 7:2.
 export function DashboardScreen({ navigation }: DashboardProps) {
-  const theme = useTheme();
+  const theme = useTheme(useUiStore((state) => state.themePreference));
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
+  const remindersEnabled = useUiStore((state) => state.remindersEnabled);
+  const smartTipsEnabled = useUiStore((state) => state.smartTipsEnabled);
   const tabNavigation = navigation.getParent<BottomTabNavigationProp<MainTabParamList>>();
   const accounts = useFinanceStore((state) => state.accounts);
   const budgets = useFinanceStore((state) => state.budgets);
   const categories = useFinanceStore((state) => state.categories);
   const transactions = useFinanceStore((state) => state.transactions);
+  const recurringRules = useFinanceStore((state) => state.recurringRules);
   const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
 
   const { accountsById, categoriesById } = useMemo(
@@ -56,6 +62,11 @@ export function DashboardScreen({ navigation }: DashboardProps) {
   const recent = useMemo(
     () => recentUiTransactions(transactions, categoriesById, accountsById, 5),
     [transactions, categoriesById, accountsById],
+  );
+
+  const dueReminders = useMemo(
+    () => (remindersEnabled ? computeDueReminders(recurringRules, categoriesById) : []),
+    [remindersEnabled, recurringRules, categoriesById],
   );
 
   const donutSegments =
@@ -126,7 +137,7 @@ export function DashboardScreen({ navigation }: DashboardProps) {
           Total Balance
         </Text>
         <Text style={{ color: theme.colors.onPrimary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.heroAmount }}>
-          {formatMinor(totals.balanceMinor)}
+          {formatMinor(totals.balanceMinor, { currencySymbol })}
         </Text>
         <View style={{ flexDirection: "row", gap: theme.spacing.md, paddingTop: theme.spacing.keyGap }}>
           {[
@@ -153,12 +164,50 @@ export function DashboardScreen({ navigation }: DashboardProps) {
                 </Text>
               </View>
               <Text style={{ color: theme.colors.onPrimary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.statAmount }}>
-                {formatMinor(stat.amount, { showCents: false })}
+                {formatMinor(stat.amount, { currencySymbol, showCents: false })}
               </Text>
             </View>
           ))}
         </View>
       </View>
+
+      {dueReminders.length > 0 ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => tabNavigation?.navigate("Budgets", { screen: "Recurring" })}
+          style={{
+            backgroundColor: theme.colors.amberBg,
+            borderRadius: theme.radii.row,
+            gap: theme.spacing.xs,
+            padding: theme.spacing.lg,
+          }}
+        >
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+            🔔 {formatReminderMessage(dueReminders[0]!)}
+          </Text>
+          {dueReminders.length > 1 ? (
+            <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+              +{dueReminders.length - 1} more upcoming bill{dueReminders.length - 1 === 1 ? "" : "s"}
+            </Text>
+          ) : null}
+        </Pressable>
+      ) : null}
+
+      {smartTipsEnabled ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => navigation.navigate("SmartTips")}
+          style={{
+            backgroundColor: theme.colors.tint,
+            borderRadius: theme.radii.row,
+            padding: theme.spacing.lg,
+          }}
+        >
+          <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
+            ✨ Open Smart Tips (offline sample tips)
+          </Text>
+        </Pressable>
+      ) : null}
 
       <SectionCard shadowed style={{ gap: theme.spacing.lg }}>
         <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.cardHeader }}>
@@ -197,7 +246,8 @@ export function DashboardScreen({ navigation }: DashboardProps) {
                   {budget.name}
                 </Text>
                 <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
-                  {formatMinor(budget.spentMinor, { showCents: false })} / {formatMinor(budget.limitMinor, { showCents: false })}
+                  {formatMinor(budget.spentMinor, { currencySymbol, showCents: false })} /{" "}
+                  {formatMinor(budget.limitMinor, { currencySymbol, showCents: false })}
                 </Text>
               </View>
               <ProgressBar

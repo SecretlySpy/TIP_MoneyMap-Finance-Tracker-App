@@ -1,35 +1,38 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useMemo, useState } from "react";
-import { Alert, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 
 import { AppText as Text } from "../components/AppText";
 import { BudgetCard } from "../components/BudgetCard";
 import { DashedButton } from "../components/Buttons";
 import { MonthChip } from "../components/MonthChip";
 import { ScreenContainer } from "../components/ScreenContainer";
+import { TextPromptModal } from "../components/TextPromptModal";
 import {
   budgetSummary,
   buildBudgetCards,
   categoriesForType,
 } from "../domain/services/financeView";
-import { formatMinor } from "../domain/services/money";
+import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import type { BudgetsStackParamList } from "../navigation/routes";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
+import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 
 type BudgetsProps = NativeStackScreenProps<BudgetsStackParamList, "BudgetsOverview">;
 
-const DEFAULT_BUDGET_LIMIT_MINOR = 500_000;
-
 // The budget list demonstrates normal, warning, and over states from frame 13:40.
-export function BudgetsScreen(_props: BudgetsProps) {
-  const theme = useTheme();
+export function BudgetsScreen({ navigation }: BudgetsProps) {
+  const theme = useTheme(useUiStore((state) => state.themePreference));
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
   const budgets = useFinanceStore((state) => state.budgets);
   const categories = useFinanceStore((state) => state.categories);
   const transactions = useFinanceStore((state) => state.transactions);
   const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
   const addBudget = useFinanceStore((state) => state.addBudget);
   const [adding, setAdding] = useState(false);
+  const [pendingCategory, setPendingCategory] = useState<string | null>(null);
+  const [showLimitPrompt, setShowLimitPrompt] = useState(false);
 
   const { categoriesById } = useMemo(() => mapsFromState({ accounts: [], categories }), [categories]);
 
@@ -40,10 +43,7 @@ export function BudgetsScreen(_props: BudgetsProps) {
 
   const summary = useMemo(() => budgetSummary(cards), [cards]);
 
-  const handleAddBudget = async () => {
-    if (adding) {
-      return;
-    }
+  const beginAddBudget = () => {
     const expenseCategories = categoriesForType(categories, "EXPENSE");
     const usedIds = new Set(
       budgets
@@ -55,17 +55,29 @@ export function BudgetsScreen(_props: BudgetsProps) {
       Alert.alert("Budgets complete", "Every expense category already has a budget this month.");
       return;
     }
+    setPendingCategory(nextCategory.name);
+    setShowLimitPrompt(true);
+  };
 
+  const handleLimitConfirm = async (value: string) => {
+    if (pendingCategory === null || adding) {
+      return;
+    }
     setAdding(true);
     try {
+      const limitMinor = parseDecimalToMinor(value.replace(/[₱$,]/g, "") || "0");
+      if (limitMinor <= 0) {
+        throw new Error("Enter a positive budget limit.");
+      }
       await addBudget({
-        categoryName: nextCategory.name,
-        limitMinor: DEFAULT_BUDGET_LIMIT_MINOR,
+        categoryName: pendingCategory,
+        limitMinor,
         monthYear: selectedMonthYear,
       });
+      setShowLimitPrompt(false);
+      setPendingCategory(null);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Could not add budget.";
-      Alert.alert("Add budget failed", message);
+      Alert.alert("Add budget failed", error instanceof Error ? error.message : "Could not add budget.");
     } finally {
       setAdding(false);
     }
@@ -79,20 +91,41 @@ export function BudgetsScreen(_props: BudgetsProps) {
         </Text>
         <MonthChip />
       </View>
-      <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
-        {formatMinor(summary.spentMinor, { showCents: false })} of {formatMinor(summary.limitMinor, { showCents: false })}{" "}
-        total budget spent
-      </Text>
+      <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label, flex: 1 }}>
+          {formatMinor(summary.spentMinor, { currencySymbol, showCents: false })} of{" "}
+          {formatMinor(summary.limitMinor, { currencySymbol, showCents: false })} total budget spent
+        </Text>
+        <Pressable accessibilityRole="button" onPress={() => navigation.navigate("Recurring")}>
+          <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
+            Bills
+          </Text>
+        </Pressable>
+      </View>
       {cards.length === 0 ? (
         <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body }}>
           No budgets yet for this month. Add one to track spending limits.
         </Text>
       ) : (
-        cards.map((budget) => <BudgetCard key={budget.name} {...budget} />)
+        cards.map((budget) => <BudgetCard key={budget.name} currencySymbol={currencySymbol} {...budget} />)
       )}
-      <DashedButton disabled={adding} onPress={() => void handleAddBudget()}>
+      <DashedButton disabled={adding} onPress={beginAddBudget}>
         {adding ? "Adding…" : "＋ Add budget"}
       </DashedButton>
+      <TextPromptModal
+        confirmLabel="Save budget"
+        initialValue="5000.00"
+        keyboardType="decimal-pad"
+        message={pendingCategory === null ? undefined : `Monthly limit for ${pendingCategory}`}
+        onCancel={() => {
+          setShowLimitPrompt(false);
+          setPendingCategory(null);
+        }}
+        onConfirm={(value) => void handleLimitConfirm(value)}
+        placeholder="5000.00"
+        title="Budget limit"
+        visible={showLimitPrompt}
+      />
     </ScreenContainer>
   );
 }

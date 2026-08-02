@@ -12,13 +12,15 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { DatabaseGate } from "./src/components/DatabaseGate";
 import { RootNavigator } from "./src/navigation/RootNavigator";
+import { useUiStore } from "./src/store/uiStore";
 import { useTheme } from "./src/theme/tokens";
 
 // Keep the native launch surface visible until the three bundled Roboto weights are ready.
 void SplashScreen.preventAutoHideAsync();
 
 function MoneyMapApp() {
-  const theme = useTheme();
+  const themePreference = useUiStore((state) => state.themePreference);
+  const theme = useTheme(themePreference);
   const baseNavigationTheme = theme.mode === "dark" ? DarkTheme : DefaultTheme;
   const navigationTheme = {
     ...baseNavigationTheme,

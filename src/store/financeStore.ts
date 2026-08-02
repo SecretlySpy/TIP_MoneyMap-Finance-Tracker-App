@@ -25,6 +25,7 @@ import type {
   TransactionType,
 } from "../domain/types";
 import type { SqlDatabase } from "../db/sql";
+import type { CsvImportRow, FinanceBackup } from "../services/dataTransfer";
 
 const DEFAULT_ACCOUNTS: readonly { name: string; type: AccountType }[] = [
   { name: "Cash", type: "CASH" },
@@ -80,9 +81,28 @@ interface FinanceState {
     note?: string | null;
     type: TransactionType;
   }) => Promise<Transaction>;
+  readonly addCategory: (input: {
+    name: string;
+    type: TransactionType;
+    colorHex?: string;
+    icon?: string;
+  }) => Promise<Category>;
   readonly ensureHydrated: () => Promise<void>;
+  readonly importCsvRows: (rows: readonly CsvImportRow[]) => Promise<number>;
   readonly refresh: () => Promise<void>;
+  readonly restoreBackup: (backup: FinanceBackup) => Promise<void>;
   readonly setSelectedMonthYear: (monthYear: string) => void;
+  readonly updateAccount: (input: {
+    id: number;
+    name?: string;
+    startingBalanceMinor?: number;
+    isArchived?: boolean;
+  }) => Promise<Account>;
+  readonly updateBudgetLimit: (input: {
+    categoryName: string;
+    limitMinor: number;
+    monthYear?: string;
+  }) => Promise<Budget>;
 }
 
 let databaseRef: SqlDatabase | null = null;
@@ -315,6 +335,212 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     const created = await new RecurringRepository(database).create(payload);
     await get().refresh();
     return created;
+  },
+
+  addCategory: async (input) => {
+    await get().ensureHydrated();
+    const database = databaseRef;
+    if (database === null) {
+      throw new Error("Database is not ready.");
+    }
+    const name = input.name.trim();
+    if (name.length === 0) {
+      throw new Error("Category name is required.");
+    }
+    const existing = get().categories.find(
+      (category) =>
+        category.name.toLowerCase() === name.toLowerCase() && category.type === input.type,
+    );
+    if (existing) {
+      return existing;
+    }
+    const created = await new CategoryRepository(database).create({
+      name,
+      icon: input.icon?.trim() || "pricetag",
+      colorHex: input.colorHex ?? (input.type === "INCOME" ? "#15803D" : "#64748B"),
+      type: input.type,
+      isCustom: true,
+    });
+    await get().refresh();
+    return created;
+  },
+
+  updateAccount: async (input) => {
+    await get().ensureHydrated();
+    const database = databaseRef;
+    if (database === null) {
+      throw new Error("Database is not ready.");
+    }
+    const updated = await new AccountRepository(database).update(input.id, {
+      name: input.name,
+      startingBalanceMinor: input.startingBalanceMinor,
+      isArchived: input.isArchived,
+    });
+    if (updated === null) {
+      throw new Error("Account could not be updated.");
+    }
+    await get().refresh();
+    return updated;
+  },
+
+  updateBudgetLimit: async (input) => get().addBudget(input),
+
+  importCsvRows: async (rows) => {
+    await get().ensureHydrated();
+    const database = databaseRef;
+    if (database === null) {
+      throw new Error("Database is not ready.");
+    }
+    if (rows.length === 0) {
+      return 0;
+    }
+
+    const categoryRepo = new CategoryRepository(database);
+    const transactionRepo = new TransactionRepository(database);
+    let createdCount = 0;
+
+    for (const row of rows) {
+      let category = get().categories.find(
+        (item) =>
+          item.name.toLowerCase() === row.categoryName.toLowerCase() && item.type === row.type,
+      );
+      if (category === undefined) {
+        category = await categoryRepo.create({
+          name: row.categoryName,
+          icon: "pricetag",
+          colorHex: row.type === "INCOME" ? "#15803D" : "#64748B",
+          type: row.type,
+          isCustom: true,
+        });
+        set({
+          categories: [...get().categories, category],
+        });
+      }
+      const account = findAccount(get().accounts, row.accountType);
+      await transactionRepo.create({
+        amountMinor: row.amountMinor,
+        type: row.type,
+        categoryId: category.id,
+        accountId: account.id,
+        dateEpochMillis: row.dateEpochMillis,
+        note: row.note,
+        recurringRuleId: null,
+      });
+      createdCount += 1;
+    }
+
+    await get().refresh();
+    return createdCount;
+  },
+
+  restoreBackup: async (backup) => {
+    await get().ensureHydrated();
+    const database = databaseRef;
+    if (database === null) {
+      throw new Error("Database is not ready.");
+    }
+
+    await database.transaction(async (tx) => {
+      await tx.execute("DELETE FROM transactions");
+      await tx.execute("DELETE FROM budgets");
+      await tx.execute("DELETE FROM recurring_rules");
+      await tx.execute("DELETE FROM categories");
+      await tx.execute("DELETE FROM accounts");
+
+      const accountIdMap = new Map<number, number>();
+      for (const account of backup.accounts) {
+        const result = await tx.execute(
+          `INSERT INTO accounts (name, type, starting_balance_minor, is_archived)
+           VALUES (?, ?, ?, ?)`,
+          [account.name, account.type, account.startingBalanceMinor, account.isArchived ? 1 : 0],
+        );
+        accountIdMap.set(account.id, Number(result.insertId));
+      }
+
+      const categoryIdMap = new Map<number, number>();
+      for (const category of backup.categories) {
+        const result = await tx.execute(
+          `INSERT INTO categories (name, icon, color_hex, type, is_custom)
+           VALUES (?, ?, ?, ?, ?)`,
+          [
+            category.name,
+            category.icon,
+            category.colorHex,
+            category.type,
+            category.isCustom ? 1 : 0,
+          ],
+        );
+        categoryIdMap.set(category.id, Number(result.insertId));
+      }
+
+      const recurringIdMap = new Map<number, number>();
+      for (const rule of backup.recurringRules) {
+        const categoryId = categoryIdMap.get(rule.categoryId);
+        const accountId = accountIdMap.get(rule.accountId);
+        if (categoryId === undefined || accountId === undefined) {
+          continue;
+        }
+        const result = await tx.execute(
+          `INSERT INTO recurring_rules (
+             amount_minor, type, category_id, account_id, note, frequency,
+             next_run_epoch_millis, is_active, reminder_enabled, reminder_lead_days
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            rule.amountMinor,
+            rule.type,
+            categoryId,
+            accountId,
+            rule.note,
+            rule.frequency,
+            rule.nextRunEpochMillis,
+            rule.isActive ? 1 : 0,
+            rule.reminderEnabled ? 1 : 0,
+            rule.reminderLeadDays,
+          ],
+        );
+        recurringIdMap.set(rule.id, Number(result.insertId));
+      }
+
+      for (const transaction of backup.transactions) {
+        const categoryId = categoryIdMap.get(transaction.categoryId);
+        const accountId = accountIdMap.get(transaction.accountId);
+        if (categoryId === undefined || accountId === undefined) {
+          continue;
+        }
+        const recurringRuleId =
+          transaction.recurringRuleId === null
+            ? null
+            : (recurringIdMap.get(transaction.recurringRuleId) ?? null);
+        await tx.execute(
+          `INSERT INTO transactions (
+             amount_minor, type, category_id, account_id, date_epoch_millis, note, recurring_rule_id
+           ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            transaction.amountMinor,
+            transaction.type,
+            categoryId,
+            accountId,
+            transaction.dateEpochMillis,
+            transaction.note,
+            recurringRuleId,
+          ],
+        );
+      }
+
+      for (const budget of backup.budgets) {
+        const categoryId = categoryIdMap.get(budget.categoryId);
+        if (categoryId === undefined) {
+          continue;
+        }
+        await tx.execute(
+          `INSERT INTO budgets (category_id, month_year, limit_minor)
+           VALUES (?, ?, ?)`,
+          [categoryId, budget.monthYear, budget.limitMinor],
+        );
+      }
+    });
+
+    await get().refresh();
   },
 }));
 

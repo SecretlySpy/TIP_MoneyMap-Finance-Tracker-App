@@ -9,6 +9,17 @@ jest.mock("../src/store/financeStore", () => ({
   useFinanceStore: jest.fn(() => []),
 }));
 
+jest.mock("../src/store/uiStore", () => ({
+  useUiStore: (selector: (state: {
+    currencySymbol: string;
+    themePreference: "system" | "light" | "dark";
+  }) => unknown) =>
+    selector({
+      currencySymbol: "₱",
+      themePreference: "system",
+    }),
+}));
+
 import { BudgetCard } from "../src/components/BudgetCard";
 import { HistoryBody } from "../src/screens/HistoryScreen";
 

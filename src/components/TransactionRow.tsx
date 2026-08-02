@@ -2,6 +2,7 @@ import { View } from "react-native";
 
 import { formatTransactionAmount } from "../domain/services/money";
 import type { TransactionType } from "../domain/types";
+import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 import { AppText as Text } from "./AppText";
 
@@ -16,8 +17,9 @@ export interface TransactionRowProps {
 
 // Shared transaction rows preserve the Figma avatar, content, and right-aligned amount layout.
 export function TransactionRow({ amountMinor, compact = false, emoji, meta, title, type }: TransactionRowProps) {
-  const theme = useTheme();
-  const amount = formatTransactionAmount(amountMinor, type);
+  const theme = useTheme(useUiStore((state) => state.themePreference));
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
+  const amount = formatTransactionAmount(amountMinor, type, true, currencySymbol);
   const avatarSize = compact ? theme.sizes.compactAvatar : theme.sizes.avatar;
 
   return (

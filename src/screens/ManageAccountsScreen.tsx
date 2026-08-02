@@ -1,0 +1,120 @@
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useState } from "react";
+import { Alert, Pressable, View } from "react-native";
+
+import { AppText as Text } from "../components/AppText";
+import { ScreenContainer } from "../components/ScreenContainer";
+import { SectionCard } from "../components/SectionCard";
+import { TextPromptModal } from "../components/TextPromptModal";
+import { accountChipLabel } from "../domain/services/financeView";
+import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
+import type { SettingsStackParamList } from "../navigation/routes";
+import { useFinanceStore } from "../store/financeStore";
+import { useUiStore } from "../store/uiStore";
+import { useTheme } from "../theme/tokens";
+
+type Props = NativeStackScreenProps<SettingsStackParamList, "ManageAccounts">;
+
+export function ManageAccountsScreen({ navigation }: Props) {
+  const theme = useTheme(useUiStore((state) => state.themePreference));
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
+  const accounts = useFinanceStore((state) => state.accounts);
+  const updateAccount = useFinanceStore((state) => state.updateAccount);
+  const [renameId, setRenameId] = useState<number | null>(null);
+  const [balanceId, setBalanceId] = useState<number | null>(null);
+
+  const active = accounts.filter((account) => !account.isArchived);
+
+  const handleRename = async (name: string) => {
+    if (renameId === null || name.trim().length === 0) {
+      setRenameId(null);
+      return;
+    }
+    try {
+      await updateAccount({ id: renameId, name: name.trim() });
+      setRenameId(null);
+    } catch (error: unknown) {
+      Alert.alert("Rename failed", error instanceof Error ? error.message : "Unknown error");
+    }
+  };
+
+  const handleBalance = async (value: string) => {
+    if (balanceId === null) {
+      return;
+    }
+    try {
+      const amountMinor = parseDecimalToMinor(value.replace(/[₱$,]/g, "") || "0");
+      await updateAccount({ id: balanceId, startingBalanceMinor: amountMinor });
+      setBalanceId(null);
+    } catch (error: unknown) {
+      Alert.alert("Balance update failed", error instanceof Error ? error.message : "Enter a valid amount.");
+    }
+  };
+
+  return (
+    <ScreenContainer contentContainerStyle={{ gap: theme.spacing.xl }} testID="manage-accounts-screen">
+      <View style={{ alignItems: "center", flexDirection: "row", gap: theme.spacing.lg }}>
+        <Pressable accessibilityLabel="Go back" accessibilityRole="button" onPress={() => navigation.goBack()}>
+          <Text style={{ color: theme.colors.text, fontSize: theme.typeScale.lockTitle }}>←</Text>
+        </Pressable>
+        <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.subScreenTitle }}>
+          Manage accounts
+        </Text>
+      </View>
+      <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.lg }}>
+        {active.map((account) => (
+          <View key={account.id} style={{ gap: theme.spacing.sm }}>
+            <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+              <View style={{ flex: 1, gap: theme.spacing.xxs }}>
+                <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                  {accountChipLabel(account.type)} · {account.name}
+                </Text>
+                <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+                  Starting balance {formatMinor(account.startingBalanceMinor, { currencySymbol })}
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: "row", gap: theme.spacing.md }}>
+              <Pressable accessibilityRole="button" onPress={() => setRenameId(account.id)}>
+                <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
+                  Rename
+                </Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => setBalanceId(account.id)}>
+                <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
+                  Edit starting balance
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ))}
+      </SectionCard>
+      <TextPromptModal
+        confirmLabel="Rename"
+        initialValue={active.find((account) => account.id === renameId)?.name ?? ""}
+        onCancel={() => setRenameId(null)}
+        onConfirm={(value) => void handleRename(value)}
+        placeholder="Account name"
+        title="Rename account"
+        visible={renameId !== null}
+      />
+      <TextPromptModal
+        confirmLabel="Save"
+        initialValue={(() => {
+          const account = active.find((item) => item.id === balanceId);
+          if (account === undefined) {
+            return "0";
+          }
+          return (account.startingBalanceMinor / 100).toFixed(2);
+        })()}
+        keyboardType="decimal-pad"
+        message="Starting balance is added to your total balance."
+        onCancel={() => setBalanceId(null)}
+        onConfirm={(value) => void handleBalance(value)}
+        placeholder="0.00"
+        title="Starting balance"
+        visible={balanceId !== null}
+      />
+    </ScreenContainer>
+  );
+}

@@ -40,6 +40,7 @@ export function formatTransactionAmount(
   amountMinor: number,
   type: TransactionType,
   showCents = true,
+  currencySymbol = "₱",
 ): string {
   assertMinorUnits(amountMinor);
   if (amountMinor < 0) {
@@ -47,7 +48,7 @@ export function formatTransactionAmount(
   }
 
   const sign = type === "EXPENSE" ? "-" : "+";
-  return `${sign}${formatMinor(amountMinor, { showCents, sign: "never" })}`;
+  return `${sign}${formatMinor(amountMinor, { currencySymbol, showCents, sign: "never" })}`;
 }
 
 // Decimal keypad text is parsed without floating-point currency arithmetic.

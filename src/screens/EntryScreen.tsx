@@ -6,6 +6,7 @@ import { AppText as Text } from "../components/AppText";
 import { Chip } from "../components/Chip";
 import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
+import { TextPromptModal } from "../components/TextPromptModal";
 import {
   accountChipLabel,
   categoriesForType,
@@ -16,6 +17,7 @@ import { formatMinor, parseDecimalToMinor, updateMoneyInput } from "../domain/se
 import type { AccountType, TransactionType } from "../domain/types";
 import type { HomeStackParamList } from "../navigation/routes";
 import { listAccountChips, useFinanceStore } from "../store/financeStore";
+import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 
 type EntryProps = NativeStackScreenProps<HomeStackParamList, "Entry">;
@@ -35,10 +37,12 @@ function todayLabel(now = new Date()): string {
 
 // The entry screen keeps the Figma three-step flow while all money stays integer minor units.
 export function EntryScreen({ navigation }: EntryProps) {
-  const theme = useTheme();
+  const theme = useTheme(useUiStore((state) => state.themePreference));
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
   const accounts = useFinanceStore((state) => state.accounts);
   const categories = useFinanceStore((state) => state.categories);
   const addTransaction = useFinanceStore((state) => state.addTransaction);
+  const addCategory = useFinanceStore((state) => state.addCategory);
   const setSelectedMonthYear = useFinanceStore((state) => state.setSelectedMonthYear);
 
   const [transactionType, setTransactionType] = useState<TransactionType>("EXPENSE");
@@ -46,6 +50,7 @@ export function EntryScreen({ navigation }: EntryProps) {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedAccountType, setSelectedAccountType] = useState<AccountType>("CASH");
   const [saving, setSaving] = useState(false);
+  const [showNewCategory, setShowNewCategory] = useState(false);
 
   const accountChips = useMemo(() => listAccountChips(accounts), [accounts]);
   const typeCategories = useMemo(
@@ -54,14 +59,15 @@ export function EntryScreen({ navigation }: EntryProps) {
   );
 
   const categoryCells = useMemo(() => {
-    const cells = typeCategories.slice(0, 8).map((category) => ({
+    const cells = typeCategories.slice(0, 7).map((category) => ({
       emoji: categoryEmoji(category.name),
       label: category.name,
     }));
+    cells.push({ emoji: "+", label: "New" });
     while (cells.length > 0 && cells.length % 4 !== 0) {
       cells.push({ emoji: "", label: "" });
     }
-    return cells;
+    return cells.slice(0, 8);
   }, [typeCategories]);
 
   useEffect(() => {
@@ -85,7 +91,8 @@ export function EntryScreen({ navigation }: EntryProps) {
 
   const amountColor = transactionType === "EXPENSE" ? theme.colors.expense : theme.colors.income;
   const selectedAccountLabel = accountChipLabel(selectedAccountType).replace(/^\S+\s/, "");
-  const canSave = amountMinor > 0 && selectedCategory !== "" && !saving;
+  const canSave =
+    amountMinor > 0 && selectedCategory !== "" && selectedCategory !== "New" && !saving;
 
   const handleSave = async () => {
     if (!canSave) {
@@ -176,7 +183,7 @@ export function EntryScreen({ navigation }: EntryProps) {
 
       <View style={{ alignItems: "center", height: theme.sizes.entryAmountBlock, justifyContent: "center" }}>
         <Text style={{ color: amountColor, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.entryAmount }}>
-          {formatMinor(amountMinor)}
+          {formatMinor(amountMinor, { currencySymbol })}
         </Text>
         <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
           {selectedAccountLabel} · {todayLabel()}
@@ -199,7 +206,13 @@ export function EntryScreen({ navigation }: EntryProps) {
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
                   key={category.label}
-                  onPress={() => setSelectedCategory(category.label)}
+                  onPress={() => {
+                    if (category.label === "New") {
+                      setShowNewCategory(true);
+                      return;
+                    }
+                    setSelectedCategory(category.label);
+                  }}
                   style={{
                     alignItems: "center",
                     backgroundColor: selected ? theme.colors.tint : theme.colors.surface,
@@ -281,6 +294,28 @@ export function EntryScreen({ navigation }: EntryProps) {
       <PrimaryButton disabled={!canSave} onPress={() => void handleSave()}>
         {saving ? "Saving…" : "Save Transaction"}
       </PrimaryButton>
+      <TextPromptModal
+        confirmLabel="Add"
+        message="Creates a custom category on this device."
+        onCancel={() => setShowNewCategory(false)}
+        onConfirm={(value) => {
+          void (async () => {
+            try {
+              const created = await addCategory({ name: value, type: transactionType });
+              setSelectedCategory(created.name);
+              setShowNewCategory(false);
+            } catch (error: unknown) {
+              Alert.alert(
+                "Could not add category",
+                error instanceof Error ? error.message : "Unknown error",
+              );
+            }
+          })();
+        }}
+        placeholder="Category name"
+        title="New category"
+        visible={showNewCategory}
+      />
     </ScreenContainer>
   );
 }
