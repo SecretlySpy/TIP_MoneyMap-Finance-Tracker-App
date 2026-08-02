@@ -1391,3 +1391,32 @@
 - **Data Analysis Notes**: Percent sums are adjusted to 100 for donut stability; budget states use 80/100 thresholds.
 - **Responsive & Accessibility Notes**: Produces display strings and percents consumed by accessible components.
 - **Security Notes**: Pure functions with no I/O; safe for unit tests without native modules.
+
+# Module / File: Development Environment (Linux Mint 22.3)
+## Function: bootstrapLocalToolchain
+- **Purpose**: Establish a fully functional MoneyMap development environment (Node, JDK 21, Android SDK, npm deps, AVD, editor extension) on Linux without requiring Expo Go.
+- **Inputs**:
+  - Host OS (`Linux x86_64`): Linux Mint 22.3 / Ubuntu 24.04 base with Git, gcc/g++/make/python3, libsqlite3, KVM device, VS Code.
+  - Network (`HTTPS`): nodejs.org, adoptium.net, dl.google.com, registry.npmjs.org.
+- **Outputs**: Runnable JS tooling, encrypted-DB-capable native build path, green unit tests, passing expo-doctor.
+- **Dependencies**: nvm + Node 22 LTS, Temurin JDK 21, Android cmdline-tools/SDK packages, npm lockfile, VS Code React Native Tools (`msjsdiag.vscode-react-native`), optional KVM.
+- **Behavior**: Install Node via nvm; install user-space JDK 21; install Android SDK packages (platform 35, build-tools 35, NDK 27.1, cmake 3.22.1, emulator, google_apis x86_64 image); create AVD `MoneyMap_VSCode_API_35`; copy `.env.example` → `.env`; run `npm ci`; verify with `npm test`, `npx expo-doctor`, `npx expo export --platform android`.
+- **Side Effects**: Writes `~/.nvm`, `~/.local/share/MoneyMap/toolchains/temurin-21`, `~/Android/Sdk`, `~/.android/avd`, project `node_modules/`, `dist/`, and `~/.moneymap-env.sh` PATH exports.
+- **DSA Used**: Linear package install and test execution O(p + t); environment resolution is constant-time path lookup.
+- **Data Analysis Notes**: Disk footprint observed ~0.2 GB nvm, ~0.3 GB JDK, ~6.8 GB Android SDK, ~0.8 GB node_modules. Jest: 11 suites / 44 tests. Peer warning only: nested `react-reconciler@0.33.0` wants `react@^19.2.0` while Expo pins `react@19.1.0` (non-blocking). npm audit high-omit-dev: moderate Expo transitive advisories only.
+- **Responsive & Accessibility Notes**: Not a UI module; enables building the accessible Android client and running UI unit tests.
+- **Security Notes**: Never commit `.env`, keystores, or SQLCipher keys. GEMINI_API_KEY unused until Smart Tips networking. Prefer JDK 21 only for Gradle (Java 25/26 EA breaks the stack). KVM access via group `kvm` or ACL; do not expose ADB over the network.
+
+# Module / File: package.json
+## Function: scripts and dependency surface
+- **Purpose**: Declare Expo 54 / RN 0.81.5 application dependencies, OP-SQLite SQLCipher flag, and developer scripts.
+- **Inputs**:
+  - npm lifecycle (`install`/`ci`): resolves lockfile v3 graph.
+- **Outputs**: Installed `node_modules` and runnable scripts: `start`, `android`, `ios`, `prebuild`, `test`, `test:coverage`, `asset:splash`, `build:readme-page`.
+- **Dependencies**: Expo `~54`, React `19.1.0`, RN `0.81.5`, `@op-engineering/op-sqlite` with `"op-sqlite": { "sqlcipher": true }`, NativeWind 4, React Navigation 7, Zustand 5, Jest Expo, better-sqlite3 (tests).
+- **Behavior**: `npm ci` installs locked graph; `overrides.postcss` pins `8.5.25`; native Android path requires prebuild + Gradle with JDK 21 and Android SDK 35.
+- **Side Effects**: Native module compile for `better-sqlite3`/`sharp` during install; no network at app runtime for core finance features.
+- **DSA Used**: npm dependency DAG resolution; O(packages) install.
+- **Data Analysis Notes**: No `typecheck` script (JS migration). Expo Go unsupported due to native SQLCipher.
+- **Responsive & Accessibility Notes**: Test scripts cover UI fidelity static contracts and component a11y-related cases.
+- **Security Notes**: `allowBackup: false` in app.json; SecureStore holds DB key; release Gemini key via EAS secrets only.

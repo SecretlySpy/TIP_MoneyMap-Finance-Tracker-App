@@ -14,7 +14,7 @@ Task 3 remains the next functional milestone: repository change subscriptions an
 
 1. Install Node.js 22 LTS, JDK 21, and the Android SDK with an API 35 Google APIs x86_64 image.
 2. Open the repository in Visual Studio Code and accept the recommended **React Native Tools** extension.
-3. Run `npm install`, `npm run typecheck`, and `npm test`.
+3. Run `npm ci` (or `npm install`) and `npm test`.
 4. Press `Ctrl+Shift+B` or choose **Terminal → Run Build Task → MoneyMap: Run on Android emulator**.
 5. The task opens the official Google Android Emulator, starts Metro, builds and installs the dev client, and opens MoneyMap. It never selects BlueStacks.
 6. On the development client's first launch only, select **Continue**, then close the developer menu to reveal the Dashboard.

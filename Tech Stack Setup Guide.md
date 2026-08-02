@@ -4,8 +4,8 @@
 
 | Layer | Technology | Version constraint | Purpose |
 |---|---|---:|---|
-| Runtime | Node.js | 22 LTS | JavaScript tooling and Expo CLI |
-| Language | TypeScript | `~5.9.2`, strict | Compile-time application contracts |
+| Runtime | Node.js | 22 LTS (verified `v22.23.2`) | JavaScript tooling and Expo CLI |
+| Language | JavaScript (JSX) | ES modules / CommonJS mix per Metro | Application source after TS→JS migration; no `typecheck` script |
 | Framework | Expo / React Native | Expo `~54.0.0`, RN `0.81.5` | Android dev build and cross-platform UI |
 | Build configuration | Expo Build Properties | `~1.0.9` | Enforce the Android API 26 minimum |
 | Native path safety | Local Expo config plugin / CMake | Temp staging + object limit `250` | Shorten generated target directories and hash excess object paths before Windows Ninja reaches `MAX_PATH` |
@@ -20,8 +20,8 @@
 | Encrypted database | OP-SQLite / SQLCipher | OP-SQLite `^17.1.3` with `sqlcipher: true` | Offline relational storage encrypted at rest |
 | Key generation/storage | Expo Crypto / SecureStore | `~15.0.9` / `~15.0.8` | Generate a 256-bit key and protect it with Android Keystore |
 | Tests | Jest Expo / RNTL / better-sqlite3 | `~54.0.17` / `^14.0.1` / `^12.11.1` | Test SQL contracts, integer money, themes, and accessible UI states |
-| Package manager | npm | 10 or newer | Dependency installation and scripts |
-| Android tooling | Android Studio, JDK | Current stable, JDK 21 | API 26+ emulator/device builds; Java 25 is unsupported by this Gradle stack |
+| Package manager | npm | 10 or newer (verified `10.9.8`) | Dependency installation and scripts |
+| Android tooling | Android SDK cmdline-tools / Studio, JDK | SDK platform 35, build-tools 35, NDK 27.1, Emulator, JDK 21 | API 26+ emulator/device builds; Java 25+ is unsupported by this Gradle stack |
 
 Later functional milestones add notification, file-import, biometric, MMKV, and Smart Tips networking libraries only when their dependencies in the project plan are complete. The current Smart Tips view is an offline visual fixture.
 
@@ -80,17 +80,19 @@ sequenceDiagram
 
 ## Before starting on any operating system
 
-1. Install Git, Node.js 22 LTS, npm, JDK 21, and Android Studio. Do not use Java 25 with this Expo SDK 54/Gradle build.
-2. In Android Studio's SDK Manager, install an Android SDK platform and matching build tools; create an emulator running Android 8.0 (API 26) or newer.
+1. Install Git, Node.js 22 LTS, npm, JDK 21, and the Android SDK (Android Studio or command-line tools). Do not use Java 25+ with this Expo SDK 54/Gradle build.
+2. Install Android SDK Platform 35, Build-Tools 35, Platform-Tools, NDK 27.1.12297006, CMake 3.22.1, Emulator, and `system-images;android-35;google_apis;x86_64`. Create AVD `MoneyMap_VSCode_API_35` (Pixel 6 / Google APIs x86_64).
 3. Clone the repository and enter its directory.
 4. Copy `.env.example` to `.env`. Leave the key blank: the current Smart Tips screen is offline-only and never reads it.
-5. Run `npm install`.
+5. Run `npm ci` (preferred with lockfile) or `npm install`.
 6. Run `npm run asset:splash` only after changing the source Home SVG or launch color; identical input produces an identical PNG hash.
-7. Run `npm run typecheck`.
-8. Run `npm test`; all persistence, money, theme, component, accessibility, and native-plugin tests must pass.
-9. Start an emulator or connect an Android device with USB debugging, then run `npm run android`.
+7. Run `npm test`; all persistence, money, theme, component, accessibility, and native-plugin tests must pass (44 tests expected).
+8. Run `npx expo-doctor` (18/18 checks) and optionally `npx expo export --platform android --clear`.
+9. Start an emulator or connect an Android device with USB debugging, then run `npm run android` (first run performs a native dev-client build).
 
 This project requires an Expo development build. Expo Go cannot load OP-SQLite or SQLCipher.
+
+There is no `npm run typecheck` script: application sources are JavaScript/JSX under Metro.
 
 ## macOS
 
@@ -113,10 +115,60 @@ This verified workstation uses Android Emulator 35.6.11 with `MoneyMap_VSCode_AP
 
 ## Linux
 
-1. Install Node.js 22 LTS and JDK 21 using your distribution's supported package or version manager.
-2. Install Android Studio, then set `ANDROID_HOME=$HOME/Android/Sdk` and add its `emulator` and `platform-tools` folders to `PATH`.
-3. Ensure your user has permission to access an attached Android device (Linux installations may need a vendor udev rule).
-4. Follow the shared npm commands.
+Verified on **Linux Mint 22.3 (Ubuntu 24.04 base)** without `sudo` for toolchains (user-space installs):
+
+1. **Node.js 22 LTS** via nvm:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+   . "$HOME/.nvm/nvm.sh"
+   nvm install 22
+   nvm alias default 22
+   ```
+2. **JDK 21 (Temurin)** user-space (avoid system Java 25/26 EA for Gradle):
+   ```bash
+   mkdir -p "$HOME/.local/share/MoneyMap/toolchains/temurin-21"
+   curl -fL -o /tmp/temurin21.tar.gz \
+     "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse?project=jdk"
+   tar -xzf /tmp/temurin21.tar.gz -C "$HOME/.local/share/MoneyMap/toolchains/temurin-21" --strip-components=1
+   export JAVA_HOME="$HOME/.local/share/MoneyMap/toolchains/temurin-21"
+   ```
+3. **Android SDK command-line tools** under `$HOME/Android/Sdk`:
+   ```bash
+   export ANDROID_HOME="$HOME/Android/Sdk"
+   export ANDROID_SDK_ROOT="$ANDROID_HOME"
+   # install cmdline-tools into $ANDROID_HOME/cmdline-tools/latest
+   yes | sdkmanager --licenses
+   sdkmanager --install \
+     "platform-tools" "platforms;android-35" "build-tools;35.0.0" \
+     "ndk;27.1.12297006" "cmake;3.22.1" "emulator" \
+     "system-images;android-35;google_apis;x86_64"
+   echo no | avdmanager create avd --name MoneyMap_VSCode_API_35 \
+     --package "system-images;android-35;google_apis;x86_64" --device pixel_6 --force
+   ```
+4. Persist env (example `~/.moneymap-env.sh` sourced from `~/.bashrc`):
+   ```bash
+   export JAVA_HOME="$HOME/.local/share/MoneyMap/toolchains/temurin-21"
+   export ANDROID_HOME="$HOME/Android/Sdk"
+   export ANDROID_SDK_ROOT="$ANDROID_HOME"
+   export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+   ```
+5. **KVM acceleration**: `/dev/kvm` must be readable/writable. Prefer membership in group `kvm` (`sudo usermod -aG kvm $USER` then re-login). ACL grants also work. Verify with `emulator -accel-check`.
+6. **USB devices**: may need a vendor udev rule and `plugdev` group membership.
+7. Host packages already required for native npm modules: `gcc`, `g++`, `make`, `python3`, `libsqlite3` (usually present on Mint/Ubuntu desktop).
+8. Follow the shared npm commands. Install VS Code extension `msjsdiag.vscode-react-native`.
+
+### Linux verified baseline (2026-08-02)
+
+| Component | Path / version |
+|---|---|
+| Node / npm | `v22.23.2` / `10.9.8` via nvm |
+| JDK | Temurin `21.0.12+8` at `~/.local/share/MoneyMap/toolchains/temurin-21` |
+| Android SDK | `~/Android/Sdk` (platform-tools 37.0.1, platform 35, build-tools 35.0.0, NDK 27.1.12297006, emulator 37.1.11) |
+| AVD | `MoneyMap_VSCode_API_35` (google_apis/x86_64, Pixel 6) |
+| KVM | usable (`emulator -accel-check` → KVM version 12) |
+| Jest | 11 suites / 44 tests passed |
+| expo-doctor | 18/18 passed |
+| expo export android | success (Hermes bundle) |
 
 ## EAS development builds
 
@@ -134,14 +186,15 @@ The SQLCipher key is created on-device and stored in SecureStore; it is never re
 
 Run these commands in order:
 
-```powershell
+```bash
 npm ci
-npm run typecheck
 npm test
 npx expo-doctor
 npx expo export --platform android --clear
 npm audit --omit=dev --audit-level high
 ```
+
+Expect: 44 tests green, expo-doctor 18/18, export writes `dist/`. Production dependency audit may still report **moderate** advisories in Expo transitive packages; do not run `npm audit fix --force` (breaking). Re-check after Expo SDK upgrades.
 
 For a native debug APK, run `npx expo prebuild --platform android --clean`, enter the generated `android` directory, and run `./gradlew :app:assembleDebug` on macOS/Linux or `.\gradlew.bat :app:assembleDebug` in PowerShell. Running the wrapper from its own directory avoids Windows wrapper working-directory surprises. During Gradle configuration, OP-SQLite should report that it is using SQLCipher and `prepareMoneyMapOpenSslJni` must run before the application JNI merge. Confirm the APK contains both `lib/<abi>/libop-sqlite.so` and `lib/<abi>/libcrypto.so`. Generated `android/` and `ios/` directories are ignored because Expo Continuous Native Generation recreates them from `app.json`.
 
