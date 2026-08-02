@@ -498,6 +498,15 @@ export const useFinanceStore = create((set, get) => ({
         await new RecurringRepository(database).delete(id);
         await get().refresh();
     },
+    deleteTransactionById: async (id) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        await new TransactionRepository(database).delete(id);
+        await get().refresh();
+    },
 }));
 export function listAccountChips(accounts) {
     return DEFAULT_ACCOUNTS.map((defaults) => {

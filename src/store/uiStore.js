@@ -16,6 +16,7 @@ function preferencesFromState(state) {
         currencySymbol: state.currencySymbol,
         remindersEnabled: state.remindersEnabled,
         smartTipsEnabled: state.smartTipsEnabled,
+        smartTipsConsentAccepted: state.smartTipsConsentAccepted,
         themePreference: state.themePreference,
     };
 }
@@ -132,7 +133,20 @@ export const useUiStore = create((set, get) => ({
         }
     },
     setSmartTipsEnabled: async (enabled) => {
-        set({ smartTipsEnabled: enabled });
+        if (!enabled) {
+            set({ smartTipsEnabled: false });
+            await persist(get());
+            return;
+        }
+        set({ smartTipsEnabled: true });
+        await persist(get());
+    },
+    acceptSmartTipsConsent: async () => {
+        set({ smartTipsConsentAccepted: true, smartTipsEnabled: true });
+        await persist(get());
+    },
+    declineSmartTipsConsent: async () => {
+        set({ smartTipsConsentAccepted: false, smartTipsEnabled: false });
         await persist(get());
     },
     setThemePreference: async (theme) => {

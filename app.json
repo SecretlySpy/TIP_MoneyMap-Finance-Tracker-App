@@ -6,9 +6,14 @@
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "icon": "./assets/splash-icon.png",
     "android": {
-      "package": "com.example.financetracker",
+      "package": "com.moneymap.financetracker",
       "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/splash-icon.png",
+        "backgroundColor": "#F5F7F6"
+      },
       "allowBackup": false,
       "permissions": [
         "INTERNET",

@@ -1,28 +1,51 @@
 # MoneyMap Finance Tracker
 
-An Android-first, offline-first personal finance tracker for students, built with React Native and Expo.
+An Android-first, offline-first personal finance tracker for **students**, built with React Native and Expo (JavaScript).
 
-## Current milestone
+## Status
 
-Tasks 1–9 and 12 are complete, plus partial work on later milestones. MoneyMap has the Expo development-build shell, encrypted SQLCipher database, repositories, live screens on real data, CSV export/backup/import, and PIN app lock. **Task 14 (biometrics)** is complete: `expo-local-authentication` is installed, wired through `appLock.js` / `AppLockScreen`, and gated by `appLockEnabled` + stored PIN (biometric failure falls back to PIN).
-**Task 10 (recurring catch-up)** is complete: pure planner + `runRecurringCatchUp` posts due rules exactly once per period (multi-period and month-boundary safe), runs on app open after DB init, and registers an `expo-background-task` worker.
-**Task 11 (bill reminders)** is complete: local `expo-notifications` schedules per active rule (lead days before `nextRun`), resyncs on toggle/CRUD/catch-up, prompts for `POST_NOTIFICATIONS` only when enabling reminders, deep-links taps to Recurring, and degrades gracefully when permission is denied.
-**Task 13 (Excel import)** is complete: CSV and `.xlsx` share one grid → column-map → validate → transactional bulk-insert pipeline; bad rows are skipped and reported; missing categories/accounts are auto-created.
-
-The approved Figma UI has also been reproduced as a fixture-driven visual integration layer: dashboard, transaction entry, history and empty history, budgets, settings, dark dashboard, app lock, recurring reminders, and Smart Tips. This does **not** mark later functional tasks complete—database writes, persistent settings, notifications, biometrics, imports, and Smart Tips networking remain governed by the strict dependency order. See [the UI fidelity implementation record](./docs/ui-fidelity-implementation.md) and [local environment audit](./docs/local-environment-audit.md).
-
-Task 3 remains the next functional milestone: repository change subscriptions and persistent Zustand-backed settings, followed by feature-by-feature replacement of visual fixtures.
+| Area | State |
+|---|---|
+| Tasks 1–9 core product | Done |
+| Task 10 recurring catch-up | Done |
+| Task 11 bill reminders (local notifications) | Done |
+| Task 12 CSV export + backup | Done |
+| Task 13 CSV + Excel import | Done |
+| Task 14 app lock (PIN + biometrics) | Done |
+| Task 15 Smart Tips offline rules | Done |
+| Task 16 Smart Tips online Gemini (opt-in) | Done |
+| Task 17 polish | Done |
+| Task 18 release prep docs | Done (EAS project ID still placeholder until `eas init`) |
 
 ## Quick start
 
-1. Install Node.js 22 LTS, JDK 21, and the Android SDK with an API 35 Google APIs x86_64 image.
-2. Open the repository in Visual Studio Code and accept the recommended **React Native Tools** extension.
-3. Run `npm ci` (or `npm install`) and `npm test`.
-4. Press `Ctrl+Shift+B` or choose **Terminal → Run Build Task → MoneyMap: Run on Android emulator**.
-5. The task opens the official Google Android Emulator, starts Metro, builds and installs the dev client, and opens MoneyMap. It never selects BlueStacks.
-6. On the development client's first launch only, select **Continue**, then close the developer menu to reveal the Dashboard.
-7. Replace the placeholder EAS project ID in `app.json` after running `eas init`.
+1. Install **Node.js 22 LTS**, **JDK 21**, Android SDK (API 35 recommended).
+2. `npm ci`
+3. Copy `.env.example` → `.env` (optional `GEMINI_API_KEY` for online tips).
+4. `npm test`
+5. Start an emulator/device, then `npm run android` (dev client required — **Expo Go unsupported** because of SQLCipher).
 
-Use **MoneyMap: Quick launch installed build** after JavaScript-only changes, **MoneyMap: Android environment status** for diagnostics, and **MoneyMap: Stop Android emulator** for a graceful shutdown. The emulator display is a native window beside VS Code; tasks and the Hermes debugger are integrated into the editor. Expo Go is not supported because SQLCipher is native.
+See [Tech Stack Setup Guide.md](./Tech%20Stack%20Setup%20Guide.md) and [docs/local-environment-audit-linux.md](./docs/local-environment-audit-linux.md).
 
-See [Tech Stack Setup Guide.md](./Tech%20Stack%20Setup%20Guide.md) for full platform-specific instructions.
+## Architecture (short)
+
+- Screens → Zustand stores → repositories → SQLCipher
+- Money is always **integer minor units** (`src/domain/services/money.js`)
+- Theme tokens only (`src/theme/tokens.js`) — no hardcoded hex in screens
+- **Only** `src/remote/smartTipsClient.js` may call `fetch`
+
+## Smart Tips privacy
+
+- Default **off**. First enable shows a consent sheet.
+- Offline: `deriveSmartTips` from local budgets/transactions.
+- Online: anonymized summary only (period, totals, category ratios, currency) to Gemini.
+- Never: raw transactions, notes, account names/IDs.
+
+## Release
+
+- Package: `com.moneymap.financetracker`
+- Privacy: [docs/privacy-policy.md](./docs/privacy-policy.md)
+- Play Data safety: [docs/play-data-safety.md](./docs/play-data-safety.md)
+- Checklist: [docs/release-checklist.md](./docs/release-checklist.md)
+
+Replace the all-zero EAS `projectId` after `eas init` before cloud builds.

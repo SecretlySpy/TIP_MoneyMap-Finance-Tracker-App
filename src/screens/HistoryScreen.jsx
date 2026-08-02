@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { Chip } from "../components/Chip";
 import { PrimaryButton } from "../components/Buttons";
@@ -11,7 +11,7 @@ import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 // This branch is shared by the populated and explicit Figma empty-state variants.
-export function HistoryBody({ groups, onAdd }) {
+export function HistoryBody({ groups, onAdd, onDeleteTransaction }) {
     const theme = useTheme();
     if (groups.length === 0) {
         return (<View style={{ alignItems: "center", flex: 1, justifyContent: "center", paddingVertical: theme.spacing.xxl }}>
@@ -54,8 +54,17 @@ export function HistoryBody({ groups, onAdd }) {
             {group.label}
           </Text>
           <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.md }}>
-            {group.transactions.map((transaction) => (<TransactionRow compact key={transaction.id} {...transaction}/>))}
-          </SectionCard>
+             {group.transactions.map((transaction) => (
+               <Pressable
+                 key={transaction.id}
+                 accessibilityHint="Long press to delete this transaction"
+                 accessibilityRole="button"
+                 onLongPress={() => onDeleteTransaction?.(transaction)}
+               >
+                 <TransactionRow compact {...transaction}/>
+               </Pressable>
+             ))}
+           </SectionCard>
         </View>))}
     </View>);
 }
@@ -68,6 +77,7 @@ export function HistoryScreen({ navigation }) {
     const transactions = useFinanceStore((state) => state.transactions);
     const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
     const setSelectedMonthYear = useFinanceStore((state) => state.setSelectedMonthYear);
+    const deleteTransactionById = useFinanceStore((state) => state.deleteTransactionById);
     const [categoryFilter, setCategoryFilter] = useState(null);
     const [accountFilter, setAccountFilter] = useState(null);
     const { accountsById, categoriesById } = useMemo(() => mapsFromState({ accounts, categories }), [accounts, categories]);
@@ -151,6 +161,27 @@ export function HistoryScreen({ navigation }) {
           {accountChipLabel}
         </Chip>
       </View>
-      <HistoryBody groups={groups} onAdd={addTransaction}/>
+      <HistoryBody
+        groups={groups}
+        onAdd={addTransaction}
+        onDeleteTransaction={(transaction) => {
+          Alert.alert(
+            transaction.title ?? "Transaction",
+            "Delete this transaction? This cannot be undone.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Delete",
+                style: "destructive",
+                onPress: () => {
+                  void deleteTransactionById(Number(transaction.id)).catch((error) => {
+                    Alert.alert("Delete failed", error instanceof Error ? error.message : "Could not delete.");
+                  });
+                },
+              },
+            ],
+          );
+        }}
+      />
     </ScreenContainer>);
 }

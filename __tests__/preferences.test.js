@@ -12,9 +12,12 @@ describe("preferences", () => {
             appLockEnabled: true,
             currencySymbol: "$",
             remindersEnabled: false,
-            smartTipsEnabled: true,
+            smartTipsEnabled: false,
+            smartTipsConsentAccepted: false,
             themePreference: "dark",
         });
+        expect(normalizePreferences({ smartTipsEnabled: true }).smartTipsEnabled).toBe(true);
+        expect(normalizePreferences({ smartTipsConsentAccepted: true }).smartTipsConsentAccepted).toBe(true);
     });
 });
 describe("reminders", () => {

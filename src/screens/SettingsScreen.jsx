@@ -52,6 +52,9 @@ export function SettingsScreen({ navigation }) {
     const setAppLockEnabled = useUiStore((state) => state.setAppLockEnabled);
     const setRemindersEnabled = useUiStore((state) => state.setRemindersEnabled);
     const setSmartTipsEnabled = useUiStore((state) => state.setSmartTipsEnabled);
+    const smartTipsConsentAccepted = useUiStore((state) => state.smartTipsConsentAccepted);
+    const acceptSmartTipsConsent = useUiStore((state) => state.acceptSmartTipsConsent);
+    const declineSmartTipsConsent = useUiStore((state) => state.declineSmartTipsConsent);
     const setCurrencySymbol = useUiStore((state) => state.setCurrencySymbol);
     const setThemePreference = useUiStore((state) => state.setThemePreference);
     const clearStoredPin = useUiStore((state) => state.clearStoredPin);
@@ -145,7 +148,24 @@ export function SettingsScreen({ navigation }) {
                 return;
             }
             tabNavigation?.navigate("Home", { screen: "SmartTips" });
-        }} trailing={<Toggle enabled={smartTipsEnabled} label="Budget-based tips" onChange={(enabled) => void setSmartTipsEnabled(enabled)}/>}/>
+        }} trailing={<Toggle enabled={smartTipsEnabled} label="Budget-based tips" onChange={(enabled) => {
+            if (!enabled) {
+                void setSmartTipsEnabled(false);
+                return;
+            }
+            if (smartTipsConsentAccepted) {
+                void setSmartTipsEnabled(true);
+                return;
+            }
+            Alert.alert(
+                "Enable Smart Tips?",
+                "When online, MoneyMap may send an anonymized budget summary to Google Gemini: period, remaining budget, per-category spend ratios, and currency symbol. Raw transactions, notes, and account names never leave this device. Offline tips always stay local.",
+                [
+                    { text: "Not now", style: "cancel", onPress: () => { void declineSmartTipsConsent(); } },
+                    { text: "I understand", onPress: () => { void acceptSmartTipsConsent(); } },
+                ],
+            );
+        }}/>}/>
         <SettingsRow emoji="🔔" label={"Recurring bill\nreminders"} onPress={() => tabNavigation?.navigate("Budgets", { screen: "Recurring" })} trailing={<Toggle enabled={remindersEnabled} label="Recurring bill reminders" onChange={(enabled) => void setRemindersEnabled(enabled)}/>}/>
         {remindersEnabled && (notificationPermissionDenied || notificationHint) ? (
           <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small, marginTop: theme.spacing.sm }}>

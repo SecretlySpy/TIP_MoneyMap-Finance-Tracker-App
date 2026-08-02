@@ -130,7 +130,7 @@ export function DashboardScreen({ navigation }) {
                 padding: theme.spacing.lg,
             }}>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
-            ✨ Open Smart Tips (offline sample tips)
+            ✨ Open Smart Tips (from your spending)
           </Text>
         </Pressable>) : null}
 

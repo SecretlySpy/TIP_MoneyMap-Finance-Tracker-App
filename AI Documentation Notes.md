@@ -1562,3 +1562,56 @@
 - **Data Analysis Notes**: Money remains integer minor units
 - **Responsive & Accessibility Notes**: n/a
 - **Security Notes**: On-device only
+
+# Module / File: src/domain/services/tips.js
+## Function: deriveSmartTips
+- **Purpose**: Pure offline Smart Tips from the user's budgets and transactions (FR-10a).
+- **Inputs**:
+  - `budgets`, `transactions`, `categories`/`Map`, `monthYear`, optional `now`
+- **Outputs**: `{ remainingMinor, limitMinor, spentMinor, daysLeftInMonth, dailyAllowanceMinor, tips[] }`
+- **Dependencies**: financeView (buildBudgetCards, budgetSummary, shiftMonthYear, transactionInMonth)
+- **Behavior**: Builds tips for daily allowance, food/day, pace-to-over, repeat small spends, MoM category compare; empty-data fallback tip
+- **Side Effects**: none — never calls fetch/network
+- **DSA Used**: O(t + b + c) scans; Map grouping for repeats O(t)
+- **Data Analysis Notes**: All money integer minor units; daily = ceil(remaining/daysLeft); pace projects linear spend to month end
+- **Responsive & Accessibility Notes**: Tip copy consumed by SmartTipsScreen cards
+- **Security Notes**: On-device only; no identifiers leave the device
+
+# Module / File: src/screens/SmartTipsScreen.jsx
+## Function: SmartTipsScreen
+- **Purpose**: Render offline-derived tips; hide/exit when smartTipsEnabled is false.
+- **Inputs**: navigation
+- **Outputs**: JSX tip list + monthly hero
+- **Dependencies**: deriveSmartTips, financeStore, uiStore
+- **Behavior**: useEffect goBack when disabled; maps tip title/meta/tag through formatMinor
+- **Side Effects**: navigation.goBack when toggle off
+- **DSA Used**: n/a
+- **Data Analysis Notes**: Hero uses monthly remaining (not fixture weekly split)
+- **Responsive & Accessibility Notes**: Empty tips message; offline badge
+- **Security Notes**: No fetch (static test enforces)
+
+# Module / File: src/remote/smartTipsClient.js
+## Function: buildAnonymizedSmartTipsPayload / fetchSmartTipsFromGemini / loadOnlineSmartTips
+- **Purpose**: Sole networked module (FR-10b); Gemini tips from anonymized budget summary only.
+- **Inputs**: enabled, consentAccepted, budgets/transactions for payload build; optional fetchImpl
+- **Outputs**: tip cards or null (caller falls back to deriveSmartTips)
+- **Dependencies**: expo-constants (API key), financeView aggregates, global fetch
+- **Behavior**: Gate on enabled+consent; assert payload; cache 30m; timeout 12s; parse JSON tip array
+- **Side Effects**: HTTPS POST to Gemini when gated open; in-memory cache
+- **DSA Used**: Map cache O(1); payload build O(t+b)
+- **Data Analysis Notes**: Ratios from spend/total; minor-unit integers only
+- **Responsive & Accessibility Notes**: SmartTipsScreen shows loading indicator during AI fetch
+- **Security Notes**: Forbidden fields enforced; no notes/accounts/raw txs; key from EAS/env only
+
+# Module / File: docs/privacy-policy.md
+## Function: privacy policy
+- **Purpose**: Disclose opt-in AI and on-device encryption for store / users
+- **Inputs**: n/a
+- **Outputs**: markdown policy
+- **Dependencies**: none
+- **Behavior**: Documents SQLCipher, Smart Tips payload limits, local notifications
+- **Side Effects**: none
+- **DSA Used**: n/a
+- **Data Analysis Notes**: n/a
+- **Responsive & Accessibility Notes**: n/a
+- **Security Notes**: Aligns Play Data safety checklist

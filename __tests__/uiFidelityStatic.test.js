@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(__dirname, "..");
@@ -40,6 +40,17 @@ describe("static UI fidelity boundaries", () => {
   it("keeps the Smart Tips UI offline and free of direct fetch calls", () => {
     const smartTipsSource = readFileSync(join(root, "src/screens/SmartTipsScreen.jsx"), "utf8");
     expect(smartTipsSource).not.toMatch(/\bfetch\s*\(/);
+    // Network fetch is isolated to the remote client module only.
+    const remoteClient = readFileSync(join(root, "src/remote/smartTipsClient.js"), "utf8");
+    expect(remoteClient).toMatch(/\bfetch\b/);
+    const screensDir = join(root, "src/screens");
+    // No other screen may call fetch directly.
+    for (const name of readdirSync(screensDir)) {
+      if (!name.endsWith(".js") && !name.endsWith(".jsx")) continue;
+      if (name === "SmartTipsScreen.jsx") continue;
+      const src = readFileSync(join(screensDir, name), "utf8");
+      expect(src).not.toMatch(/\bfetch\s*\(/);
+    }
   });
 
   it("avoids Fabric-incompatible pressed-state style callbacks", () => {

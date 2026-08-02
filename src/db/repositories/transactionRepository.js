@@ -24,15 +24,26 @@ function validateTransaction(transaction) {
         assertPositiveInteger(transaction.recurringRuleId, "recurringRuleId");
     }
 }
+async function assertCategoryMatchesType(database, categoryId, type) {
+    const result = await database.execute("SELECT type FROM categories WHERE id = ?", [categoryId]);
+    const categoryType = result.rows[0]?.type;
+    if (categoryType === undefined) {
+        throw new TypeError("Transaction category does not exist.");
+    }
+    if (categoryType !== type) {
+        throw new TypeError("Transaction type must match the category type.");
+    }
+}
 export class TransactionRepository {
     constructor(database) {
         this.database = database;
     }
     async create(transaction) {
         validateTransaction(transaction);
+        await assertCategoryMatchesType(this.database, transaction.categoryId, transaction.type);
         const id = await insertRow(this.database, `INSERT INTO transactions (
-         amount_minor, type, category_id, account_id, date_epoch_millis, note, recurring_rule_id
-       ) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
+          amount_minor, type, category_id, account_id, date_epoch_millis, note, recurring_rule_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
             transaction.amountMinor,
             transaction.type,
             transaction.categoryId,

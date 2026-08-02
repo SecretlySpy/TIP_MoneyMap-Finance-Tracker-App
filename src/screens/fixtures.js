@@ -90,33 +90,3 @@ export const recurringBills = [
     { id: "netflix", emoji: "📺", name: "Netflix", due: "Jul 20", amountMinor: 54_900, leadDays: 3 },
     { id: "water", emoji: "💧", name: "Water", due: "Jul 28", amountMinor: 35_000, leadDays: 5 },
 ];
-export const smartTips = [
-    {
-        id: "lugaw",
-        emoji: "🍜",
-        title: "Lugaw + egg",
-        meta: { before: "", amountMinor: 4_500, after: " · fits your daily food budget" },
-        tag: "-70% vs eating out",
-    },
-    {
-        id: "carinderia",
-        emoji: "🍚",
-        title: "Carinderia rice meal",
-        meta: { before: "", amountMinor: 7_000, after: " · popular & filling near campus" },
-        tag: "Budget pick",
-    },
-    {
-        id: "coffee",
-        emoji: "☕",
-        title: { before: "Skip the daily ", amountMinor: 15_000, after: " coffee" },
-        meta: "Brew at home instead",
-        tag: { before: "Save ", amountMinor: 60_000, after: "/mo" },
-    },
-    {
-        id: "cook",
-        emoji: "🛒",
-        title: "Cook 3 meals at home",
-        meta: { before: "", amountMinor: 20_000, after: " total ingredients", approximate: true },
-        tag: { before: "vs ", amountMinor: 45_000, after: " takeout" },
-    },
-];

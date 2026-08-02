@@ -23,8 +23,15 @@ export class BudgetRepository {
         assertMonthYear(budget.monthYear);
         assertPositiveInteger(budget.limitMinor, "limitMinor");
         await assertExpenseCategory(this.database, budget.categoryId);
+        const existing = await this.database.execute(
+            "SELECT id FROM budgets WHERE category_id = ? AND month_year = ? LIMIT 1",
+            [budget.categoryId, budget.monthYear],
+        );
+        if ((existing.rows?.length ?? 0) > 0) {
+            throw new TypeError("A budget already exists for this category and month.");
+        }
         const id = await insertRow(this.database, `INSERT INTO budgets (category_id, month_year, limit_minor)
-       VALUES (?, ?, ?)`, [budget.categoryId, budget.monthYear, budget.limitMinor]);
+        VALUES (?, ?, ?)`, [budget.categoryId, budget.monthYear, budget.limitMinor]);
         return requireCreatedEntity(await this.getById(id), "Budget");
     }
     async getById(id) {

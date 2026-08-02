@@ -17,8 +17,13 @@ export class TestSqliteDatabase {
   constructor() {
     // Each in-memory DB is isolated; enable FK before any schema/migration work.
     this.database = new BetterSqlite3(":memory:");
+    // Avoid WAL on :memory: — keeps constraint enforcement predictable under Jest.
+    this.database.pragma("journal_mode = MEMORY");
     this.database.pragma("foreign_keys = ON");
     this.database.pragma("busy_timeout = 5000");
+    if (this.database.pragma("foreign_keys", { simple: true }) !== 1) {
+      throw new Error("TestSqliteDatabase failed to enable foreign_keys");
+    }
   }
 
   /**
@@ -27,6 +32,11 @@ export class TestSqliteDatabase {
    */
   applyPragma(sql) {
     const body = String(sql).replace(/^\s*PRAGMA\s+/i, "").replace(/;+\s*$/, "").trim();
+    // Force MEMORY journal in tests even if migrate asks for WAL.
+    if (/^journal_mode\s*=/i.test(body) && !/memory/i.test(body)) {
+      const mode = this.database.pragma("journal_mode = MEMORY", { simple: true });
+      return { rowsAffected: 0, rows: [{ journal_mode: mode }] };
+    }
     const result = this.database.pragma(body);
     if (Array.isArray(result)) {
       return { rowsAffected: 0, rows: result };
