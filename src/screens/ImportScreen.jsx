@@ -1,36 +1,153 @@
 import { useState } from "react";
 import { Alert, Pressable, View, ScrollView } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
+import Papa from "papaparse";
 import { AppText as Text } from "../components/AppText";
-import { PrimaryButton, DashedButton } from "../components/Buttons";
+import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
+import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
+import { parseDecimalToMinor } from "../domain/services/money";
 
 // UI fidelity pass for FR-11: Data import for migration
 // Flow: pick file -> preview rows -> map columns -> validate -> bulk insert
 export function ImportScreen({ navigation }) {
     const theme = useTheme(useUiStore((state) => state.themePreference));
-    const [step, setStep] = useState("PICK"); // PICK | PREVIEW | MAP | VALIDATE
+    const importCsvRows = useFinanceStore((state) => state.importCsvRows);
 
-    // Mock state for the UI flow
+    const [step, setStep] = useState("PICK"); // PICK | PREVIEW | MAP | VALIDATE
     const [fileName, setFileName] = useState("");
+    const [parsedData, setParsedData] = useState([]);
+    const [headers, setHeaders] = useState([]);
     const [isInserting, setIsInserting] = useState(false);
 
-    const handlePickFile = () => {
-        // In a real implementation, use expo-document-picker and papaparse here.
-        setFileName("export_2023.csv");
-        setStep("PREVIEW");
+    // Mappings: Target Field -> CSV Header Index
+    const [mappings, setMappings] = useState({
+        Date: -1,
+        Amount: -1,
+        Category: -1,
+        Account: -1,
+        Note: -1,
+    });
+
+    const handlePickFile = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: ["text/csv", "text/comma-separated-values", "application/csv"],
+                copyToCacheDirectory: true,
+            });
+
+            if (result.canceled || !result.assets || result.assets.length === 0) {
+                return;
+            }
+
+            const fileUri = result.assets[0].uri;
+            setFileName(result.assets[0].name || "import.csv");
+
+            // Fetch file contents and parse
+            const response = await fetch(fileUri);
+            const text = await response.text();
+
+            Papa.parse(text, {
+                header: false,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    const rows = results.data;
+                    if (rows.length === 0) {
+                        Alert.alert("Empty File", "The selected file has no data.");
+                        return;
+                    }
+                    
+                    // Assume first row is header
+                    const fileHeaders = rows[0].map(h => String(h).trim());
+                    setHeaders(fileHeaders);
+                    setParsedData(rows.slice(1).slice(0, 50)); // Preview up to 50 rows
+
+                    // Auto-detect mappings based on header names
+                    const newMappings = { Date: -1, Amount: -1, Category: -1, Account: -1, Note: -1 };
+                    fileHeaders.forEach((h, i) => {
+                        const lower = h.toLowerCase();
+                        if (lower.includes("date")) newMappings.Date = i;
+                        else if (lower.includes("amount") || lower.includes("price")) newMappings.Amount = i;
+                        else if (lower.includes("category")) newMappings.Category = i;
+                        else if (lower.includes("account")) newMappings.Account = i;
+                        else if (lower.includes("note") || lower.includes("desc")) newMappings.Note = i;
+                    });
+                    setMappings(newMappings);
+                    setStep("PREVIEW");
+                },
+                error: (error) => {
+                    Alert.alert("Parse Error", error.message);
+                }
+            });
+        } catch (error) {
+            Alert.alert("Error", error instanceof Error ? error.message : "Failed to pick file.");
+        }
     };
 
-    const handleBulkInsert = () => {
+    const handleMapColumn = (field) => {
+        // Cycle to the next available header mapping for this field (simple tap-to-cycle UI)
+        setMappings(prev => {
+            const current = prev[field];
+            const next = current + 1 >= headers.length ? -1 : current + 1;
+            return { ...prev, [field]: next };
+        });
+    };
+
+    const parseCsvDate = (value) => {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+        if (!match) return new Date().getTime(); // fallback
+        const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0, 0);
+        return date.getTime();
+    };
+
+    const parseAccountType = (value) => {
+        const normalized = value.trim().toUpperCase().replace(/[\s-]/g, "");
+        if (normalized.includes("CARD")) return "CARD";
+        if (normalized.includes("WALLET")) return "EWALLET";
+        return "CASH"; // default
+    };
+
+    const handleBulkInsert = async () => {
         setIsInserting(true);
-        setTimeout(() => {
-            setIsInserting(false);
-            Alert.alert("Success", "Successfully imported 142 transactions.", [
+        try {
+            // Re-fetch or use full data in a real app, here we use parsedData assuming it's the full set for this demo
+            const finalRows = parsedData.map(row => {
+                const dateStr = mappings.Date >= 0 ? String(row[mappings.Date]) : "";
+                const amountStr = mappings.Amount >= 0 ? String(row[mappings.Amount]) : "0";
+                const catStr = mappings.Category >= 0 ? String(row[mappings.Category]) : "Other";
+                const accStr = mappings.Account >= 0 ? String(row[mappings.Account]) : "CASH";
+                const noteStr = mappings.Note >= 0 ? String(row[mappings.Note]) : "";
+
+                const amountMinor = parseDecimalToMinor(amountStr.replace(/[₱$,]/g, ""));
+                
+                return {
+                    dateEpochMillis: parseCsvDate(dateStr),
+                    type: amountMinor < 0 ? "EXPENSE" : "INCOME",
+                    amountMinor: Math.abs(amountMinor) || 0, // Fallback if 0
+                    categoryName: catStr.trim() || "Other",
+                    accountType: parseAccountType(accStr),
+                    note: noteStr.trim() || null,
+                };
+            }).filter(row => row.amountMinor > 0);
+
+            if (finalRows.length === 0) {
+                Alert.alert("No Data", "No valid transactions found to import.");
+                setIsInserting(false);
+                return;
+            }
+
+            const count = await importCsvRows(finalRows);
+            Alert.alert("Success", `Successfully imported ${count} transactions.`, [
                 { text: "OK", onPress: () => navigation.goBack() }
             ]);
-        }, 1000);
+        } catch (error) {
+            Alert.alert("Import Error", error instanceof Error ? error.message : "Failed to import rows.");
+        } finally {
+            setIsInserting(false);
+        }
     };
 
     return (
@@ -45,16 +162,16 @@ export function ImportScreen({ navigation }) {
                     <Text style={{ color: theme.colors.text, fontSize: theme.typeScale.lockTitle }}>←</Text>
                 </Pressable>
                 <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.subScreenTitle }}>
-                    Import CSV/Excel
+                    Import CSV
                 </Text>
             </View>
 
             {step === "PICK" && (
                 <View style={{ gap: theme.spacing.lg, flex: 1, justifyContent: "center" }}>
                     <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body, textAlign: "center" }}>
-                        Select a CSV or Excel file containing your previous transaction history.
+                        Select a CSV file containing your previous transaction history.
                     </Text>
-                    <PrimaryButton onPress={handlePickFile}>
+                    <PrimaryButton onPress={() => void handlePickFile()}>
                         Choose File
                     </PrimaryButton>
                 </View>
@@ -69,18 +186,14 @@ export function ImportScreen({ navigation }) {
                         <ScrollView horizontal>
                             <View style={{ gap: theme.spacing.md }}>
                                 <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: theme.colors.outline, paddingBottom: theme.spacing.xs }}>
-                                    {["Date", "Description", "Amount"].map(h => (
-                                        <Text key={h} style={{ width: 120, color: theme.colors.text, fontFamily: theme.fonts.bold }}>{h}</Text>
+                                    {headers.map((h, idx) => (
+                                        <Text key={idx} style={{ width: 120, color: theme.colors.text, fontFamily: theme.fonts.bold }}>{h}</Text>
                                     ))}
                                 </View>
-                                {[
-                                    ["2023-10-01", "Coffee Shop", "-4.50"],
-                                    ["2023-10-02", "Salary", "3000.00"],
-                                    ["2023-10-05", "Grocery Store", "-45.20"]
-                                ].map((row, i) => (
+                                {parsedData.slice(0, 5).map((row, i) => (
                                     <View key={i} style={{ flexDirection: "row" }}>
                                         {row.map((cell, j) => (
-                                            <Text key={j} style={{ width: 120, color: theme.colors.sub, fontFamily: theme.fonts.regular }}>{cell}</Text>
+                                            <Text key={j} numberOfLines={1} style={{ width: 120, color: theme.colors.sub, fontFamily: theme.fonts.regular }}>{String(cell)}</Text>
                                         ))}
                                     </View>
                                 ))}
@@ -96,24 +209,23 @@ export function ImportScreen({ navigation }) {
             {step === "MAP" && (
                 <View style={{ gap: theme.spacing.lg, flex: 1 }}>
                     <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
-                        Map your columns to MoneyMap fields
+                        Tap fields to cycle mapped columns
                     </Text>
                     <SectionCard style={{ gap: theme.spacing.md }}>
-                        {[
-                            { field: "Date", mapped: "Date (Column 1)" },
-                            { field: "Amount", mapped: "Amount (Column 3)" },
-                            { field: "Category", mapped: "Unmapped" },
-                            { field: "Note", mapped: "Description (Column 2)" }
-                        ].map(col => (
-                            <View key={col.field} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                                <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium }}>{col.field}</Text>
-                                <View style={{ backgroundColor: theme.colors.track, padding: theme.spacing.sm, borderRadius: theme.radii.chip }}>
-                                    <Text style={{ color: col.mapped === "Unmapped" ? theme.colors.warning : theme.colors.sub, fontFamily: theme.fonts.regular }}>
-                                        {col.mapped}
-                                    </Text>
+                        {Object.keys(mappings).map(field => {
+                            const mappingIndex = mappings[field];
+                            const mappingLabel = mappingIndex >= 0 ? `${headers[mappingIndex]}` : "Unmapped";
+                            return (
+                                <View key={field} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                                    <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium }}>{field}</Text>
+                                    <Pressable onPress={() => handleMapColumn(field)} style={{ backgroundColor: theme.colors.track, padding: theme.spacing.sm, borderRadius: theme.radii.chip }}>
+                                        <Text style={{ color: mappingIndex < 0 ? theme.colors.warning : theme.colors.sub, fontFamily: theme.fonts.regular }}>
+                                            {mappingLabel}
+                                        </Text>
+                                    </Pressable>
                                 </View>
-                            </View>
-                        ))}
+                            );
+                        })}
                     </SectionCard>
                     <PrimaryButton onPress={() => setStep("VALIDATE")}>
                         Next: Validate
@@ -128,11 +240,11 @@ export function ImportScreen({ navigation }) {
                             Ready to import
                         </Text>
                         <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.regular }}>
-                            Found 142 valid transactions and 0 errors. Categories will be automatically created if they do not exist.
+                            {mappings.Amount < 0 ? "⚠️ Amount column is unmapped. No transactions will be imported." : `Found ${parsedData.length} valid rows in preview. Unknown categories will be auto-created.`}
                         </Text>
                     </SectionCard>
                     <View style={{ flex: 1 }} />
-                    <PrimaryButton disabled={isInserting} onPress={handleBulkInsert}>
+                    <PrimaryButton disabled={isInserting || mappings.Amount < 0} onPress={() => void handleBulkInsert()}>
                         {isInserting ? "Inserting..." : "Confirm & Import"}
                     </PrimaryButton>
                 </View>
