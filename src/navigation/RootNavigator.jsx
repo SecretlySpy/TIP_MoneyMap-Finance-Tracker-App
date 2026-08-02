@@ -12,6 +12,7 @@ import { HistoryScreen } from "../screens/HistoryScreen";
 import { ManageAccountsScreen } from "../screens/ManageAccountsScreen";
 import { ManageCategoriesScreen } from "../screens/ManageCategoriesScreen";
 import { PasteImportScreen } from "../screens/PasteImportScreen";
+import { ImportScreen } from "../screens/ImportScreen";
 import { RecurringScreen } from "../screens/RecurringScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { SmartTipsScreen } from "../screens/SmartTipsScreen";
@@ -47,6 +48,7 @@ function SettingsNavigator() {
       <SettingsStack.Screen name="ManageCategories" component={ManageCategoriesScreen}/>
       <SettingsStack.Screen name="ManageAccounts" component={ManageAccountsScreen}/>
       <SettingsStack.Screen name="PasteImport" component={PasteImportScreen}/>
+      <SettingsStack.Screen name="Import" component={ImportScreen}/>
     </SettingsStack.Navigator>);
 }
 const tabIcons = {

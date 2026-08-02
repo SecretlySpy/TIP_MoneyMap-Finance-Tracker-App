@@ -126,7 +126,7 @@ export function SettingsScreen({ navigation }) {
         <SettingsRow emoji="📤" label="Export as CSV" onPress={() => void handleExportCsv()} trailing={trailingText("›")}/>
         <SettingsRow emoji="💾" label="Backup data" onPress={() => void handleBackup()} trailing={trailingText("›")}/>
         <SettingsRow emoji="♻️" label="Restore from backup" onPress={() => navigation.navigate("PasteImport", { mode: "backup" })} trailing={trailingText("›")}/>
-        <SettingsRow emoji="📥" label={"Import data (CSV/\nExcel)"} onPress={() => navigation.navigate("PasteImport", { mode: "csv" })} trailing={trailingText("›")}/>
+        <SettingsRow emoji="📥" label={"Import data (CSV/\nExcel)"} onPress={() => navigation.navigate("Import")} trailing={trailingText("›")}/>
       </SettingsSection>
 
       <SettingsSection title="PREFERENCES">
@@ -153,7 +153,7 @@ export function SettingsScreen({ navigation }) {
             padding: theme.spacing.lg,
         }}>
         <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
-          🔀 Offline-first · AI tips stay local until you add a network client
+          🔀 Offline-first · AI tips use internet (opt-in)
         </Text>
       </View>
     </ScreenContainer>);
