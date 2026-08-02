@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "MoneyMap",
+    "slug": "moneymap-finance-tracker",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.example.financetracker",
+      "versionCode": 1,
+      "allowBackup": false,
+      "permissions": [
+        "INTERNET",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "plugins": [
+      "expo-dev-client",
+      "./plugins/withAndroidCmakeObjectPathLimit",
+      "./plugins/withAndroidOpenSslJniPackaging",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F5F7F6",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 96,
+          "dark": {
+            "backgroundColor": "#0D1412"
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "00000000-0000-0000-0000-000000000000"
+      }
+    }
+  }
+}

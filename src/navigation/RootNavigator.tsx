@@ -1,0 +1,125 @@
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { TabIcon, type TabIconName } from "../components/TabIcon";
+import { AppLockScreen } from "../screens/AppLockScreen";
+import { BudgetsScreen } from "../screens/BudgetsScreen";
+import { DashboardScreen } from "../screens/DashboardScreen";
+import { EntryScreen } from "../screens/EntryScreen";
+import { HistoryScreen } from "../screens/HistoryScreen";
+import { RecurringScreen } from "../screens/RecurringScreen";
+import { SettingsScreen } from "../screens/SettingsScreen";
+import { SmartTipsScreen } from "../screens/SmartTipsScreen";
+import { useTheme } from "../theme/tokens";
+import type {
+  BudgetsStackParamList,
+  HistoryStackParamList,
+  HomeStackParamList,
+  MainTabParamList,
+  RootStackParamList,
+  SettingsStackParamList,
+} from "./routes";
+
+const RootStack = createNativeStackNavigator<RootStackParamList>();
+const Tabs = createBottomTabNavigator<MainTabParamList>();
+const HomeStack = createNativeStackNavigator<HomeStackParamList>();
+const HistoryStack = createNativeStackNavigator<HistoryStackParamList>();
+const BudgetsStack = createNativeStackNavigator<BudgetsStackParamList>();
+const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
+
+function HomeNavigator() {
+  return (
+    <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+      <HomeStack.Screen name="Dashboard" component={DashboardScreen} />
+      <HomeStack.Screen name="Entry" component={EntryScreen} options={{ animation: "slide_from_bottom" }} />
+      <HomeStack.Screen name="SmartTips" component={SmartTipsScreen} />
+    </HomeStack.Navigator>
+  );
+}
+
+function HistoryNavigator() {
+  return (
+    <HistoryStack.Navigator screenOptions={{ headerShown: false }}>
+      <HistoryStack.Screen name="HistoryList" component={HistoryScreen} />
+    </HistoryStack.Navigator>
+  );
+}
+
+function BudgetsNavigator() {
+  return (
+    <BudgetsStack.Navigator screenOptions={{ headerShown: false }}>
+      <BudgetsStack.Screen name="BudgetsOverview" component={BudgetsScreen} />
+      <BudgetsStack.Screen name="Recurring" component={RecurringScreen} />
+    </BudgetsStack.Navigator>
+  );
+}
+
+function SettingsNavigator() {
+  return (
+    <SettingsStack.Navigator screenOptions={{ headerShown: false }}>
+      <SettingsStack.Screen name="SettingsOverview" component={SettingsScreen} />
+    </SettingsStack.Navigator>
+  );
+}
+
+const tabIcons: Record<keyof MainTabParamList, TabIconName> = {
+  Home: "home",
+  History: "history",
+  Budgets: "budgets",
+  Settings: "settings",
+};
+
+// The four-tab shell uses exact exported Figma icon geometry and screen-aware visibility.
+function MainTabs() {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Tabs.Navigator
+      screenOptions={({ route }) => {
+        const nestedRoute = getFocusedRouteNameFromRoute(route) ?? "Dashboard";
+        const hideForEntry = route.name === "Home" && nestedRoute === "Entry";
+        return {
+          headerShown: false,
+          tabBarActiveTintColor: theme.colors.primary,
+          tabBarInactiveTintColor: theme.colors.sub,
+          tabBarIcon: ({ color }) => <TabIcon color={color} name={tabIcons[route.name]} />,
+          tabBarIconStyle: { marginTop: theme.spacing.xs },
+          tabBarLabelStyle: {
+            fontFamily: theme.fonts.medium,
+            fontSize: theme.typeScale.small,
+            marginTop: theme.spacing.xs,
+          },
+          tabBarStyle: hideForEntry
+            ? { display: "none" }
+            : {
+                backgroundColor: theme.colors.surface,
+                borderTopColor: theme.colors.outline,
+                borderTopWidth: theme.spacing.hairline,
+                height: theme.sizes.tabBar + insets.bottom,
+                paddingBottom: Math.max(insets.bottom, theme.spacing.xl),
+                paddingHorizontal: theme.spacing.screen,
+                paddingTop: theme.spacing.md,
+              },
+        };
+      }}
+    >
+      <Tabs.Screen name="Home" component={HomeNavigator} />
+      <Tabs.Screen name="History" component={HistoryNavigator} />
+      <Tabs.Screen name="Budgets" component={BudgetsNavigator} />
+      <Tabs.Screen name="Settings" component={SettingsNavigator} />
+    </Tabs.Navigator>
+  );
+}
+
+// App Lock sits above navigation; the approved UI screens remain grouped under tabs.
+export function RootNavigator() {
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      <RootStack.Screen name="Main" component={MainTabs} />
+      <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
+    </RootStack.Navigator>
+  );
+}

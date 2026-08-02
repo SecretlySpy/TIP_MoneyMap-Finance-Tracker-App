@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "MoneyMap: Attach Hermes debugger",
+      "type": "reactnativedirect",
+      "request": "attach",
+      "cwd": "${workspaceFolder}",
+      "platform": "android",
+      "port": 8081,
+      "useHermesEngine": true,
+      "sourceMaps": true
+    }
+  ]
+}

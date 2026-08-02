@@ -1,0 +1,14 @@
+// Derive a stable checkout key so parallel MoneyMap clones never share generated output.
+def checkoutKey = Integer.toUnsignedString(gradle.startParameter.currentDir.absolutePath.hashCode(), 16)
+
+// Configure the Expo Constants project before its build script captures the Gradle build directory.
+gradle.beforeProject { project ->
+    // Redirect only generated Expo Constants assets away from inherited or stale node_modules ACLs.
+    if (project.name == 'expo-constants') {
+        // Keep disposable native output in the operating-system temp area and out of source control.
+        def isolatedBuildDirectory = new File(System.getProperty('java.io.tmpdir'), "moneymap-gradle/${checkoutKey}/expo-constants")
+
+        // Use Gradle's lazy directory API so every task observes the same isolated path.
+        project.layout.buildDirectory.set(isolatedBuildDirectory)
+    }
+}

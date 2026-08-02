@@ -1,0 +1,16 @@
+{
+  "react-native.packager.port": 8081,
+  "react-native.packager.status-indicator": "Full",
+  "react-native.android.logCatArguments": [
+    "*:S",
+    "ReactNative:V",
+    "ReactNativeJS:V",
+    "Expo:V"
+  ],
+  "react-native-tools.projectRoot": "${workspaceFolder}",
+  "files.watcherExclude": {
+    "**/.expo/**": true,
+    "**/android/.gradle/**": true,
+    "**/android/app/build/**": true
+  }
+}
