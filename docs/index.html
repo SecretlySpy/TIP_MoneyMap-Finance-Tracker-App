@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MoneyMap Finance Tracker</title>
+  <meta name="description" content="Static MoneyMap project overview and quick start guide.">
+  <style>
+    :root {
+      color-scheme: light;
+      color: #111111;
+      background: #f4f4f2;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.7;
+      text-rendering: optimizeLegibility;
+      font-variant-east-asian: full-width;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: #f4f4f2;
+      color: #111;
+    }
+    .page {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+    a { color: #0b6af2; text-decoration: none; }
+    a:hover, a:focus-visible { text-decoration: underline; }
+    h1, h2, h3, h4, h5, h6 { margin-top: 2.25rem; margin-bottom: 1rem; line-height: 1.15; }
+    h1 { font-size: clamp(2rem, 3vw, 3rem); }
+    h2 { font-size: clamp(1.5rem, 2.6vw, 2.2rem); }
+    p { margin-bottom: 1.25rem; }
+    ul, ol { margin: 0 0 1.25rem 1.5rem; }
+    li { margin-bottom: 0.75rem; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #e8e7e5; padding: 0.2rem 0.35rem; border-radius: 4px; }
+    pre {
+      overflow: auto;
+      padding: 1rem;
+      background: #1d1f21;
+      color: #f8f8f2;
+      border-radius: 0.75rem;
+      margin: 1rem 0;
+    }
+    pre code { color: inherit; background: transparent; padding: 0; }
+    blockquote {
+      margin: 1.5rem 0;
+      padding-left: 1rem;
+      border-left: 4px solid #0b6af2;
+      color: #333;
+    }
+    .hero {
+      padding: 3rem 0 1.5rem;
+      border-bottom: 1px solid rgba(17, 17, 17, 0.08);
+    }
+    .hero p { max-width: 68ch; margin-top: 1rem; font-size: 1.05rem; color: #3e444a; }
+    .hero .meta { margin-top: 0.75rem; font-size: 0.95rem; color: #5c6369; }
+    @media (max-width: 640px) {
+      .page { padding: 1.5rem 1rem 2.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="hero">
+      <h1>MoneyMap Finance Tracker</h1>
+      <p>An Android-first, offline-first personal finance tracker for students, built with React Native and Expo.</p>
+      <p class="meta">Static project documentation generated from README.md.</p>
+    </div>
+    <h2>Current milestone</h2>
+<p>
+Tasks 1 and 2 of the project plan are complete. MoneyMap has the strict Expo development-build shell plus an encrypted SQLCipher database, deterministic OpenSSL runtime packaging, atomic migration, idempotent first-launch seed, strict domain models, and typed CRUD repositories for accounts, categories, transactions, budgets, and recurring rules.
+</p>
+<p>
+The approved Figma UI has also been reproduced as a fixture-driven visual integration layer: dashboard, transaction entry, history and empty history, budgets, settings, dark dashboard, app lock, recurring reminders, and Smart Tips. This does <strong>not</strong> mark later functional tasks complete—database writes, persistent settings, notifications, biometrics, imports, and Smart Tips networking remain governed by the strict dependency order. See <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/ui-fidelity-implementation.md">the UI fidelity implementation record</a> and <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/local-environment-audit.md">local environment audit</a>.
+</p>
+<p>
+Task 3 remains the next functional milestone: repository change subscriptions and persistent Zustand-backed settings, followed by feature-by-feature replacement of visual fixtures.
+</p>
+<h2>Quick start</h2>
+<ol>
+<li>Install Node.js 22 LTS, JDK 21, and the Android SDK with an API 35 Google APIs x86_64 image.</li>
+<li>Open the repository in Visual Studio Code and accept the recommended <strong>React Native Tools</strong> extension.</li>
+<li>Run <code>npm install</code>, <code>npm run typecheck</code>, and <code>npm test</code>.</li>
+<li>Press <code>Ctrl+Shift+B</code> or choose <strong>Terminal → Run Build Task → MoneyMap: Run on Android emulator</strong>.</li>
+<li>The task opens the official Google Android Emulator, starts Metro, builds and installs the dev client, and opens MoneyMap. It never selects BlueStacks.</li>
+<li>On the development client&#39;s first launch only, select <strong>Continue</strong>, then close the developer menu to reveal the Dashboard.</li>
+<li>Replace the placeholder EAS project ID in <code>app.json</code> after running <code>eas init</code>.</li>
+</ol>
+<p>
+Use <strong>MoneyMap: Quick launch installed build</strong> after JavaScript-only changes, <strong>MoneyMap: Android environment status</strong> for diagnostics, and <strong>MoneyMap: Stop Android emulator</strong> for a graceful shutdown. The emulator display is a native window beside VS Code; tasks and the Hermes debugger are integrated into the editor. Expo Go is not supported because SQLCipher is native.
+</p>
+<p>
+See <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/Tech%20Stack%20Setup%20Guide.md">Tech Stack Setup Guide.md</a> for full platform-specific instructions.
+</p>
+  </main>
+</body>
+</html>
