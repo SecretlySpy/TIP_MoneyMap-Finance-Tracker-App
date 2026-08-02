@@ -10,6 +10,7 @@
     "prebuild": "expo prebuild",
     "test": "jest --runInBand",
     "test:coverage": "jest --runInBand --coverage",
+    "build:readme-page": "node ./scripts/build-readme-page.mjs",
     "ios": "expo run:ios"
   },
   "op-sqlite": {
