@@ -51,6 +51,8 @@ export function EntryScreen({ navigation }: EntryProps) {
   const [selectedAccountType, setSelectedAccountType] = useState<AccountType>("CASH");
   const [saving, setSaving] = useState(false);
   const [showNewCategory, setShowNewCategory] = useState(false);
+  const [note, setNote] = useState("");
+  const [showNotePrompt, setShowNotePrompt] = useState(false);
 
   const accountChips = useMemo(() => listAccountChips(accounts), [accounts]);
   const typeCategories = useMemo(
@@ -104,6 +106,7 @@ export function EntryScreen({ navigation }: EntryProps) {
         accountType: selectedAccountType,
         amountMinor,
         categoryName: selectedCategory,
+        note: note.trim() ? note.trim() : null,
         type: transactionType,
       });
       setSelectedMonthYear(toMonthYear());
@@ -245,6 +248,22 @@ export function EntryScreen({ navigation }: EntryProps) {
       </View>
 
       <View style={{ gap: theme.spacing.keyGap }}>
+        <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+            Note
+          </Text>
+          <Pressable accessibilityRole="button" onPress={() => setShowNotePrompt(true)}>
+            <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
+              {note.trim() ? "Edit" : "Add"}
+            </Text>
+          </Pressable>
+        </View>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
+          {note.trim() ? note.trim() : "Optional note (shown in History)"}
+        </Text>
+      </View>
+
+      <View style={{ gap: theme.spacing.keyGap }}>
         <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
           Account
         </Text>
@@ -315,6 +334,19 @@ export function EntryScreen({ navigation }: EntryProps) {
         placeholder="Category name"
         title="New category"
         visible={showNewCategory}
+      />
+      <TextPromptModal
+        confirmLabel="Save note"
+        initialValue={note}
+        message="Optional description for this transaction."
+        onCancel={() => setShowNotePrompt(false)}
+        onConfirm={(value) => {
+          setNote(value);
+          setShowNotePrompt(false);
+        }}
+        placeholder="Lunch — Jollibee"
+        title="Transaction note"
+        visible={showNotePrompt}
       />
     </ScreenContainer>
   );

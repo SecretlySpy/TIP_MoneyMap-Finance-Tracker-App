@@ -17,6 +17,7 @@ import {
 import type { HistoryStackParamList, MainTabParamList } from "../navigation/routes";
 import type { HistoryGroup } from "./fixtures";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
+import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 
 type HistoryProps = NativeStackScreenProps<HistoryStackParamList, "HistoryList">;
@@ -97,7 +98,7 @@ export function HistoryBody({ groups, onAdd }: HistoryBodyProps) {
 
 // The history frame combines a fixed header/filter treatment with data-driven groups.
 export function HistoryScreen({ navigation }: HistoryProps) {
-  const theme = useTheme();
+  const theme = useTheme(useUiStore((state) => state.themePreference));
   const tabNavigation = navigation.getParent<BottomTabNavigationProp<MainTabParamList>>();
   const accounts = useFinanceStore((state) => state.accounts);
   const categories = useFinanceStore((state) => state.categories);

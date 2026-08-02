@@ -1,26 +1,54 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useMemo } from "react";
 import { Pressable, View } from "react-native";
 
 import { AppText as Text } from "../components/AppText";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
+import {
+  budgetSummary,
+  buildBudgetCards,
+} from "../domain/services/financeView";
 import { formatMinor } from "../domain/services/money";
 import type { HomeStackParamList } from "../navigation/routes";
+import { mapsFromState, useFinanceStore } from "../store/financeStore";
+import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 import { smartTips, type UiCopy } from "./fixtures";
 
 type SmartTipsProps = NativeStackScreenProps<HomeStackParamList, "SmartTips">;
 
-// Structured copy ensures even incidental UI amounts originate from integer minor units.
-function formatCopy(copy: UiCopy): string {
+function formatCopy(copy: UiCopy, currencySymbol: string): string {
   if (typeof copy === "string") return copy;
   const prefix = copy.approximate === true ? "~" : "";
-  return `${copy.before}${prefix}${formatMinor(copy.amountMinor, { showCents: false })}${copy.after}`;
+  return `${copy.before}${prefix}${formatMinor(copy.amountMinor, { currencySymbol, showCents: false })}${copy.after}`;
 }
 
-// This screen is a visual fixture only and intentionally performs no network request.
+// Offline sample tips only — no network client. Hero numbers come from live budgets when available.
 export function SmartTipsScreen({ navigation }: SmartTipsProps) {
-  const theme = useTheme();
+  const theme = useTheme(useUiStore((state) => state.themePreference));
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
+  const budgets = useFinanceStore((state) => state.budgets);
+  const categories = useFinanceStore((state) => state.categories);
+  const transactions = useFinanceStore((state) => state.transactions);
+  const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
+
+  const { categoriesById } = useMemo(() => mapsFromState({ accounts: [], categories }), [categories]);
+  const cards = useMemo(
+    () => buildBudgetCards(budgets, transactions, categoriesById, selectedMonthYear),
+    [budgets, transactions, categoriesById, selectedMonthYear],
+  );
+  const summary = useMemo(() => budgetSummary(cards), [cards]);
+
+  const weeklyLimitMinor = summary.limitMinor > 0 ? Math.max(1, Math.round(summary.limitMinor / 4)) : 150_000;
+  const weeklySpentMinor =
+    summary.limitMinor > 0
+      ? Math.min(weeklyLimitMinor, Math.round(summary.spentMinor / 4))
+      : 50_000;
+  const weeklyLeftMinor = Math.max(0, weeklyLimitMinor - weeklySpentMinor);
+  const dailyMinor = Math.max(1, Math.ceil(weeklyLeftMinor / 7));
+  const progressPercent =
+    weeklyLimitMinor <= 0 ? 0 : Math.min(100, Math.round((weeklySpentMinor / weeklyLimitMinor) * 100));
 
   return (
     <ScreenContainer contentContainerStyle={{ gap: theme.spacing.xl }} testID="smart-tips-screen">
@@ -58,7 +86,7 @@ export function SmartTipsScreen({ navigation }: SmartTipsProps) {
         >
           <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>✨</Text>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny }}>
-            AI · Online
+            Offline samples
           </Text>
         </View>
       </View>
@@ -76,10 +104,11 @@ export function SmartTipsScreen({ navigation }: SmartTipsProps) {
           Left this week
         </Text>
         <Text style={{ color: theme.colors.onPrimary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.smartHeroAmount }}>
-          {formatMinor(100_000, { showCents: false })}
+          {formatMinor(weeklyLeftMinor, { currencySymbol, showCents: false })}
         </Text>
         <Text style={{ color: theme.colors.heroMeta, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-          of {formatMinor(150_000, { showCents: false })} weekly budget · ~{formatMinor(14_000, { showCents: false })}/day for food
+          of {formatMinor(weeklyLimitMinor, { currencySymbol, showCents: false })} weekly budget · ~
+          {formatMinor(dailyMinor, { currencySymbol, showCents: false })}/day remaining
         </Text>
         <View
           style={{
@@ -95,7 +124,7 @@ export function SmartTipsScreen({ navigation }: SmartTipsProps) {
               backgroundColor: theme.colors.onPrimary,
               borderRadius: theme.radii.progress,
               height: "100%",
-              width: "67%",
+              width: `${progressPercent}%`,
             }}
           />
         </View>
@@ -115,10 +144,11 @@ export function SmartTipsScreen({ navigation }: SmartTipsProps) {
         <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.subScreenTitle }}>💡</Text>
         <View style={{ flex: 1, gap: theme.spacing.xxs }}>
           <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
-            You've got {formatMinor(100_000, { showCents: false })} for the week
+            You've got {formatMinor(weeklyLeftMinor, { currencySymbol, showCents: false })} for the week
           </Text>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-            That's ~{formatMinor(14_000, { showCents: false })}/day. Here are budget-friendly picks near you.
+            That's ~{formatMinor(dailyMinor, { currencySymbol, showCents: false })}/day. Here are budget-friendly sample
+            picks (no internet used).
           </Text>
         </View>
       </View>
@@ -150,13 +180,13 @@ export function SmartTipsScreen({ navigation }: SmartTipsProps) {
               numberOfLines={1}
               style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}
             >
-              {formatCopy(tip.title)}
+              {formatCopy(tip.title, currencySymbol)}
             </Text>
             <Text
               numberOfLines={1}
               style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}
             >
-              {formatCopy(tip.meta)}
+              {formatCopy(tip.meta, currencySymbol)}
             </Text>
           </View>
           <View
@@ -169,7 +199,7 @@ export function SmartTipsScreen({ navigation }: SmartTipsProps) {
             }}
           >
             <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tag }}>
-              {formatCopy(tip.tag)}
+              {formatCopy(tip.tag, currencySymbol)}
             </Text>
           </View>
         </SectionCard>
@@ -193,7 +223,7 @@ export function SmartTipsScreen({ navigation }: SmartTipsProps) {
       >
         <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>🔀</Text>
         <Text style={{ color: theme.colors.sub, flex: 1, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-          Online: AI-personalized tips. Offline: basic tips from your own spending.
+          Offline-first: sample tips stay local. A future network client can personalize tips only with opt-in consent.
         </Text>
       </View>
     </ScreenContainer>

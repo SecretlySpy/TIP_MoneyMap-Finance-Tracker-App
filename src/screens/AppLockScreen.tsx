@@ -50,7 +50,9 @@ export function AppLockScreen({ navigation }: AppLockProps) {
   const canLeaveWithoutUnlock = !isLocked || !appLockEnabled || !hasPin;
 
   const finishUnlock = () => {
-    if (navigation.canGoBack() && canLeaveWithoutUnlock) {
+    // Root-level lock swaps navigators when isLocked becomes false.
+    // Setup/preview navigated from Settings still needs an explicit pop.
+    if (navigation.canGoBack()) {
       navigation.goBack();
     }
   };

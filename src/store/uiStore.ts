@@ -75,18 +75,16 @@ export const useUiStore = create<UiState>((set, get) => ({
       });
       if (!appStateSubscriptionAttached) {
         appStateSubscriptionAttached = true;
-        let previous: AppStateStatus = AppState.currentState;
-        AppState.addEventListener("change", (next) => {
-          if (
-            (previous === "active" && next.match(/inactive|background/)) ||
-            next === "background"
-          ) {
-            const current = get();
-            if (current.appLockEnabled && current.hasPin) {
-              set({ isLocked: true });
-            }
+        // Lock only on true backgrounding. Android "inactive" fires for share sheets and
+        // system dialogs and must not force the PIN gate mid-action.
+        AppState.addEventListener("change", (next: AppStateStatus) => {
+          if (next !== "background") {
+            return;
           }
-          previous = next;
+          const current = get();
+          if (current.appLockEnabled && current.hasPin && !current.isLocked) {
+            set({ isLocked: true });
+          }
         });
       }
     })();

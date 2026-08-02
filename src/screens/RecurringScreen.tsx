@@ -32,6 +32,7 @@ export function RecurringScreen({ navigation }: RecurringProps) {
   const categories = useFinanceStore((state) => state.categories);
   const recurringRules = useFinanceStore((state) => state.recurringRules);
   const addRecurringBill = useFinanceStore((state) => state.addRecurringBill);
+  const deleteRecurringById = useFinanceStore((state) => state.deleteRecurringById);
   const [adding, setAdding] = useState(false);
   const [step, setStep] = useState<PromptStep>(null);
   const [draftName, setDraftName] = useState("");
@@ -141,49 +142,72 @@ export function RecurringScreen({ navigation }: RecurringProps) {
         </Text>
       ) : (
         bills.map((bill) => (
-          <SectionCard key={bill.id} padding={theme.spacing.lg} style={{ gap: theme.spacing.md, minHeight: theme.sizes.billCard }}>
-            <View style={{ alignItems: "center", flexDirection: "row", gap: theme.spacing.md }}>
+          <Pressable
+            key={bill.id}
+            accessibilityHint="Long press to delete this bill"
+            accessibilityRole="button"
+            onLongPress={() => {
+              Alert.alert(bill.name, "Remove this recurring bill?", [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: () => {
+                    void deleteRecurringById(Number(bill.id)).catch((error: unknown) => {
+                      Alert.alert(
+                        "Delete failed",
+                        error instanceof Error ? error.message : "Could not delete bill.",
+                      );
+                    });
+                  },
+                },
+              ]);
+            }}
+          >
+            <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.md, minHeight: theme.sizes.billCard }}>
+              <View style={{ alignItems: "center", flexDirection: "row", gap: theme.spacing.md }}>
+                <View
+                  style={{
+                    alignItems: "center",
+                    backgroundColor: theme.colors.avatarBg,
+                    borderRadius: theme.radii.round,
+                    height: theme.sizes.avatar,
+                    justifyContent: "center",
+                    width: theme.sizes.avatar,
+                  }}
+                >
+                  <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.emptyTitle }}>{bill.emoji}</Text>
+                </View>
+                <View style={{ flex: 1, gap: theme.spacing.xxs }}>
+                  <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.listName }}>
+                    {bill.name}
+                  </Text>
+                  <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+                    Monthly · Due {bill.due}
+                  </Text>
+                </View>
+                <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.listName }}>
+                  {formatMinor(bill.amountMinor, { currencySymbol, showCents: false })}
+                </Text>
+              </View>
               <View
                 style={{
-                  alignItems: "center",
-                  backgroundColor: theme.colors.avatarBg,
-                  borderRadius: theme.radii.round,
-                  height: theme.sizes.avatar,
-                  justifyContent: "center",
-                  width: theme.sizes.avatar,
+                  alignSelf: "flex-start",
+                  backgroundColor: theme.colors.tint,
+                  borderRadius: theme.radii.chip,
+                  flexDirection: "row",
+                  gap: theme.spacing.compact,
+                  paddingHorizontal: theme.spacing.md,
+                  paddingVertical: theme.spacing.sm,
                 }}
               >
-                <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.emptyTitle }}>{bill.emoji}</Text>
-              </View>
-              <View style={{ flex: 1, gap: theme.spacing.xxs }}>
-                <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.listName }}>
-                  {bill.name}
-                </Text>
-                <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-                  Monthly · Due {bill.due}
+                <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>🔔</Text>
+                <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                  Remind {bill.leadDays} days before
                 </Text>
               </View>
-              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.listName }}>
-                {formatMinor(bill.amountMinor, { currencySymbol, showCents: false })}
-              </Text>
-            </View>
-            <View
-              style={{
-                alignSelf: "flex-start",
-                backgroundColor: theme.colors.tint,
-                borderRadius: theme.radii.chip,
-                flexDirection: "row",
-                gap: theme.spacing.compact,
-                paddingHorizontal: theme.spacing.md,
-                paddingVertical: theme.spacing.sm,
-              }}
-            >
-              <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>🔔</Text>
-              <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
-                Remind {bill.leadDays} days before
-              </Text>
-            </View>
-          </SectionCard>
+            </SectionCard>
+          </Pressable>
         ))
       )}
 

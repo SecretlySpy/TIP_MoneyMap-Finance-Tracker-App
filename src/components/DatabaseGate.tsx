@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useFinanceStore } from "../store/financeStore";
+import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 import { AppText as Text } from "./AppText";
 
@@ -13,7 +14,7 @@ interface DatabaseGateProps {
 type InitializationState = "loading" | "ready" | "error";
 
 export function DatabaseGate({ children }: DatabaseGateProps) {
-  const theme = useTheme();
+  const theme = useTheme(useUiStore((state) => state.themePreference));
   const ensureHydrated = useFinanceStore((state) => state.ensureHydrated);
   const [initializationState, setInitializationState] =
     useState<InitializationState>("loading");

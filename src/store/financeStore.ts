@@ -103,6 +103,8 @@ interface FinanceState {
     limitMinor: number;
     monthYear?: string;
   }) => Promise<Budget>;
+  readonly deleteBudgetByCategoryName: (categoryName: string, monthYear?: string) => Promise<void>;
+  readonly deleteRecurringById: (id: number) => Promise<void>;
 }
 
 let databaseRef: SqlDatabase | null = null;
@@ -440,6 +442,27 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       throw new Error("Database is not ready.");
     }
 
+    const insertReturningId = async (
+      tx: { execute: SqlDatabase["execute"] },
+      statement: string,
+      parameters: readonly (string | number | null | boolean)[],
+    ): Promise<number> => {
+      const result = await tx.execute(statement, parameters);
+      if (
+        result.insertId !== undefined &&
+        Number.isSafeInteger(result.insertId) &&
+        result.insertId > 0
+      ) {
+        return result.insertId;
+      }
+      const idResult = await tx.execute("SELECT last_insert_rowid() AS id");
+      const id = Number(idResult.rows[0]?.id);
+      if (!Number.isSafeInteger(id) || id <= 0) {
+        throw new Error("Backup restore could not read inserted row ids.");
+      }
+      return id;
+    };
+
     await database.transaction(async (tx) => {
       await tx.execute("DELETE FROM transactions");
       await tx.execute("DELETE FROM budgets");
@@ -449,17 +472,19 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
 
       const accountIdMap = new Map<number, number>();
       for (const account of backup.accounts) {
-        const result = await tx.execute(
+        const nextId = await insertReturningId(
+          tx,
           `INSERT INTO accounts (name, type, starting_balance_minor, is_archived)
            VALUES (?, ?, ?, ?)`,
           [account.name, account.type, account.startingBalanceMinor, account.isArchived ? 1 : 0],
         );
-        accountIdMap.set(account.id, Number(result.insertId));
+        accountIdMap.set(account.id, nextId);
       }
 
       const categoryIdMap = new Map<number, number>();
       for (const category of backup.categories) {
-        const result = await tx.execute(
+        const nextId = await insertReturningId(
+          tx,
           `INSERT INTO categories (name, icon, color_hex, type, is_custom)
            VALUES (?, ?, ?, ?, ?)`,
           [
@@ -470,7 +495,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
             category.isCustom ? 1 : 0,
           ],
         );
-        categoryIdMap.set(category.id, Number(result.insertId));
+        categoryIdMap.set(category.id, nextId);
       }
 
       const recurringIdMap = new Map<number, number>();
@@ -480,7 +505,8 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
         if (categoryId === undefined || accountId === undefined) {
           continue;
         }
-        const result = await tx.execute(
+        const nextId = await insertReturningId(
+          tx,
           `INSERT INTO recurring_rules (
              amount_minor, type, category_id, account_id, note, frequency,
              next_run_epoch_millis, is_active, reminder_enabled, reminder_lead_days
@@ -498,7 +524,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
             rule.reminderLeadDays,
           ],
         );
-        recurringIdMap.set(rule.id, Number(result.insertId));
+        recurringIdMap.set(rule.id, nextId);
       }
 
       for (const transaction of backup.transactions) {
@@ -540,6 +566,34 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       }
     });
 
+    await get().refresh();
+  },
+
+  deleteBudgetByCategoryName: async (categoryName, monthYear) => {
+    await get().ensureHydrated();
+    const database = databaseRef;
+    if (database === null) {
+      throw new Error("Database is not ready.");
+    }
+    const scope = monthYear ?? get().selectedMonthYear;
+    const category = findCategory(get().categories, categoryName, "EXPENSE");
+    const budget = get().budgets.find(
+      (item) => item.categoryId === category.id && item.monthYear === scope,
+    );
+    if (budget === undefined) {
+      return;
+    }
+    await new BudgetRepository(database).delete(budget.id);
+    await get().refresh();
+  },
+
+  deleteRecurringById: async (id) => {
+    await get().ensureHydrated();
+    const database = databaseRef;
+    if (database === null) {
+      throw new Error("Database is not ready.");
+    }
+    await new RecurringRepository(database).delete(id);
     await get().refresh();
   },
 }));

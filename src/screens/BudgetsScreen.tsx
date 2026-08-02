@@ -30,9 +30,11 @@ export function BudgetsScreen({ navigation }: BudgetsProps) {
   const transactions = useFinanceStore((state) => state.transactions);
   const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
   const addBudget = useFinanceStore((state) => state.addBudget);
+  const deleteBudgetByCategoryName = useFinanceStore((state) => state.deleteBudgetByCategoryName);
   const [adding, setAdding] = useState(false);
   const [pendingCategory, setPendingCategory] = useState<string | null>(null);
   const [showLimitPrompt, setShowLimitPrompt] = useState(false);
+  const [editingLimit, setEditingLimit] = useState<string | null>(null);
 
   const { categoriesById } = useMemo(() => mapsFromState({ accounts: [], categories }), [categories]);
 
@@ -107,23 +109,63 @@ export function BudgetsScreen({ navigation }: BudgetsProps) {
           No budgets yet for this month. Add one to track spending limits.
         </Text>
       ) : (
-        cards.map((budget) => <BudgetCard key={budget.name} currencySymbol={currencySymbol} {...budget} />)
+        cards.map((budget) => (
+          <Pressable
+            key={budget.name}
+            accessibilityHint="Long press to edit or delete this budget"
+            accessibilityRole="button"
+            onLongPress={() => {
+              Alert.alert(budget.name, "Edit limit or remove this budget.", [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Edit limit",
+                  onPress: () => {
+                    setEditingLimit(budget.name);
+                    setPendingCategory(budget.name);
+                    setShowLimitPrompt(true);
+                  },
+                },
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: () => {
+                    void deleteBudgetByCategoryName(budget.name, selectedMonthYear).catch((error: unknown) => {
+                      Alert.alert(
+                        "Delete failed",
+                        error instanceof Error ? error.message : "Could not delete budget.",
+                      );
+                    });
+                  },
+                },
+              ]);
+            }}
+          >
+            <BudgetCard {...budget} currencySymbol={currencySymbol} />
+          </Pressable>
+        ))
       )}
       <DashedButton disabled={adding} onPress={beginAddBudget}>
         {adding ? "Adding…" : "＋ Add budget"}
       </DashedButton>
       <TextPromptModal
         confirmLabel="Save budget"
-        initialValue="5000.00"
+        initialValue={
+          editingLimit === null
+            ? "5000.00"
+            : ((cards.find((card) => card.name === editingLimit)?.limitMinor ?? 500_000) / 100).toFixed(2)
+        }
         keyboardType="decimal-pad"
         message={pendingCategory === null ? undefined : `Monthly limit for ${pendingCategory}`}
         onCancel={() => {
           setShowLimitPrompt(false);
           setPendingCategory(null);
+          setEditingLimit(null);
         }}
-        onConfirm={(value) => void handleLimitConfirm(value)}
+        onConfirm={(value) => {
+          void handleLimitConfirm(value).then(() => setEditingLimit(null));
+        }}
         placeholder="5000.00"
-        title="Budget limit"
+        title={editingLimit === null ? "Budget limit" : "Edit budget limit"}
         visible={showLimitPrompt}
       />
     </ScreenContainer>
