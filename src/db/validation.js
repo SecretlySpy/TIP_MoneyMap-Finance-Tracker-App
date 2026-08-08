@@ -53,6 +53,16 @@ export function readInteger(row, columnName) {
     }
     return value;
 }
+export function readNullableInteger(row, columnName) {
+    const value = row[columnName];
+    if (value === null || value === undefined) {
+        return null;
+    }
+    if (typeof value !== "number" || !Number.isSafeInteger(value)) {
+        throw new DataIntegrityError(`${columnName} is not a nullable safe integer.`);
+    }
+    return value;
+}
 export function readString(row, columnName) {
     const value = row[columnName];
     if (typeof value !== "string") {

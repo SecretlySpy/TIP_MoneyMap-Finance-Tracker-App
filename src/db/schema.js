@@ -1,6 +1,6 @@
 import { seedInitialData } from "./seed";
 import { DataIntegrityError, readInteger } from "./validation";
-export const LATEST_SCHEMA_VERSION = 1;
+export const LATEST_SCHEMA_VERSION = 2;
 const CREATE_SCHEMA_STATEMENTS = [
     `CREATE TABLE accounts (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,6 +70,19 @@ const CREATE_SCHEMA_STATEMENTS = [
     "CREATE INDEX idx_recurring_rules_next_run ON recurring_rules (is_active, next_run_epoch_millis)",
     "CREATE INDEX idx_budgets_category_id ON budgets (category_id)",
 ];
+const CREATE_GOALS_STATEMENTS = [
+    `CREATE TABLE savings_goals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+      target_minor INTEGER NOT NULL CHECK (target_minor > 0),
+      current_minor INTEGER NOT NULL DEFAULT 0 CHECK (current_minor >= 0),
+      deadline_epoch_millis INTEGER,
+      is_archived INTEGER NOT NULL DEFAULT 0 CHECK (is_archived IN (0, 1)),
+      created_epoch_millis INTEGER NOT NULL
+    ) STRICT`,
+    "CREATE INDEX idx_savings_goals_active ON savings_goals (is_archived, deadline_epoch_millis)",
+];
+
 const MIGRATIONS = [
     {
         version: 1,
@@ -79,6 +92,15 @@ const MIGRATIONS = [
                 await database.execute(statement);
             }
             await seedInitialData(database);
+        },
+    },
+    {
+        version: 2,
+        name: "add savings goals table",
+        async apply(database) {
+            for (const statement of CREATE_GOALS_STATEMENTS) {
+                await database.execute(statement);
+            }
         },
     },
 ];

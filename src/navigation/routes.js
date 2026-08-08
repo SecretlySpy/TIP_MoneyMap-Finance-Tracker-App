@@ -16,6 +16,7 @@
  *
  * @typedef {Object} SettingsStackParamList
  * @property {undefined} SettingsOverview
+ * @property {undefined} Goals
  * @property {undefined} ManageCategories
  * @property {undefined} ManageAccounts
  * @property {{ mode: 'csv' | 'backup' }} PasteImport

@@ -37,8 +37,45 @@ export function EntryScreen({ navigation }) {
     const [showNewCategory, setShowNewCategory] = useState(false);
     const [note, setNote] = useState("");
     const [showNotePrompt, setShowNotePrompt] = useState(false);
+    const transactions = useFinanceStore((state) => state.transactions);
     const accountChips = useMemo(() => listAccountChips(accounts), [accounts]);
     const typeCategories = useMemo(() => categoriesForType(categories, transactionType), [categories, transactionType]);
+    // Recent expense categories from history (for quick re-pick).
+    const recentCategoryChips = useMemo(() => {
+        const names = [];
+        const seen = new Set();
+        const ordered = [...transactions].sort((a, b) => b.dateEpochMillis - a.dateEpochMillis);
+        for (const tx of ordered) {
+            if (tx.type !== transactionType) continue;
+            const cat = categories.find((c) => c.id === tx.categoryId);
+            if (!cat || seen.has(cat.name)) continue;
+            seen.add(cat.name);
+            names.push(cat.name);
+            if (names.length >= 4) break;
+        }
+        return names;
+    }, [transactions, categories, transactionType]);
+    const quickTemplates = useMemo(() => {
+        if (transactionType === "INCOME") {
+            return [
+                { label: "Allowance", amount: "2000", note: "Monthly allowance", category: "Allowance" },
+                { label: "Part-time", amount: "500", note: "Shift pay", category: "Part-time" },
+            ];
+        }
+        return [
+            { label: "Lunch ₱80", amount: "80", note: "Lunch", category: "Food" },
+            { label: "Jeep ₱15", amount: "15", note: "Commute", category: "Transport" },
+            { label: "Load ₱50", amount: "50", note: "Mobile load", category: "Bills" },
+            { label: "Coffee ₱120", amount: "120", note: "Coffee", category: "Food" },
+        ];
+    }, [transactionType]);
+    const applyTemplate = (template) => {
+        setAmountInput(template.amount);
+        if (template.note) setNote(template.note);
+        if (template.category && typeCategories.some((c) => c.name === template.category)) {
+            setSelectedCategory(template.category);
+        }
+    };
     const categoryCells = useMemo(() => {
         const cells = typeCategories.slice(0, 7).map((category) => ({
             emoji: categoryEmoji(category.name),
@@ -144,6 +181,43 @@ export function EntryScreen({ navigation }) {
         <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
           {selectedAccountLabel} · {todayLabel()}
         </Text>
+      </View>
+
+      {recentCategoryChips.length > 0 ? (
+        <View style={{ gap: theme.spacing.sm }}>
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+            RECENT CATEGORIES
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm }}>
+            {recentCategoryChips.map((name) => (
+              <Chip
+                key={`recent-${name}`}
+                onPress={() => setSelectedCategory(name)}
+                selected={selectedCategory === name}
+                style={{ height: theme.sizes.filterChip }}
+              >
+                {name}
+              </Chip>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      <View style={{ gap: theme.spacing.sm }}>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+          QUICK TEMPLATES
+        </Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm }}>
+          {quickTemplates.map((template) => (
+            <Chip
+              key={template.label}
+              onPress={() => applyTemplate(template)}
+              style={{ height: theme.sizes.filterChip }}
+            >
+              {template.label}
+            </Chip>
+          ))}
+        </View>
       </View>
 
       <View style={{ gap: theme.spacing.md }}>

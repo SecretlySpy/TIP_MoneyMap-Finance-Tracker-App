@@ -30,21 +30,22 @@ describe("database schema and seed", () => {
     afterEach(() => {
         database.close();
     });
-    test("migrates a fresh database to the latest version with five domain tables", async () => {
+    test("migrates a fresh database to the latest version with domain tables including goals", async () => {
         const migration = await migrateDatabase(database);
         const tables = await database.execute(`SELECT name FROM sqlite_schema
-       WHERE type = 'table' AND name IN (?, ?, ?, ?, ?)
-       ORDER BY name`, ["accounts", "budgets", "categories", "recurring_rules", "transactions"]);
+       WHERE type = 'table' AND name IN (?, ?, ?, ?, ?, ?)
+       ORDER BY name`, ["accounts", "budgets", "categories", "recurring_rules", "savings_goals", "transactions"]);
         expect(migration).toEqual({
             previousVersion: 0,
             currentVersion: LATEST_SCHEMA_VERSION,
-            appliedVersions: [1],
+            appliedVersions: [1, 2],
         });
         expect(tables.rows.map(({ name }) => name)).toEqual([
             "accounts",
             "budgets",
             "categories",
             "recurring_rules",
+            "savings_goals",
             "transactions",
         ]);
     });

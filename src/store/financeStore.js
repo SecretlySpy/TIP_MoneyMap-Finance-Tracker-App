@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { initializeDatabase } from "../db/client";
-import { AccountRepository, BudgetRepository, CategoryRepository, RecurringRepository, TransactionRepository, } from "../db/repositories";
+import { AccountRepository, BudgetRepository, CategoryRepository, GoalRepository, RecurringRepository, TransactionRepository, } from "../db/repositories";
 import { accountChipLabel, toMonthYear, } from "../domain/services/financeView";
 import { runRecurringCatchUp } from "../services/recurringCatchUp";
 import { registerFinanceSnapshotProvider, syncRemindersFromStores } from "./uiStore";
@@ -28,6 +28,7 @@ function repositories(database) {
         accounts: new AccountRepository(database),
         budgets: new BudgetRepository(database),
         categories: new CategoryRepository(database),
+        goals: new GoalRepository(database),
         recurring: new RecurringRepository(database),
         transactions: new TransactionRepository(database),
     };
@@ -65,14 +66,15 @@ async function loadSnapshot(database) {
     const repos = repositories(database);
     await ensureDefaultAccounts(repos.accounts);
     await ensureEntryCategories(repos.categories);
-    const [accounts, categories, transactions, budgets, recurringRules] = await Promise.all([
+    const [accounts, categories, transactions, budgets, recurringRules, goals] = await Promise.all([
         repos.accounts.list(),
         repos.categories.list(),
         repos.transactions.list(),
         repos.budgets.list(),
         repos.recurring.list(),
+        repos.goals.list(),
     ]);
-    return { accounts, categories, transactions, budgets, recurringRules };
+    return { accounts, categories, transactions, budgets, recurringRules, goals };
 }
 function findCategory(categories, name, type) {
     const match = categories.find((category) => category.name.toLowerCase() === name.toLowerCase() && category.type === type);
@@ -93,6 +95,7 @@ export const useFinanceStore = create((set, get) => ({
     budgets: [],
     categories: [],
     errorMessage: null,
+    goals: [],
     recurringRules: [],
     revision: 0,
     selectedMonthYear: toMonthYear(),
@@ -398,6 +401,7 @@ export const useFinanceStore = create((set, get) => ({
             await tx.execute("DELETE FROM transactions");
             await tx.execute("DELETE FROM budgets");
             await tx.execute("DELETE FROM recurring_rules");
+            await tx.execute("DELETE FROM savings_goals");
             await tx.execute("DELETE FROM categories");
             await tx.execute("DELETE FROM accounts");
             const accountIdMap = new Map();
@@ -505,6 +509,40 @@ export const useFinanceStore = create((set, get) => ({
             throw new Error("Database is not ready.");
         }
         await new TransactionRepository(database).delete(id);
+        await get().refresh();
+    },
+    addGoal: async (input) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const created = await new GoalRepository(database).create({
+            name: input.name,
+            targetMinor: input.targetMinor,
+            currentMinor: input.currentMinor ?? 0,
+            deadlineEpochMillis: input.deadlineEpochMillis ?? null,
+        });
+        await get().refresh();
+        return created;
+    },
+    contributeToGoal: async (id, amountMinor) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const updated = await new GoalRepository(database).contribute(id, amountMinor);
+        await get().refresh();
+        return updated;
+    },
+    archiveGoal: async (id) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        await new GoalRepository(database).update(id, { isArchived: true });
         await get().refresh();
     },
 }));

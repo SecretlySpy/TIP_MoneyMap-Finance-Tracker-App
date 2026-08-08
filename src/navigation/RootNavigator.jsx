@@ -16,6 +16,7 @@ import { ManageCategoriesScreen } from "../screens/ManageCategoriesScreen";
 import { PasteImportScreen } from "../screens/PasteImportScreen";
 import { ImportScreen } from "../screens/ImportScreen";
 import { RecurringScreen } from "../screens/RecurringScreen";
+import { GoalsScreen } from "../screens/GoalsScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { SmartTipsScreen } from "../screens/SmartTipsScreen";
 import { StudentEatsScreen } from "../screens/StudentEatsScreen";
@@ -49,6 +50,7 @@ function BudgetsNavigator() {
 function SettingsNavigator() {
     return (<SettingsStack.Navigator screenOptions={{ headerShown: false }}>
       <SettingsStack.Screen name="SettingsOverview" component={SettingsScreen}/>
+      <SettingsStack.Screen name="Goals" component={GoalsScreen}/>
       <SettingsStack.Screen name="ManageCategories" component={ManageCategoriesScreen}/>
       <SettingsStack.Screen name="ManageAccounts" component={ManageAccountsScreen}/>
       <SettingsStack.Screen name="PasteImport" component={PasteImportScreen}/>

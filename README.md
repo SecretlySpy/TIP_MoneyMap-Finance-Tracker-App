@@ -22,8 +22,11 @@ The Pages site is the polished setup guide: root [`index.html`](./index.html) (s
 | Task 18 release prep docs | Done (EAS project ID still placeholder until `eas init`) |
 | Dark-mode theme consistency | Done (`useTheme` reads `themePreference`) |
 | Student Eats Near Me | Done (Overpass/Nominatim + ranking + optional AI) |
+| Settings pickers + Dashboard polish | Done (theme/currency chips, empties, tips teaser) |
+| Safe-to-Spend + Savings Goals | Done (pure calc + schema v2 + Goals screen) |
+| Entry quick chips + MoM trend | Done |
 
-**v0.1.0** — Tasks 1–18 complete + Student Eats.
+**v0.1.0** — Core complete + Student Eats + Goals / Safe-to-Spend.
 
 ## Quick start
 

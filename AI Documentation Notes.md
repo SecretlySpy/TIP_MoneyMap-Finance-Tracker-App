@@ -1769,3 +1769,44 @@ v0.1.0 student finance tracker; Tasks 1–18 complete in application code. QA au
 - **Responsive & Accessibility Notes**: EmptyState; loading spinner; back/refresh 44px targets
 - **Security Notes**: privacy footer copy; AI only if Smart Tips consented
 - **Verification Status**: static hex/fetch tests include this screen
+
+# Module / File: src/components/OptionChipRow.jsx
+## Function: OptionChipRow
+- **Purpose**: Accessible single-select chip row for Settings theme/currency pickers
+- **Inputs**: label, options[{value,label}], value, onChange
+- **Outputs**: JSX radiogroup of chips
+- **Dependencies**: useTheme (store-aware)
+- **Behavior**: selected chip uses tint/primary border; minHeight 44
+- **Side Effects**: none
+- **Verification Status**: used by SettingsScreen Preferences
+
+# Module / File: src/domain/services/safeToSpend.js
+## Function: computeSafeToSpend
+- **Purpose**: remaining budgets − upcoming recurring − capped goal reserves (integer minor units)
+- **Inputs**: budgets, transactions, categoriesById, recurringRules, goals, monthYear
+- **Outputs**: `{ remainingBudgetsMinor, upcomingRecurringMinor, goalReservesMinor, safeMinor, state }`
+- **Dependencies**: buildBudgetCards, budgetSummary
+- **Behavior**: state comfortable|tight|over; goal reserves capped at remaining budgets
+- **Side Effects**: none
+- **DSA Used**: O(b+t+r+g)
+- **Verification Status**: __tests__/safeToSpend.test.js
+
+# Module / File: src/domain/services/goals.js + goalRepository + GoalsScreen
+## Function: savings goals MVP
+- **Purpose**: Create goals, track progress, contribute, archive; Dashboard preview
+- **Schema**: savings_goals table (migration v2)
+- **Money**: target/current integer minor units
+- **UI**: GoalCard + GoalsScreen; Settings → Savings goals
+- **Verification Status**: __tests__/goals.test.js domain + repository
+
+# Module / File: src/domain/services/periodCompare.js
+## Function: comparePeriods
+- **Purpose**: MoM income/expense delta for Dashboard trend line
+- **Dependencies**: computeDashboardTotals, spendingByCategory, shiftMonthYear
+- **Verification Status**: used on Dashboard (reasoned)
+
+# Module / File: DashboardScreen hierarchy (P0/P1)
+## Function: DashboardScreen
+- **Order**: Balance → SafeToSpend → Reminders → Tips teaser/Eats → Goals → Donut → Budgets empty CTA → Recent empty CTA
+- **Smart Tips off**: teaser card routes to Settings to enable
+- **Entry**: recent category chips + amount/note templates

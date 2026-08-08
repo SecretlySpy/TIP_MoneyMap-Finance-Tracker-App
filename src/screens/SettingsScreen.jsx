@@ -1,5 +1,6 @@
 import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
+import { OptionChipRow } from "../components/OptionChipRow";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { Toggle } from "../components/Toggle";
@@ -7,8 +8,22 @@ import { buildBackup, buildTransactionsCsv, serializeBackup, shareText, } from "
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
+
+const CURRENCY_OPTIONS = [
+    { value: "₱", label: "₱" },
+    { value: "$", label: "$" },
+    { value: "€", label: "€" },
+    { value: "£", label: "£" },
+    { value: "¥", label: "¥" },
+];
+const THEME_OPTIONS = [
+    { value: "system", label: "System" },
+    { value: "light", label: "Light" },
+    { value: "dark", label: "Dark" },
+];
+
 function SettingsRow({ emoji, label, onPress, trailing }) {
-    const theme = useTheme(useUiStore((state) => state.themePreference));
+    const theme = useTheme();
     return (<Pressable accessibilityRole={onPress === undefined ? "text" : "button"} disabled={onPress === undefined} onPress={onPress} style={{
             alignItems: "center",
             flexDirection: "row",
@@ -31,17 +46,17 @@ function SettingsRow({ emoji, label, onPress, trailing }) {
     </Pressable>);
 }
 function SettingsSection({ children, title }) {
-    const theme = useTheme(useUiStore((state) => state.themePreference));
+    const theme = useTheme();
     return (<View style={{ gap: theme.spacing.sm }}>
       <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
         {title}
       </Text>
-      <SectionCard padding={theme.spacing.lg}>{children}</SectionCard>
+      <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.lg }}>{children}</SectionCard>
     </View>);
 }
 export function SettingsScreen({ navigation }) {
     const themePreference = useUiStore((state) => state.themePreference);
-    const theme = useTheme(themePreference);
+    const theme = useTheme();
     const appLockEnabled = useUiStore((state) => state.appLockEnabled);
     const remindersEnabled = useUiStore((state) => state.remindersEnabled);
     const notificationPermissionDenied = useUiStore((state) => state.notificationPermissionDenied);
@@ -104,19 +119,6 @@ export function SettingsScreen({ navigation }) {
             Alert.alert("Backup failed", error instanceof Error ? error.message : "Could not share backup.");
         }
     };
-    const cycleCurrency = () => {
-        const options = ["₱", "$", "€", "£", "¥"];
-        const index = options.indexOf(currencySymbol);
-        const next = options[(index + 1) % options.length] ?? "₱";
-        void setCurrencySymbol(next);
-    };
-    const cycleTheme = () => {
-        const order = ["system", "light", "dark"];
-        const index = order.indexOf(themePreference);
-        const next = order[(index + 1) % order.length] ?? "system";
-        void setThemePreference(next);
-    };
-    const themeLabel = themePreference === "system" ? "System" : themePreference === "light" ? "Light" : "Dark";
     return (<ScreenContainer contentContainerStyle={{ gap: theme.spacing.xl }} testID="settings-screen">
       <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.screenTitle }}>
         Settings
@@ -135,10 +137,23 @@ export function SettingsScreen({ navigation }) {
       </SettingsSection>
 
       <SettingsSection title="PREFERENCES">
-        <SettingsRow emoji="💱" label="Currency symbol" onPress={cycleCurrency} trailing={trailingText(currencySymbol)}/>
-        <SettingsRow emoji="🎨" label="Theme" onPress={cycleTheme} trailing={trailingText(themeLabel)}/>
+        <OptionChipRow
+          accessibilityLabel="Currency symbol"
+          label="💱 Currency symbol"
+          onChange={(value) => void setCurrencySymbol(value)}
+          options={CURRENCY_OPTIONS}
+          value={currencySymbol}
+        />
+        <OptionChipRow
+          accessibilityLabel="Theme"
+          label="🎨 Theme"
+          onChange={(value) => void setThemePreference(value)}
+          options={THEME_OPTIONS}
+          value={themePreference}
+        />
         <SettingsRow emoji="🗂️" label="Manage categories" onPress={() => navigation.navigate("ManageCategories")} trailing={trailingText("›")}/>
         <SettingsRow emoji="🏦" label="Manage accounts" onPress={() => navigation.navigate("ManageAccounts")} trailing={trailingText("›")}/>
+        <SettingsRow emoji="🎯" label="Savings goals" onPress={() => navigation.navigate("Goals")} trailing={trailingText("›")}/>
       </SettingsSection>
 
       <SettingsSection title="SMART FEATURES">

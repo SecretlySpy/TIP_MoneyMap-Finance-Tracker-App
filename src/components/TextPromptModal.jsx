@@ -15,7 +15,7 @@ export function TextPromptModal({ cancelLabel = "Cancel", confirmLabel = "Save",
     return (<Modal animationType="fade" transparent visible={visible} onRequestClose={onCancel}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{
             alignItems: "center",
-            backgroundColor: "rgba(0,0,0,0.45)",
+            backgroundColor: theme.colors.shadow + "73",
             flex: 1,
             justifyContent: "center",
             paddingHorizontal: theme.spacing.screen,
