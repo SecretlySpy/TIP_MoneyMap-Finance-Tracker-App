@@ -42,7 +42,11 @@ export function ManageCategoriesScreen({ navigation }) {
         {title}
       </Text>
       <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.md }}>
-        {items.map((category) => (<View key={`${category.type}-${category.id}`} style={{ alignItems: "center", flexDirection: "row", gap: theme.spacing.md }}>
+        {items.length === 0 ? (
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body }}>
+            No {title.toLowerCase()} categories yet. Add one below.
+          </Text>
+        ) : items.map((category) => (<View key={`${category.type}-${category.id}`} style={{ alignItems: "center", flexDirection: "row", gap: theme.spacing.md, minHeight: 44 }}>
             <Text style={{ fontSize: theme.typeScale.emptyTitle }}>{categoryEmoji(category.name)}</Text>
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>

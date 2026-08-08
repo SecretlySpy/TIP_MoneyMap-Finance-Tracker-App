@@ -16,14 +16,18 @@
 | Deterministic asset generation | Sharp | `0.35.3` development-only | Rasterize the exact Home SVG geometry into the Expo splash PNG |
 | Typography and launch | Expo Font / Roboto / Splash Screen | `~14.0.12` / `^0.4.3` / `~31.0.13` | Bundle three approved font weights and hold the native surface until they load |
 | Navigation | React Navigation | 7.x | Typed native stack and bottom tabs |
-| Visual state | Zustand | `^5.0.14` | Lightweight in-memory preview switches; persistent settings arrive in task 3 |
+| Visual state | Zustand | `^5.0.14` | App/UI preferences + finance snapshot orchestration |
 | Encrypted database | OP-SQLite / SQLCipher | OP-SQLite `^17.1.3` with `sqlcipher: true` | Offline relational storage encrypted at rest |
 | Key generation/storage | Expo Crypto / SecureStore | `~15.0.9` / `~15.0.8` | Generate a 256-bit key and protect it with Android Keystore |
-| Tests | Jest Expo / RNTL / better-sqlite3 | `~54.0.17` / `^14.0.1` / `^12.11.1` | Test SQL contracts, integer money, themes, and accessible UI states |
+| Background / reminders | expo-background-task / expo-notifications / expo-task-manager | Expo 54-compatible | Recurring catch-up + local bill reminders |
+| App lock | expo-local-authentication | Expo 54-compatible | Biometrics with PIN fallback |
+| Import | papaparse / xlsx / expo-document-picker / expo-file-system | Locked via package.json | CSV + Excel migration import |
+| Smart Tips (optional HTTPS) | `src/remote/smartTipsClient.js` + Gemini | Key via `app.config.js` / EAS | Only networked module; offline rules always available |
+| Tests | Jest Expo / RNTL / better-sqlite3 | `~54.0.17` / `^14.0.1` / `^12.11.1` | ~91 unit tests: SQL, money, tips, import, lock, UI |
 | Package manager | npm | 10 or newer (verified `10.9.8`) | Dependency installation and scripts |
 | Android tooling | Android SDK cmdline-tools / Studio, JDK | SDK platform 35, build-tools 35, NDK 27.1, Emulator, JDK 21 | API 26+ emulator/device builds; Java 25+ is unsupported by this Gradle stack |
 
-Later functional milestones add notification, file-import, biometric, MMKV, and Smart Tips networking libraries only when their dependencies in the project plan are complete. The current Smart Tips view is an offline visual fixture.
+**Tasks 1–18 are complete** in v0.1.0. Live setup guide: [index.html](./index.html) / [GitHub Pages](https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/). Expo Go is unsupported (SQLCipher).
 
 ## Architecture visualization
 
@@ -83,16 +87,18 @@ sequenceDiagram
 1. Install Git, Node.js 22 LTS, npm, JDK 21, and the Android SDK (Android Studio or command-line tools). Do not use Java 25+ with this Expo SDK 54/Gradle build.
 2. Install Android SDK Platform 35, Build-Tools 35, Platform-Tools, NDK 27.1.12297006, CMake 3.22.1, Emulator, and `system-images;android-35;google_apis;x86_64`. Create AVD `MoneyMap_VSCode_API_35` (Pixel 6 / Google APIs x86_64).
 3. Clone the repository and enter its directory.
-4. Copy `.env.example` to `.env`. Leave the key blank: the current Smart Tips screen is offline-only and never reads it.
+4. Copy `.env.example` to `.env`. Optional `GEMINI_API_KEY` enables online Smart Tips after in-app consent; offline tips work without it.
 5. Run `npm ci` (preferred with lockfile) or `npm install`.
 6. Run `npm run asset:splash` only after changing the source Home SVG or launch color; identical input produces an identical PNG hash.
-7. Run `npm test`; all persistence, money, theme, component, accessibility, and native-plugin tests must pass (44 tests expected).
-8. Run `npx expo-doctor` (18/18 checks) and optionally `npx expo export --platform android --clear`.
+7. Run `npm test` (~91 tests expected).
+8. Run `npx expo-doctor` and optionally `npx expo export --platform android --clear`.
 9. Start an emulator or connect an Android device with USB debugging, then run `npm run android` (first run performs a native dev-client build).
 
 This project requires an Expo development build. Expo Go cannot load OP-SQLite or SQLCipher.
 
 There is no `npm run typecheck` script: application sources are JavaScript/JSX under Metro.
+
+**Polished walkthrough with OS tabs, SVG previews, and troubleshooting:** [https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/](https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/)
 
 ## macOS
 

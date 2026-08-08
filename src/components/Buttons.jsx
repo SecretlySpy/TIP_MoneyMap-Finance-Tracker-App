@@ -2,9 +2,10 @@ import { Pressable } from "react-native";
 import { useTheme } from "../theme/tokens";
 import { AppText as Text } from "./AppText";
 // Primary actions use the exact 51 px Figma height and brand fill.
-export function PrimaryButton({ children, disabled = false, onPress, style }) {
+export function PrimaryButton({ accessibilityLabel, children, disabled = false, onPress, style }) {
     const theme = useTheme();
-    return (<Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[
+    const label = accessibilityLabel ?? (typeof children === "string" ? children : undefined);
+    return (<Pressable accessibilityLabel={label} accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[
             {
                 alignItems: "center",
                 backgroundColor: theme.colors.primary,
@@ -26,9 +27,10 @@ export function PrimaryButton({ children, disabled = false, onPress, style }) {
     </Pressable>);
 }
 // Dashed secondary actions retain the approved outline treatment and 44 px height.
-export function DashedButton({ children, disabled = false, onPress, style }) {
+export function DashedButton({ accessibilityLabel, children, disabled = false, onPress, style }) {
     const theme = useTheme();
-    return (<Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[
+    const label = accessibilityLabel ?? (typeof children === "string" ? children : undefined);
+    return (<Pressable accessibilityLabel={label} accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[
             {
                 alignItems: "center",
                 borderColor: theme.colors.primary,

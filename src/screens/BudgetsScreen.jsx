@@ -3,6 +3,7 @@ import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { BudgetCard } from "../components/BudgetCard";
 import { DashedButton } from "../components/Buttons";
+import { EmptyState } from "../components/EmptyState";
 import { MonthChip } from "../components/MonthChip";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { TextPromptModal } from "../components/TextPromptModal";
@@ -84,9 +85,15 @@ export function BudgetsScreen({ navigation }) {
           </Text>
         </Pressable>
       </View>
-      {cards.length === 0 ? (<Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body }}>
-          No budgets yet for this month. Add one to track spending limits.
-        </Text>) : (cards.map((budget) => (<Pressable key={budget.name} accessibilityHint="Long press to edit or delete this budget" accessibilityRole="button" onLongPress={() => {
+      {cards.length === 0 ? (
+        <EmptyState
+          actionLabel="＋ Add budget"
+          emoji="📊"
+          message="Set a monthly limit per category to see progress bars and overspend warnings."
+          onAction={beginAddBudget}
+          title="No budgets this month"
+        />
+      ) : (cards.map((budget) => (<Pressable key={budget.name} accessibilityHint="Long press to edit or delete this budget" accessibilityRole="button" onLongPress={() => {
                 Alert.alert(budget.name, "Edit limit or remove this budget.", [
                     { text: "Cancel", style: "cancel" },
                     {

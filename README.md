@@ -2,6 +2,10 @@
 
 An Android-first, offline-first personal finance tracker for **students**, built with React Native and Expo (JavaScript).
 
+**Live docs (GitHub Pages):** https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/
+
+The Pages site is the polished setup guide: root [`index.html`](./index.html) (self-contained HTML, OS tabs, SVG app previews, troubleshooting). A static README mirror is also generated at [`docs/index.html`](./docs/index.html) via `npm run build:readme-page`.
+
 ## Status
 
 | Area | State |
@@ -17,15 +21,17 @@ An Android-first, offline-first personal finance tracker for **students**, built
 | Task 17 polish | Done |
 | Task 18 release prep docs | Done (EAS project ID still placeholder until `eas init`) |
 
+**v0.1.0** — Tasks 1–18 complete.
+
 ## Quick start
 
 1. Install **Node.js 22 LTS**, **JDK 21**, Android SDK (API 35 recommended).
 2. `npm ci`
 3. Copy `.env.example` → `.env` (optional `GEMINI_API_KEY` for online tips).
-4. `npm test`
+4. `npm test` (91 tests)
 5. Start an emulator/device, then `npm run android` (dev client required — **Expo Go unsupported** because of SQLCipher).
 
-See [Tech Stack Setup Guide.md](./Tech%20Stack%20Setup%20Guide.md) and [docs/local-environment-audit-linux.md](./docs/local-environment-audit-linux.md).
+Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or the [live Pages site](https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/). Also see [Tech Stack Setup Guide.md](./Tech%20Stack%20Setup%20Guide.md) and [docs/local-environment-audit-linux.md](./docs/local-environment-audit-linux.md).
 
 ## Architecture (short)
 

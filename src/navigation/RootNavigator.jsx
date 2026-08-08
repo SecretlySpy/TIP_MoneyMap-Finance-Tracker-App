@@ -2,7 +2,9 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppText as Text } from "../components/AppText";
 import { TabIcon } from "../components/TabIcon";
 import { AppLockScreen } from "../screens/AppLockScreen";
 import { BudgetsScreen } from "../screens/BudgetsScreen";
@@ -98,11 +100,30 @@ export function RootNavigator() {
     const isLocked = useUiStore((state) => state.isLocked);
     const preferencesReady = useUiStore((state) => state.preferencesReady);
     const ensurePreferencesLoaded = useUiStore((state) => state.ensurePreferencesLoaded);
+    const themePreference = useUiStore((state) => state.themePreference);
+    const theme = useTheme(themePreference);
     useEffect(() => {
         void ensurePreferencesLoaded();
     }, [ensurePreferencesLoaded]);
     if (!preferencesReady) {
-        return null;
+        return (
+          <View
+            accessibilityLabel="Loading preferences"
+            accessibilityRole="progressbar"
+            style={{
+              alignItems: "center",
+              backgroundColor: theme.colors.bg,
+              flex: 1,
+              gap: theme.spacing.xl,
+              justifyContent: "center",
+            }}
+          >
+            <ActivityIndicator color={theme.colors.primary} size="large" />
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+              Restoring your settings…
+            </Text>
+          </View>
+        );
     }
     return (<RootStack.Navigator screenOptions={{ headerShown: false }}>
       {isLocked ? (<RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }}/>) : (<>

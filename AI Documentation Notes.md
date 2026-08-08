@@ -353,33 +353,49 @@
 - **Responsive & Accessibility Notes**: Uses text plus color, a semantic progress bar, and a flexible name column.
 - **Security Notes**: Does not write or transmit budget values.
 
-# Module / File: src/components/Buttons.tsx
+# Module / File: src/components/Buttons.jsx
 ## Function: PrimaryButton
 - **Purpose**: Render the approved full-width primary action and disabled state.
 - **Inputs**:
-  - `props` (`ButtonProps`): Child label, press callback, optional disabled flag, and view style.
+  - `props` (`object`): `children` label, `onPress`, optional `disabled`, `style`, optional `accessibilityLabel`.
 - **Outputs**: `React.JSX.Element` containing an accessible Pressable.
 - **Dependencies**: `AppText` and `useTheme`.
-- **Behavior**: Applies deterministic 51 dp geometry, semantic colors, disabled opacity, and forwards the callback.
+- **Behavior**: Applies deterministic 51 dp geometry, semantic colors, disabled opacity, and forwards the callback. Sets `accessibilityLabel` from prop or string `children` so RNTL `getByRole("button", { name })` matches.
 - **Side Effects**: Invokes `onPress` when enabled.
 - **DSA Used**: Constant-size rendering, O(1) time and space.
 - **Data Analysis Notes**: Disabled appearance is a binary state.
-- **Responsive & Accessibility Notes**: Exposes button role and disabled state with a full-width touch target.
+- **Responsive & Accessibility Notes**: Exposes button role, named label, and disabled state with a full-width touch target.
 - **Security Notes**: Does not execute when disabled; action security remains the caller's responsibility.
+- **Verification Status**: reasoned — empty-history CTA depends on named button role
 
-# Module / File: src/components/Buttons.tsx
+# Module / File: src/components/Buttons.jsx
 ## Function: DashedButton
 - **Purpose**: Render the approved secondary dashed-outline action.
 - **Inputs**:
-  - `props` (`ButtonProps`): Child label, press callback, optional disabled flag, and view style.
+  - `props` (`object`): `children` label, `onPress`, optional `disabled`, `style`, optional `accessibilityLabel`.
 - **Outputs**: `React.JSX.Element` containing an accessible Pressable.
 - **Dependencies**: `AppText` and `useTheme`.
-- **Behavior**: Applies deterministic 44 dp geometry, dashed semantic outline, and disabled opacity.
+- **Behavior**: Applies deterministic 44 dp geometry, dashed semantic outline, and disabled opacity. Mirrors PrimaryButton label resolution.
 - **Side Effects**: Invokes `onPress` when enabled.
 - **DSA Used**: Constant-size rendering, O(1) time and space.
 - **Data Analysis Notes**: No finance data is processed.
-- **Responsive & Accessibility Notes**: Exposes button role and disabled state; full width supports compact screens.
+- **Responsive & Accessibility Notes**: Exposes button role, named label, and disabled state; full width supports compact screens.
 - **Security Notes**: Does not itself mutate application state.
+- **Verification Status**: reasoned
+
+# Module / File: src/components/EmptyState.jsx
+## Function: EmptyState
+- **Purpose**: Shared empty-list illustration, title, message, and optional primary CTA.
+- **Inputs**:
+  - `emoji` (`string`, default 📭), `title` (`string`), `message` (`string`, optional), `actionLabel` (`string`, optional), `onAction` (`function`, optional), `testID` (`string`, default empty-state)
+- **Outputs**: `React.JSX.Element`
+- **Dependencies**: `PrimaryButton`, `AppText`, `useTheme`, `useUiStore`
+- **Behavior**: Centers emoji circle, title, optional message; renders `PrimaryButton` only when both `actionLabel` and `onAction` are set.
+- **Side Effects**: Invokes `onAction` via PrimaryButton
+- **DSA Used**: O(1) layout
+- **Responsive & Accessibility Notes**: Container must NOT set `accessible` — that collapses children and hides the CTA from the a11y tree / `getByRole("button", { name: actionLabel })`. History empty state uses label `＋ Add your first transaction`.
+- **Security Notes**: Display-only; no network
+- **Verification Status**: reasoned — targets uiComponents empty-history test
 
 # Module / File: src/components/Chip.tsx
 ## Function: Chip
@@ -513,19 +529,20 @@
 - **Responsive & Accessibility Notes**: Announces title, metadata, and amount as one label; flexible text avoids horizontal overflow.
 - **Security Notes**: Does not expose identifiers or notes beyond supplied display copy.
 
-# Module / File: src/screens/fixtures.ts
-## Function: static UI fixture exports
-- **Purpose**: Provide immutable integer-money data matching every approved Figma screen and visual state.
+# Module / File: src/screens/fixtures.js
+## Function: (removed stub)
+- **Purpose**: Deprecated empty module formerly holding Figma UI fixtures; live Zustand/SQL data replaced it.
 - **Inputs**:
-  - None (`never`): This module declares typed constants.
-- **Outputs**: Dashboard totals, transactions, budget snapshots/cards, history groups, recurring bills, Smart Tips, and structured copy types.
-- **Dependencies**: Finance domain and shared component prop types.
-- **Behavior**: Exports deterministic arrays and records in the exact Figma ordering.
-- **Side Effects**: None.
-- **DSA Used**: Read-only ordered arrays with O(1) index access and O(n) mapping.
-- **Data Analysis Notes**: Every monetary value, including incidental tip copy, originates as integer minor units.
-- **Responsive & Accessibility Notes**: Copy is short enough for the approved compact layout and long rows truncate safely.
-- **Security Notes**: Contains synthetic local data only and no real identifiers, notes, or credentials.
+  - None
+- **Outputs**: Empty module (`export {}`) — no imports remain in app or tests.
+- **Dependencies**: None
+- **Behavior**: No runtime behavior. Safe to delete when tooling allows file removal.
+- **Side Effects**: None
+- **DSA Used**: N/A
+- **Data Analysis Notes**: N/A
+- **Responsive & Accessibility Notes**: N/A
+- **Security Notes**: No data
+- **Verification Status**: reasoned — grep shows zero imports of `screens/fixtures`
 
 # Module / File: src/screens/DashboardScreen.tsx
 ## Function: DashboardScreen
@@ -1615,3 +1632,54 @@
 - **Data Analysis Notes**: n/a
 - **Responsive & Accessibility Notes**: n/a
 - **Security Notes**: Aligns Play Data safety checklist
+
+# Module / File: index.html
+## Function: GitHub Pages documentation site
+- **Purpose**: Self-contained onboarding/docs site for MoneyMap at https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/
+- **Inputs**: none (static HTML)
+- **Outputs**: Browser-rendered setup guide with sticky TOC, OS tabs, SVG phone mocks, architecture, troubleshooting
+- **Dependencies**: Google Fonts (Inter, Anton, IBM Plex Mono); brand tokens primary `#0F6E5C`, accent `#3DBF9A`
+- **Behavior**: Single-file Pages entry; pure-CSS OS tabs (Windows/macOS/Linux); inline SVG mocks (Dashboard, Entry, History empty, Settings/Smart Tips); links to repo blob docs
+- **Side Effects**: none
+- **DSA Used**: n/a (static document)
+- **Data Analysis Notes**: Status states Tasks 1–18 complete / v0.1.0; Quick verify expects 91 Jest tests
+- **Responsive & Accessibility Notes**: Skip link, `:focus-visible`, sticky TOC (static on small screens), 44px targets on tabs/buttons, `prefers-reduced-motion`, SVG title/desc
+- **Security Notes**: No secrets; docs only; warns Expo Go unsupported and EAS projectId placeholder
+- **Verification Status**: reasoned (HTML structure + content audit); regenerate `docs/index.html` via `node scripts/build-readme-page.mjs` after README edits
+
+# Module / File: docs/assets/README.md
+## Function: assets folder note
+- **Purpose**: Explain that GH Pages visual aids are inline SVG in root `index.html`, not external images
+- **Inputs**: n/a
+- **Outputs**: markdown
+- **Dependencies**: none
+- **Behavior**: Documents reliability rationale and how to add future visuals
+- **Side Effects**: none
+- **DSA Used**: n/a
+- **Data Analysis Notes**: n/a
+- **Responsive & Accessibility Notes**: points authors to title/desc on SVGs
+- **Security Notes**: none
+- **Verification Status**: reasoned
+
+# Project Handover — MoneyMap QA/Docs pass
+_Generated: 2026-08-09 · For: subsequent LLM session_
+
+## 1. Project Overview
+v0.1.0 student finance tracker; Tasks 1–18 complete in application code. QA audit + UI empty-state polish + GitHub Pages setup guide completed 2026-08-09.
+
+## 2. Immediate Next Steps
+1. Run `npm test` (expect 17 suites / ~91 tests) and `npx expo-doctor` after pull
+2. Commit and push so https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/ serves the new root `index.html`
+3. Optional: `rm src/screens/fixtures.js` (deprecated stub `export {}`)
+4. Store release: `eas init`, host privacy URL, production AAB
+
+## 3. Critical Context
+- Expo Go unsupported (SQLCipher)
+- JDK 21 only; port 8081 conflicts → Metro on 8082 + adb reverse
+- `app.config.js` must wrap `{ expo: { ...appJson.expo, extra } }` for expo-doctor
+- Local `fetch(fileUri)` in importFile is filesystem fallback only
+- EAS projectId still all zeros until eas init
+
+## 4. Verification Status
+- Prior baseline: 91/91 tests green; expo-doctor one config warning (addressed in app.config.js)
+- This session: code/docs changes applied; re-run tests locally if agent shell is denied

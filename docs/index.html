@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MoneyMap Finance Tracker</title>
+  <meta name="description" content="Static MoneyMap project overview and quick start guide.">
+  <style>
+    :root {
+      color-scheme: light;
+      color: #111111;
+      background: #f4f4f2;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.7;
+      text-rendering: optimizeLegibility;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; padding: 0; min-height: 100vh; background: #f4f4f2; color: #111; }
+    .page { max-width: 920px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    a { color: #0F6E5C; text-decoration: none; }
+    a:hover, a:focus-visible { text-decoration: underline; }
+    h1, h2, h3 { margin-top: 2.25rem; margin-bottom: 1rem; line-height: 1.15; }
+    h1 { font-size: clamp(2rem, 3vw, 3rem); }
+    h2 { font-size: clamp(1.5rem, 2.6vw, 2.2rem); }
+    p { margin-bottom: 1.25rem; }
+    ul, ol { margin: 0 0 1.25rem 1.5rem; }
+    li { margin-bottom: 0.75rem; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #e8e7e5; padding: 0.2rem 0.35rem; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+    th, td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid #ddd; }
+    th { background: #eef3f1; }
+    .hero { padding: 3rem 0 1.5rem; border-bottom: 1px solid rgba(17, 17, 17, 0.08); }
+    .hero p { max-width: 68ch; margin-top: 1rem; font-size: 1.05rem; color: #3e444a; }
+    .hero .meta { margin-top: 0.75rem; font-size: 0.95rem; color: #5c6369; }
+    .banner {
+      background: #D7F2EA;
+      border: 1px solid #0F6E5C;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+    }
+    @media (max-width: 640px) { .page { padding: 1.5rem 1rem 2.5rem; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="hero">
+      <h1>MoneyMap Finance Tracker</h1>
+      <p>An Android-first, offline-first personal finance tracker for students, built with React Native and Expo.</p>
+      <p class="meta">Static project documentation generated from README.md · v0.1.0 · Tasks 1–18 complete.</p>
+    </div>
+
+    <div class="banner">
+      <strong>Full setup guide with OS tabs, SVG previews, and troubleshooting:</strong>
+      <a href="https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/">GitHub Pages (root index.html)</a>
+      · or open <a href="../index.html">../index.html</a> in this repo.
+    </div>
+
+    <h2>Status</h2>
+    <table>
+      <thead><tr><th>Area</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td>Tasks 1–9 core product</td><td>Done</td></tr>
+        <tr><td>Task 10 recurring catch-up</td><td>Done</td></tr>
+        <tr><td>Task 11 bill reminders</td><td>Done</td></tr>
+        <tr><td>Task 12 CSV export + backup</td><td>Done</td></tr>
+        <tr><td>Task 13 CSV + Excel import</td><td>Done</td></tr>
+        <tr><td>Task 14 app lock</td><td>Done</td></tr>
+        <tr><td>Task 15 Smart Tips offline</td><td>Done</td></tr>
+        <tr><td>Task 16 Smart Tips online Gemini</td><td>Done</td></tr>
+        <tr><td>Task 17 polish</td><td>Done</td></tr>
+        <tr><td>Task 18 release prep</td><td>Done (EAS projectId placeholder until <code>eas init</code>)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Quick start</h2>
+    <ol>
+      <li>Install <strong>Node.js 22 LTS</strong>, <strong>JDK 21</strong>, Android SDK (API 35 recommended).</li>
+      <li><code>npm ci</code></li>
+      <li>Copy <code>.env.example</code> → <code>.env</code> (optional <code>GEMINI_API_KEY</code>).</li>
+      <li><code>npm test</code> (~91 tests)</li>
+      <li>Start emulator/device, then <code>npm run android</code> (dev client required — <strong>Expo Go unsupported</strong>).</li>
+    </ol>
+
+    <h2>Architecture</h2>
+    <ul>
+      <li>Screens → Zustand stores → repositories → SQLCipher</li>
+      <li>Money is always <strong>integer minor units</strong></li>
+      <li>Theme tokens only — no hardcoded hex in screens</li>
+      <li><strong>Only</strong> <code>src/remote/smartTipsClient.js</code> may call remote <code>fetch</code></li>
+    </ul>
+
+    <h2>Smart Tips privacy</h2>
+    <ul>
+      <li>Default <strong>off</strong>. First enable shows a consent sheet.</li>
+      <li>Offline: rules from local budgets/transactions.</li>
+      <li>Online: anonymized summary only (period, totals, category ratios, currency).</li>
+      <li>Never: raw transactions, notes, account names/IDs.</li>
+    </ul>
+
+    <h2>Release docs</h2>
+    <ul>
+      <li>Package: <code>com.moneymap.financetracker</code></li>
+      <li><a href="./privacy-policy.md">Privacy policy</a></li>
+      <li><a href="./play-data-safety.md">Play Data safety</a></li>
+      <li><a href="./release-checklist.md">Release checklist</a></li>
+    </ul>
+  </main>
+</body>
+</html>

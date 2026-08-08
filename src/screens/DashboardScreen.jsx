@@ -54,6 +54,7 @@ export function DashboardScreen({ navigation }) {
             width: theme.sizes.fab,
             zIndex: 10,
             ...theme.shadows.fab,
+            elevation: 6,
         }}>
       <Text style={{
             color: theme.mode === "dark" ? theme.colors.onAccent : theme.colors.onPrimary,

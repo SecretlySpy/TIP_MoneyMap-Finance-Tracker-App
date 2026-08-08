@@ -1,39 +1,31 @@
 <!DOCTYPE html>
-<!--
-  GitHub Pages site for TIP_MoneyMap-Finance-Tracker-App — local setup and testing guide.
-  
-  This page is the team's onboarding guide: it explains how to install the toolchain,
-  configure the project, run it locally, and verify that it works.
-  
-  Deliberately self-contained. The palette and type scale mirror the Finance Tracker
-  branding (using the primary green accent).
--->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MoneyMap — Local Setup &amp; Testing Guide</title>
-  <meta name="description" content="Step-by-step guide for setting up and testing the MoneyMap Finance Tracker locally.">
-
+  <title>MoneyMap Finance Tracker — Setup &amp; Docs</title>
+  <meta name="description" content="MoneyMap Finance Tracker: offline-first Android finance app. Setup, architecture, troubleshooting, and docs for v0.1.0 (Tasks 1–18 complete).">
+  <meta name="theme-color" content="#0F6E5C">
+  <link rel="canonical" href="https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
   <style>
     :root {
       --color-base: #F7F9F8;
       --color-ink: #0F1413;
+      --color-primary: #0F6E5C;
       --color-accent: #3DBF9A;
       --color-surface-raised: #FFFFFF;
-      --color-muted: #6B7572;
-      --color-border: #E2E8E5;
-      --color-danger: #D64545;
-      --color-success: #1E9E6A;
-
-      --font-display: 'Anton', sans-serif;
-      --font-body: 'Inter', sans-serif;
-      --font-mono: 'IBM Plex Mono', monospace;
-
+      --color-muted: #4A5552;
+      --color-border: #D5DED9;
+      --color-danger: #B3261E;
+      --color-success: #1A7A52;
+      --color-warn-bg: #FFF8E8;
+      --color-ink-soft: #E8ECEA;
+      --font-display: 'Anton', system-ui, sans-serif;
+      --font-body: 'Inter', system-ui, sans-serif;
+      --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
       --space-xs: 0.25rem;
       --space-sm: 0.5rem;
       --space-md: 1rem;
@@ -41,11 +33,13 @@
       --space-xl: 2rem;
       --space-2xl: 3rem;
       --space-3xl: 4rem;
-
       --radius-sm: 4px;
       --radius-md: 8px;
+      --radius-lg: 12px;
       --radius-pill: 9999px;
-      --container-max: 940px;
+      --container-max: 980px;
+      --nav-h: 3.25rem;
+      --focus-ring: 0 0 0 3px #FFFFFF, 0 0 0 6px var(--color-primary);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -53,10 +47,19 @@
     html {
       font-size: 16px;
       scroll-behavior: smooth;
-      scroll-padding-top: 5rem;
+      scroll-padding-top: calc(var(--nav-h) + 1.25rem);
       -webkit-text-size-adjust: 100%;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
     }
 
     body {
@@ -66,20 +69,44 @@
       line-height: 1.65;
     }
 
+    .skip-link {
+      position: absolute;
+      left: var(--space-md);
+      top: -100px;
+      z-index: 100;
+      background: var(--color-primary);
+      color: #FFFFFF;
+      padding: 0.65rem 1rem;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .skip-link:focus {
+      top: var(--space-md);
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
     .container {
       max-width: var(--container-max);
       margin: 0 auto;
       padding: 0 var(--space-lg);
     }
 
-    a { color: inherit; }
-
+    a { color: var(--color-primary); }
+    a:hover { color: #0A5245; }
     p { margin-bottom: var(--space-md); }
     p:last-child { margin-bottom: 0; }
-
     strong { font-weight: 600; }
+    ul, ol { margin: 0 0 var(--space-md) 1.25rem; }
+    li { margin-bottom: 0.4rem; }
+    li:last-child { margin-bottom: 0; }
 
-    /* --- Barcode strip motif --- */
     .barcode {
       height: 8px;
       background: repeating-linear-gradient(
@@ -91,13 +118,12 @@
       );
     }
 
-    /* --- Masthead --- */
+    /* Masthead */
     .masthead {
       background: var(--color-ink);
-      color: var(--color-base);
+      color: var(--color-ink-soft);
       padding: var(--space-3xl) 0 var(--space-2xl);
     }
-
     .eyebrow {
       font-family: var(--font-mono);
       font-size: 0.75rem;
@@ -106,73 +132,127 @@
       color: var(--color-accent);
       margin-bottom: var(--space-md);
     }
-
     .wordmark {
       font-family: var(--font-display);
       font-size: clamp(2.5rem, 8vw, 4rem);
       line-height: 1;
       letter-spacing: 0.02em;
       text-transform: uppercase;
+      color: #FFFFFF;
     }
-
     .wordmark span { color: var(--color-accent); }
-
-    .masthead h2 {
+    .masthead h1.sub {
       font-family: var(--font-display);
       font-weight: 400;
-      font-size: clamp(1.25rem, 3.5vw, 1.75rem);
+      font-size: clamp(1.15rem, 3.2vw, 1.6rem);
       text-transform: uppercase;
       letter-spacing: 0.02em;
       margin-top: var(--space-sm);
-      color: #E8ECEA;
+      color: var(--color-ink-soft);
     }
-
     .tagline {
       margin-top: var(--space-lg);
-      max-width: 56ch;
+      max-width: 58ch;
       font-size: 1.0625rem;
-      color: #E8ECEA;
+      color: var(--color-ink-soft);
     }
-
     .stack {
       display: flex;
       flex-wrap: wrap;
       gap: var(--space-sm);
       margin-top: var(--space-xl);
       list-style: none;
+      margin-left: 0;
     }
-
     .stack li {
       font-family: var(--font-mono);
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       letter-spacing: 0.04em;
       text-transform: uppercase;
       padding: 0.3rem 0.7rem;
       border: 1px solid #2E3835;
       border-radius: var(--radius-pill);
-      color: #E8ECEA;
+      color: var(--color-ink-soft);
+      margin: 0;
     }
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      margin-top: var(--space-xl);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 0.4rem 0.75rem;
+      border-radius: var(--radius-pill);
+      font-weight: 600;
+    }
+    .badge--ok {
+      background: rgba(61, 191, 154, 0.18);
+      color: var(--color-accent);
+      border: 1px solid rgba(61, 191, 154, 0.45);
+    }
+    .badge--info {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--color-ink-soft);
+      border: 1px solid #2E3835;
+    }
+    .masthead-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      margin-top: var(--space-xl);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0.55rem 1.1rem;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: 0.9375rem;
+      text-decoration: none;
+      border: 2px solid transparent;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+    .btn--primary {
+      background: var(--color-accent);
+      color: var(--color-ink);
+    }
+    .btn--primary:hover { background: #54CBA8; color: var(--color-ink); }
+    .btn--ghost {
+      background: transparent;
+      color: #FFFFFF;
+      border-color: #3A4541;
+    }
+    .btn--ghost:hover { border-color: var(--color-accent); color: var(--color-accent); }
 
-    /* --- Sticky section nav --- */
+    /* Sticky TOC */
     .tocbar {
       position: sticky;
       top: 0;
-      z-index: 20;
-      background: rgba(247, 249, 248, 0.94);
-      backdrop-filter: blur(8px);
+      z-index: 30;
+      background: rgba(247, 249, 248, 0.96);
+      backdrop-filter: blur(10px);
       border-bottom: 1px solid var(--color-border);
     }
-
     .tocbar nav {
       display: flex;
       flex-wrap: wrap;
-      column-gap: var(--space-md);
-      row-gap: 0.15rem;
-      padding: var(--space-sm) var(--space-lg);
+      gap: 0.15rem var(--space-md);
+      padding: 0.65rem var(--space-lg);
       max-width: var(--container-max);
       margin: 0 auto;
+      min-height: var(--nav-h);
+      align-items: center;
     }
-
     .tocbar a {
       font-family: var(--font-mono);
       font-size: 0.6875rem;
@@ -181,49 +261,42 @@
       white-space: nowrap;
       text-decoration: none;
       color: var(--color-muted);
-      padding: var(--space-xs) 0;
+      padding: 0.35rem 0;
       border-bottom: 2px solid transparent;
     }
-
-    .tocbar a:hover { color: var(--color-ink); border-bottom-color: var(--color-accent); }
+    .tocbar a:hover,
+    .tocbar a:focus-visible {
+      color: var(--color-ink);
+      border-bottom-color: var(--color-accent);
+    }
 
     @media (max-width: 767px) {
-      .tocbar {
-        position: static;
-        backdrop-filter: none;
-        background: var(--color-base);
-      }
-
-      .tocbar nav {
-        column-gap: var(--space-xs);
-        row-gap: var(--space-xs);
-        padding: var(--space-sm) var(--space-lg) var(--space-md);
-      }
-
+      .tocbar { position: static; backdrop-filter: none; background: var(--color-base); }
+      .tocbar nav { gap: var(--space-xs); padding: var(--space-sm) var(--space-lg) var(--space-md); }
       .tocbar a {
-        padding: 0.3rem 0.55rem;
+        padding: 0.4rem 0.65rem;
         border-radius: var(--radius-pill);
         background: var(--color-surface-raised);
         border: 1px solid var(--color-border);
         border-bottom-width: 1px;
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
       }
-
       html { scroll-padding-top: 1rem; }
     }
 
-    /* --- Sections --- */
-    main { padding-top: var(--space-2xl); }
-    section { margin-bottom: var(--space-3xl); }
-
+    /* Sections */
+    main { padding-top: var(--space-2xl); padding-bottom: var(--space-3xl); }
+    section { margin-bottom: var(--space-3xl); scroll-margin-top: calc(var(--nav-h) + 1rem); }
     .section-head {
       display: flex;
       align-items: baseline;
       gap: var(--space-md);
-      margin-bottom: var(--space-md);
+      margin-bottom: var(--space-lg);
       padding-bottom: var(--space-sm);
       border-bottom: 2px solid var(--color-ink);
     }
-
     .step-num {
       font-family: var(--font-mono);
       font-size: 0.75rem;
@@ -235,22 +308,22 @@
       border-radius: var(--radius-sm);
       white-space: nowrap;
     }
-
     h2.section-title {
       font-family: var(--font-display);
       font-size: clamp(1.35rem, 4vw, 1.75rem);
       text-transform: uppercase;
       letter-spacing: 0.02em;
       font-weight: 400;
+      color: var(--color-ink);
     }
-
     h3 {
       font-size: 1.0625rem;
       font-weight: 600;
       margin: var(--space-xl) 0 var(--space-sm);
+      color: var(--color-ink);
     }
+    h3:first-child { margin-top: 0; }
 
-    /* --- Callouts --- */
     .note {
       border-left: 4px solid var(--color-ink);
       background: var(--color-surface-raised);
@@ -258,12 +331,11 @@
       padding: var(--space-md) var(--space-lg);
       margin: var(--space-lg) 0;
       font-size: 0.9375rem;
+      box-shadow: 0 1px 0 rgba(15, 20, 19, 0.04);
     }
-
-    .note--tip     { border-left-color: var(--color-success); }
-    .note--warn    { border-left-color: var(--color-danger); }
-    .note--accent  { border-left-color: var(--color-accent); }
-
+    .note--tip { border-left-color: var(--color-success); }
+    .note--warn { border-left-color: var(--color-danger); background: #FFF6F5; }
+    .note--accent { border-left-color: var(--color-accent); }
     .note__label {
       display: block;
       font-family: var(--font-mono);
@@ -272,319 +344,1002 @@
       text-transform: uppercase;
       color: var(--color-muted);
       margin-bottom: var(--space-xs);
+      font-weight: 600;
     }
 
-    /* --- Code blocks --- */
     .code {
       position: relative;
       margin: var(--space-md) 0;
     }
-
     .code pre {
       background: var(--color-ink);
-      color: #E8ECEA;
+      color: var(--color-ink-soft);
       border-radius: var(--radius-md);
       padding: var(--space-lg);
-      padding-right: 5.5rem;
       overflow-x: auto;
       font-family: var(--font-mono);
       font-size: 0.8125rem;
       line-height: 1.75;
       tab-size: 2;
     }
-
-    .code .c  { color: #9AA5A1; }   /* comment */
-    .code .p  { color: var(--color-accent); }  /* prompt / highlight */
-    .code .o  { color: #4A90D9; }   /* output */
-
-    code:not(pre code) {
+    .code .c { color: #9AA5A1; }
+    .code .p { color: var(--color-accent); }
+    code {
       font-family: var(--font-mono);
       font-size: 0.875em;
-      background: #E9EEEB;
-      padding: 0.1em 0.35em;
-      border-radius: var(--radius-sm);
-      word-break: break-word;
+      background: #E8EEEC;
+      color: var(--color-ink);
+      padding: 0.12rem 0.35rem;
+      border-radius: 3px;
     }
+    pre code { background: transparent; color: inherit; padding: 0; font-size: inherit; }
 
-    /* --- OS switcher (pure CSS) --- */
-    .osroot > input[type="radio"] {
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: var(--space-md) 0 var(--space-lg);
+      font-size: 0.9375rem;
+      background: var(--color-surface-raised);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid var(--color-border);
+    }
+    th, td {
+      text-align: left;
+      padding: 0.7rem 0.9rem;
+      border-bottom: 1px solid var(--color-border);
+      vertical-align: top;
+    }
+    th {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: #EEF3F1;
+      color: var(--color-ink);
+      font-weight: 600;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* OS tabs (pure CSS) */
+    .tabs { margin-top: var(--space-lg); }
+    .tabs__nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+      margin-bottom: 0;
+      border-bottom: 2px solid var(--color-border);
+    }
+    .tabs__nav label {
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 600;
+      padding: 0.7rem 1rem;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      color: var(--color-muted);
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      background: transparent;
+    }
+    .tabs__nav label:hover { color: var(--color-ink); }
+    .tabs input[type="radio"] {
       position: absolute;
       opacity: 0;
       pointer-events: none;
     }
+    .tab-panel {
+      display: none;
+      padding: var(--space-lg) 0 0;
+      border-top: 0;
+    }
+    #tab-win:checked ~ .tabs__nav label[for="tab-win"],
+    #tab-mac:checked ~ .tabs__nav label[for="tab-mac"],
+    #tab-lin:checked ~ .tabs__nav label[for="tab-lin"] {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-accent);
+    }
+    #tab-win:checked ~ #panel-win,
+    #tab-mac:checked ~ #panel-mac,
+    #tab-lin:checked ~ #panel-lin {
+      display: block;
+    }
 
-    .ostabs {
-      z-index: 15;
+    /* Phone mockups */
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-xl);
+      margin-top: var(--space-lg);
+    }
+    .mock-card {
+      text-align: center;
+    }
+    .mock-card figcaption {
+      margin-top: var(--space-md);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      font-weight: 600;
+    }
+    .phone {
+      display: block;
+      width: 100%;
+      max-width: 220px;
+      height: auto;
+      margin: 0 auto;
+      filter: drop-shadow(0 12px 24px rgba(15, 20, 19, 0.14));
+    }
+
+    /* Architecture flow */
+    .flow {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--space-xs);
-      background: var(--color-base);
-      padding: var(--space-md) 0;
-      margin-bottom: var(--space-md);
-      border-bottom: 1px solid var(--color-border);
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: var(--space-xl) 0;
+      padding: var(--space-lg);
+      background: var(--color-surface-raised);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
     }
-
-    .ostabs span {
-      font-family: var(--font-mono);
-      font-size: 0.6875rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--color-muted);
-      align-self: center;
-      margin-right: var(--space-sm);
-    }
-
-    .ostabs label {
+    .flow__node {
+      background: #EEF3F1;
+      border: 2px solid var(--color-primary);
+      color: var(--color-ink);
       font-family: var(--font-mono);
       font-size: 0.75rem;
-      padding: 0.4rem 0.9rem;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-pill);
-      background: var(--color-surface-raised);
-      cursor: pointer;
-      transition: all 150ms ease;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.65rem 0.9rem;
+      border-radius: var(--radius-md);
+      min-width: 5.5rem;
+      text-align: center;
+    }
+    .flow__node--store { border-color: var(--color-accent); background: rgba(61, 191, 154, 0.12); }
+    .flow__node--db { background: var(--color-primary); color: #FFFFFF; border-color: var(--color-primary); }
+    .flow__node--net {
+      border-color: var(--color-danger);
+      background: #FFF6F5;
+      border-style: dashed;
+    }
+    .flow__arrow {
+      font-family: var(--font-mono);
+      color: var(--color-muted);
+      font-weight: 600;
+      font-size: 1.1rem;
       user-select: none;
     }
-
-    .ostabs label:hover { border-color: var(--color-ink); }
-
-    .only-win, .only-mac, .only-linux { display: none; }
-
-    #os-win:checked   ~ * .only-win,
-    #os-mac:checked   ~ * .only-mac,
-    #os-linux:checked ~ * .only-linux { display: block; }
-
-    .only-win-i, .only-mac-i, .only-linux-i { display: none; }
-
-    #os-win:checked   ~ * .only-win-i,
-    #os-mac:checked   ~ * .only-mac-i,
-    #os-linux:checked ~ * .only-linux-i { display: inline; }
-
-    #os-win:checked   ~ .ostabs label[for="os-win"],
-    #os-mac:checked   ~ .ostabs label[for="os-mac"],
-    #os-linux:checked ~ .ostabs label[for="os-linux"] {
-      background: var(--color-ink);
-      color: var(--color-base);
-      border-color: var(--color-ink);
-    }
-
-    .osroot > input[type="radio"]:focus-visible ~ .ostabs label { outline: 2px dashed var(--color-muted); outline-offset: 2px; }
-
-    /* --- Doc cards --- */
-    .docs {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: var(--space-md);
-      list-style: none;
-    }
-
-    .doc {
-      display: block;
-      background: var(--color-surface-raised);
-      border: 2px dashed var(--color-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-lg);
-      text-decoration: none;
-      transition: border-color 150ms ease, transform 150ms ease;
-    }
-
-    .doc:hover, .doc:focus-visible { border-color: var(--color-ink); transform: translateY(-2px); }
-
-    .doc__label {
-      display: block;
-      font-family: var(--font-mono);
-      font-size: 0.6875rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
+    .flow-note {
+      width: 100%;
+      text-align: center;
+      font-size: 0.875rem;
       color: var(--color-muted);
-      margin-bottom: var(--space-sm);
+      margin-top: var(--space-sm);
     }
 
-    .doc__title { font-weight: 600; font-size: 1.0625rem; margin-bottom: 0.35rem; }
-    .doc__desc  { font-size: 0.875rem; color: var(--color-muted); line-height: 1.5; }
+    /* Checklist */
+    .checklist {
+      list-style: none;
+      margin-left: 0;
+      display: grid;
+      gap: var(--space-sm);
+    }
+    .checklist li {
+      display: flex;
+      gap: var(--space-md);
+      align-items: flex-start;
+      background: var(--color-surface-raised);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md) var(--space-lg);
+      margin: 0;
+    }
+    .checklist .box {
+      flex-shrink: 0;
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 2px solid var(--color-primary);
+      border-radius: 3px;
+      margin-top: 0.15rem;
+      position: relative;
+    }
+    .checklist .box::after {
+      content: "";
+      position: absolute;
+      left: 0.28rem;
+      top: 0.05rem;
+      width: 0.35rem;
+      height: 0.65rem;
+      border: solid var(--color-primary);
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+    .checklist code { white-space: nowrap; }
 
-    /* --- Footer --- */
-    footer {
-      border-top: 1px solid var(--color-border);
-      padding: var(--space-xl) 0 var(--space-2xl);
+    /* Doc links */
+    .doc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: var(--space-md);
+      margin-top: var(--space-md);
+      list-style: none;
+      margin-left: 0;
+    }
+    .doc-grid li { margin: 0; }
+    .doc-card {
+      display: block;
+      height: 100%;
+      padding: var(--space-lg);
+      background: var(--color-surface-raised);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      min-height: 44px;
+    }
+    .doc-card:hover,
+    .doc-card:focus-visible {
+      border-color: var(--color-accent);
+      box-shadow: 0 4px 16px rgba(15, 110, 92, 0.1);
+      outline: none;
+    }
+    .doc-card strong {
+      display: block;
+      color: var(--color-primary);
+      margin-bottom: var(--space-xs);
+    }
+    .doc-card span {
       font-size: 0.875rem;
       color: var(--color-muted);
     }
 
-    footer a { color: var(--color-ink); text-decoration-color: var(--color-border); text-underline-offset: 3px; }
-    footer a:hover { text-decoration-color: var(--color-ink); }
+    details.trouble {
+      background: var(--color-surface-raised);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-sm);
+      padding: 0;
+    }
+    details.trouble summary {
+      cursor: pointer;
+      font-weight: 600;
+      padding: var(--space-md) var(--space-lg);
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      list-style: none;
+      color: var(--color-ink);
+    }
+    details.trouble summary::-webkit-details-marker { display: none; }
+    details.trouble summary::before {
+      content: "+";
+      font-family: var(--font-mono);
+      color: var(--color-primary);
+      margin-right: var(--space-md);
+      font-weight: 700;
+      width: 1rem;
+    }
+    details.trouble[open] summary::before { content: "−"; }
+    details.trouble .trouble-body {
+      padding: 0 var(--space-lg) var(--space-lg);
+      border-top: 1px solid var(--color-border);
+      padding-top: var(--space-md);
+      font-size: 0.9375rem;
+    }
 
-    :focus-visible { outline: 3px solid var(--color-accent); outline-offset: 2px; }
+    footer {
+      background: var(--color-ink);
+      color: var(--color-ink-soft);
+      padding: var(--space-2xl) 0;
+      font-size: 0.875rem;
+    }
+    footer a { color: var(--color-accent); }
+    footer a:hover { color: #7AD4B8; }
+    .footer-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: var(--space-lg);
+    }
+    .footer-meta {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #9AA5A1;
+      margin-top: var(--space-sm);
+    }
 
     @media (max-width: 640px) {
-      .section-head { flex-direction: column; gap: var(--space-xs); }
+      .flow__arrow { transform: rotate(90deg); }
+      .flow { flex-direction: column; }
     }
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <div class="barcode" aria-hidden="true"></div>
 
   <header class="masthead">
     <div class="container">
-      <p class="eyebrow">Local Setup &amp; Testing Guide</p>
-      <h1 class="wordmark">Money<span>Map</span></h1>
-      <h2>Run the project on your own machine</h2>
+      <p class="eyebrow">GitHub Pages · v0.1.0</p>
+      <p class="wordmark">Money<span>Map</span></p>
+      <h1 class="sub">Finance Tracker — Docs &amp; Local Setup</h1>
       <p class="tagline">
-        MoneyMap is an offline-first, hybrid finance tracking app for students. This guide takes you from a completely fresh computer to a working React Native application running locally on your Android emulator.
+        Android-first, offline-first personal finance for students. React Native + Expo 54
+        development client, SQLCipher at rest, integer money, and opt-in Smart Tips.
       </p>
-      <ul class="stack">
-        <li>React Native</li>
-        <li>Expo</li>
-        <li>SQLCipher</li>
-        <li>NativeWind</li>
+      <div class="status-row" role="list" aria-label="Project status">
+        <span class="badge badge--ok" role="listitem">Tasks 1–18 complete</span>
+        <span class="badge badge--ok" role="listitem">v0.1.0</span>
+        <span class="badge badge--info" role="listitem">Expo 54 · Dev client</span>
+        <span class="badge badge--info" role="listitem">Android API 26+</span>
+        <span class="badge badge--info" role="listitem">SQLCipher offline-first</span>
+      </div>
+      <ul class="stack" aria-label="Stack">
+        <li>React Native 0.81</li>
+        <li>Expo ~54</li>
+        <li>OP-SQLite / SQLCipher</li>
         <li>Zustand</li>
+        <li>NativeWind 4</li>
+        <li>Jest · 91 tests</li>
       </ul>
-      <p class="tagline" style="font-size:0.875rem;">
-        Last verified against the core architecture: Android build setup, UI tokens, SQLite databases, and basic component fidelity.
-      </p>
+      <div class="masthead-actions">
+        <a class="btn btn--primary" href="#setup">Start setup</a>
+        <a class="btn btn--ghost" href="https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App">View repository</a>
+        <a class="btn btn--ghost" href="#verify">Quick verify</a>
+      </div>
     </div>
   </header>
 
   <div class="tocbar">
-    <nav>
+    <nav aria-label="On this page">
       <a href="#overview">Overview</a>
+      <a href="#preview">App preview</a>
       <a href="#prerequisites">Prerequisites</a>
-      <a href="#install">Install</a>
-      <a href="#run">Run</a>
-      <a href="#docs">Documentation</a>
+      <a href="#setup">Setup</a>
+      <a href="#verify">Run &amp; verify</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+      <a href="#privacy">Privacy &amp; release</a>
+      <a href="#docs">Docs links</a>
     </nav>
   </div>
 
-  <main class="container">
-    <div class="osroot">
-      <input type="radio" name="os" id="os-win" checked>
-      <input type="radio" name="os" id="os-mac">
-      <input type="radio" name="os" id="os-linux">
+  <main id="main" class="container">
+    <!-- Overview -->
+    <section id="overview" aria-labelledby="overview-title">
+      <div class="section-head">
+        <span class="step-num" aria-hidden="true">01</span>
+        <h2 class="section-title" id="overview-title">Overview</h2>
+      </div>
+      <p>
+        <strong>MoneyMap</strong> is a student-focused finance tracker that keeps ledgers on-device.
+        Data lives in an encrypted SQLCipher database. Networking is limited to optional Smart Tips
+        (Gemini) behind an explicit consent gate.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <caption class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Milestone status</caption>
+          <thead>
+            <tr><th scope="col">Area</th><th scope="col">State</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Tasks 1–9 core product</td><td>Done</td></tr>
+            <tr><td>Task 10 recurring catch-up</td><td>Done</td></tr>
+            <tr><td>Task 11 bill reminders (local notifications)</td><td>Done</td></tr>
+            <tr><td>Task 12 CSV export + backup</td><td>Done</td></tr>
+            <tr><td>Task 13 CSV + Excel import</td><td>Done</td></tr>
+            <tr><td>Task 14 app lock (PIN + biometrics)</td><td>Done</td></tr>
+            <tr><td>Task 15 Smart Tips offline rules</td><td>Done</td></tr>
+            <tr><td>Task 16 Smart Tips online Gemini (opt-in)</td><td>Done</td></tr>
+            <tr><td>Task 17 polish</td><td>Done</td></tr>
+            <tr><td>Task 18 release prep docs</td><td>Done (EAS <code>projectId</code> placeholder until <code>eas init</code>)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--warn">
+        <span class="note__label">Expo Go unsupported</span>
+        OP-SQLite with SQLCipher requires a <strong>custom development client</strong>
+        (<code>npm run android</code> / EAS dev build). Expo Go cannot load the native module.
+      </div>
+    </section>
 
-      <div class="ostabs">
-        <span>Select your OS:</span>
-        <label for="os-win">Windows</label>
-        <label for="os-mac">macOS</label>
-        <label for="os-linux">Linux</label>
+    <!-- App preview -->
+    <section id="preview" aria-labelledby="preview-title">
+      <div class="section-head">
+        <span class="step-num" aria-hidden="true">02</span>
+        <h2 class="section-title" id="preview-title">App preview</h2>
+      </div>
+      <p>
+        Inline SVG phone mockups (no external images). Brand palette:
+        primary <code>#0F6E5C</code>, accent <code>#3DBF9A</code>.
+      </p>
+      <div class="preview-grid">
+        <figure class="mock-card">
+          <svg class="phone" viewBox="0 0 220 440" role="img" aria-labelledby="mock-dash-title mock-dash-desc">
+            <title id="mock-dash-title">Dashboard mock</title>
+            <desc id="mock-dash-desc">Phone frame showing balance card, income and expense row, donut chart placeholder, and floating action button.</desc>
+            <rect x="4" y="4" width="212" height="432" rx="28" fill="#0F1413"/>
+            <rect x="12" y="12" width="196" height="416" rx="22" fill="#F7F9F8"/>
+            <rect x="80" y="22" width="60" height="6" rx="3" fill="#D5DED9"/>
+            <text x="28" y="58" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#0F6E5C">MONEYMAP</text>
+            <text x="28" y="78" font-family="Inter,sans-serif" font-size="13" font-weight="700" fill="#0F1413">Dashboard</text>
+            <rect x="24" y="92" width="172" height="72" rx="12" fill="#0F6E5C"/>
+            <text x="36" y="114" font-family="Inter,sans-serif" font-size="10" fill="#A8E6D4">Total balance</text>
+            <text x="36" y="140" font-family="IBM Plex Mono,monospace" font-size="20" font-weight="600" fill="#FFFFFF">₱12,450.00</text>
+            <rect x="24" y="176" width="80" height="44" rx="8" fill="#FFFFFF" stroke="#D5DED9"/>
+            <text x="34" y="194" font-family="Inter,sans-serif" font-size="9" fill="#4A5552">Income</text>
+            <text x="34" y="210" font-family="IBM Plex Mono,monospace" font-size="11" font-weight="600" fill="#1A7A52">+₱8,200</text>
+            <rect x="116" y="176" width="80" height="44" rx="8" fill="#FFFFFF" stroke="#D5DED9"/>
+            <text x="126" y="194" font-family="Inter,sans-serif" font-size="9" fill="#4A5552">Expense</text>
+            <text x="126" y="210" font-family="IBM Plex Mono,monospace" font-size="11" font-weight="600" fill="#B3261E">−₱3,750</text>
+            <circle cx="110" cy="280" r="48" fill="none" stroke="#E2E8E5" stroke-width="16"/>
+            <circle cx="110" cy="280" r="48" fill="none" stroke="#3DBF9A" stroke-width="16" stroke-dasharray="180 120" stroke-linecap="round" transform="rotate(-90 110 280)"/>
+            <circle cx="110" cy="280" r="48" fill="none" stroke="#0F6E5C" stroke-width="16" stroke-dasharray="70 230" stroke-dashoffset="-180" stroke-linecap="round" transform="rotate(-90 110 280)"/>
+            <text x="110" y="276" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" fill="#4A5552">Spend</text>
+            <text x="110" y="292" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="12" font-weight="600" fill="#0F1413">46%</text>
+            <text x="28" y="360" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#0F1413">Recent</text>
+            <rect x="24" y="368" width="172" height="10" rx="4" fill="#E8EEEC"/>
+            <rect x="24" y="384" width="120" height="10" rx="4" fill="#E8EEEC"/>
+            <circle cx="176" cy="400" r="22" fill="#3DBF9A"/>
+            <text x="176" y="406" text-anchor="middle" font-family="Inter,sans-serif" font-size="20" font-weight="700" fill="#0F1413">+</text>
+            <rect x="70" y="412" width="80" height="4" rx="2" fill="#D5DED9"/>
+          </svg>
+          <figcaption>Dashboard · balance, I/E, donut, FAB</figcaption>
+        </figure>
+
+        <figure class="mock-card">
+          <svg class="phone" viewBox="0 0 220 440" role="img" aria-labelledby="mock-entry-title mock-entry-desc">
+            <title id="mock-entry-title">Entry screen mock</title>
+            <desc id="mock-entry-desc">Phone frame showing amount entry with number pad hint and category chips.</desc>
+            <rect x="4" y="4" width="212" height="432" rx="28" fill="#0F1413"/>
+            <rect x="12" y="12" width="196" height="416" rx="22" fill="#F7F9F8"/>
+            <rect x="80" y="22" width="60" height="6" rx="3" fill="#D5DED9"/>
+            <text x="28" y="58" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#0F6E5C">← Back</text>
+            <text x="28" y="86" font-family="Inter,sans-serif" font-size="15" font-weight="700" fill="#0F1413">New entry</text>
+            <rect x="24" y="100" width="172" height="36" rx="18" fill="#E8EEEC"/>
+            <text x="52" y="122" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#0F6E5C">Expense</text>
+            <text x="128" y="122" font-family="Inter,sans-serif" font-size="11" fill="#4A5552">Income</text>
+            <text x="110" y="168" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="28" font-weight="600" fill="#0F1413">₱250.00</text>
+            <text x="110" y="188" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#4A5552">Food &amp; drinks</text>
+            <g font-family="IBM Plex Mono,monospace" font-size="16" font-weight="600" fill="#0F1413" text-anchor="middle">
+              <rect x="28" y="210" width="48" height="40" rx="8" fill="#FFFFFF" stroke="#D5DED9"/><text x="52" y="236">1</text>
+              <rect x="86" y="210" width="48" height="40" rx="8" fill="#FFFFFF" stroke="#D5DED9"/><text x="110" y="236">2</text>
+              <rect x="144" y="210" width="48" height="40" rx="8" fill="#FFFFFF" stroke="#D5DED9"/><text x="168" y="236">3</text>
+              <rect x="28" y="258" width="48" height="40" rx="8" fill="#FFFFFF" stroke="#D5DED9"/><text x="52" y="284">4</text>
+              <rect x="86" y="258" width="48" height="40" rx="8" fill="#FFFFFF" stroke="#D5DED9"/><text x="110" y="284">5</text>
+              <rect x="144" y="258" width="48" height="40" rx="8" fill="#FFFFFF" stroke="#D5DED9"/><text x="168" y="284">6</text>
+              <rect x="28" y="306" width="48" height="40" rx="8" fill="#FFFFFF" stroke="#D5DED9"/><text x="52" y="332">7</text>
+              <rect x="86" y="306" width="48" height="40" rx="8" fill="#FFFFFF" stroke="#D5DED9"/><text x="110" y="332">8</text>
+              <rect x="144" y="306" width="48" height="40" rx="8" fill="#FFFFFF" stroke="#D5DED9"/><text x="168" y="332">9</text>
+              <rect x="28" y="354" width="48" height="40" rx="8" fill="#FFFFFF" stroke="#D5DED9"/><text x="52" y="380">.</text>
+              <rect x="86" y="354" width="48" height="40" rx="8" fill="#FFFFFF" stroke="#D5DED9"/><text x="110" y="380">0</text>
+              <rect x="144" y="354" width="48" height="40" rx="8" fill="#0F6E5C"/><text x="168" y="380" fill="#FFFFFF">⌫</text>
+            </g>
+            <rect x="28" y="404" width="164" height="16" rx="8" fill="#3DBF9A"/>
+          </svg>
+          <figcaption>Entry · amount + number pad</figcaption>
+        </figure>
+
+        <figure class="mock-card">
+          <svg class="phone" viewBox="0 0 220 440" role="img" aria-labelledby="mock-hist-title mock-hist-desc">
+            <title id="mock-hist-title">History empty state mock</title>
+            <desc id="mock-hist-desc">Phone frame showing history tab with empty state message and call to add first transaction.</desc>
+            <rect x="4" y="4" width="212" height="432" rx="28" fill="#0F1413"/>
+            <rect x="12" y="12" width="196" height="416" rx="22" fill="#F7F9F8"/>
+            <rect x="80" y="22" width="60" height="6" rx="3" fill="#D5DED9"/>
+            <text x="28" y="58" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#0F6E5C">MONEYMAP</text>
+            <text x="28" y="82" font-family="Inter,sans-serif" font-size="15" font-weight="700" fill="#0F1413">History</text>
+            <rect x="24" y="96" width="172" height="32" rx="16" fill="#FFFFFF" stroke="#D5DED9"/>
+            <text x="40" y="116" font-family="Inter,sans-serif" font-size="10" fill="#4A5552">Search transactions…</text>
+            <circle cx="110" cy="220" r="36" fill="#E8EEEC"/>
+            <path d="M96 220h28M110 206v28" stroke="#0F6E5C" stroke-width="3" stroke-linecap="round"/>
+            <text x="110" y="280" text-anchor="middle" font-family="Inter,sans-serif" font-size="13" font-weight="600" fill="#0F1413">No transactions yet</text>
+            <text x="110" y="300" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#4A5552">Add your first entry to</text>
+            <text x="110" y="314" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#4A5552">see history here.</text>
+            <rect x="55" y="334" width="110" height="32" rx="16" fill="#3DBF9A"/>
+            <text x="110" y="354" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#0F1413">Add entry</text>
+            <rect x="24" y="390" width="172" height="28" rx="10" fill="#FFFFFF" stroke="#D5DED9"/>
+            <text x="48" y="408" font-family="Inter,sans-serif" font-size="9" fill="#4A5552">Home</text>
+            <text x="100" y="408" font-family="Inter,sans-serif" font-size="9" font-weight="700" fill="#0F6E5C">History</text>
+            <text x="155" y="408" font-family="Inter,sans-serif" font-size="9" fill="#4A5552">More</text>
+          </svg>
+          <figcaption>History · empty state</figcaption>
+        </figure>
+
+        <figure class="mock-card">
+          <svg class="phone" viewBox="0 0 220 440" role="img" aria-labelledby="mock-set-title mock-set-desc">
+            <title id="mock-set-title">Settings Smart Tips toggle mock</title>
+            <desc id="mock-set-desc">Phone frame showing settings with Smart Tips toggle off by default and privacy note.</desc>
+            <rect x="4" y="4" width="212" height="432" rx="28" fill="#0F1413"/>
+            <rect x="12" y="12" width="196" height="416" rx="22" fill="#F7F9F8"/>
+            <rect x="80" y="22" width="60" height="6" rx="3" fill="#D5DED9"/>
+            <text x="28" y="58" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#0F6E5C">MONEYMAP</text>
+            <text x="28" y="82" font-family="Inter,sans-serif" font-size="15" font-weight="700" fill="#0F1413">Settings</text>
+            <rect x="24" y="100" width="172" height="52" rx="10" fill="#FFFFFF" stroke="#D5DED9"/>
+            <text x="36" y="122" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#0F1413">App lock</text>
+            <text x="36" y="138" font-family="Inter,sans-serif" font-size="9" fill="#4A5552">PIN · biometrics</text>
+            <text x="168" y="130" font-family="Inter,sans-serif" font-size="14" fill="#0F6E5C">›</text>
+            <rect x="24" y="164" width="172" height="88" rx="10" fill="#FFFFFF" stroke="#3DBF9A" stroke-width="1.5"/>
+            <text x="36" y="188" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#0F1413">Smart Tips</text>
+            <text x="36" y="204" font-family="Inter,sans-serif" font-size="9" fill="#4A5552">Offline rules · optional AI</text>
+            <rect x="150" y="178" width="34" height="20" rx="10" fill="#D5DED9"/>
+            <circle cx="160" cy="188" r="8" fill="#FFFFFF"/>
+            <text x="36" y="228" font-family="Inter,sans-serif" font-size="8.5" fill="#4A5552">Default off. Consent before</text>
+            <text x="36" y="240" font-family="Inter,sans-serif" font-size="8.5" fill="#4A5552">any online request.</text>
+            <rect x="24" y="268" width="172" height="52" rx="10" fill="#FFFFFF" stroke="#D5DED9"/>
+            <text x="36" y="290" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#0F1413">Export &amp; backup</text>
+            <text x="36" y="306" font-family="Inter,sans-serif" font-size="9" fill="#4A5552">CSV · encrypted backup</text>
+            <rect x="24" y="332" width="172" height="52" rx="10" fill="#EEF3F1" stroke="#D5DED9"/>
+            <text x="36" y="354" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#0F6E5C">Privacy</text>
+            <text x="36" y="370" font-family="Inter,sans-serif" font-size="9" fill="#4A5552">On-device · SQLCipher</text>
+          </svg>
+          <figcaption>Settings · Smart Tips toggle</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- Prerequisites -->
+    <section id="prerequisites" aria-labelledby="prereq-title">
+      <div class="section-head">
+        <span class="step-num" aria-hidden="true">03</span>
+        <h2 class="section-title" id="prereq-title">Prerequisites</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th scope="col">Tool</th><th scope="col">Version</th><th scope="col">Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Node.js</td><td>22 LTS</td><td>Via nvm recommended (verified <code>v22.23.2</code>)</td></tr>
+            <tr><td>npm</td><td>10+</td><td>Verified <code>10.9.8</code></td></tr>
+            <tr><td>JDK</td><td>21</td><td>Temurin 21. Java <strong>25+</strong> breaks this Gradle stack</td></tr>
+            <tr><td>Android SDK</td><td>Platform 35</td><td>Build-tools 35, NDK 27.1, CMake 3.22.1, emulator</td></tr>
+            <tr><td>Device / AVD</td><td>API 26+</td><td>Recommended AVD: <code>MoneyMap_VSCode_API_35</code></td></tr>
+            <tr><td>Git</td><td>any recent</td><td>Clone the repository</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--accent">
+        <span class="note__label">Dev client required</span>
+        First <code>npm run android</code> compiles a native APK with SQLCipher. Subsequent runs reuse the client and only refresh the JS bundle via Metro.
+      </div>
+    </section>
+
+    <!-- Setup -->
+    <section id="setup" aria-labelledby="setup-title">
+      <div class="section-head">
+        <span class="step-num" aria-hidden="true">04</span>
+        <h2 class="section-title" id="setup-title">Setup</h2>
+      </div>
+      <p>Shared flow after toolchain install: clone → <code>npm ci</code> → <code>.env</code> → emulator → <code>npm run android</code>.</p>
+
+      <div class="tabs">
+        <input type="radio" name="os-tab" id="tab-win" checked>
+        <input type="radio" name="os-tab" id="tab-mac">
+        <input type="radio" name="os-tab" id="tab-lin">
+        <div class="tabs__nav" role="tablist" aria-label="Operating system">
+          <label for="tab-win" role="tab">Windows</label>
+          <label for="tab-mac" role="tab">macOS</label>
+          <label for="tab-lin" role="tab">Linux</label>
+        </div>
+
+        <div class="tab-panel" id="panel-win" role="tabpanel" aria-labelledby="tab-win">
+          <h3>1. Node 22 (nvm-windows or installer)</h3>
+          <div class="code"><pre><span class="c"># nvm-windows, then:</span>
+nvm install 22
+nvm use 22
+node -v   <span class="c"># expect v22.x</span></pre></div>
+
+          <h3>2. JDK 21</h3>
+          <p>Install Temurin 21. Set <code>JAVA_HOME</code> to the JDK 21 root (not a JRE). Confirm:</p>
+          <div class="code"><pre>java -version
+<span class="c"># openjdk version "21.x.x"</span></pre></div>
+
+          <h3>3. Android SDK</h3>
+          <ol>
+            <li>Install Android Studio or command-line tools.</li>
+            <li>SDK Manager: Platform 35, Build-Tools 35, Platform-Tools, NDK <code>27.1.12297006</code>, CMake 3.22.1, Emulator, <code>system-images;android-35;google_apis;x86_64</code>.</li>
+            <li>Enable WHPX / virtualization; verify with <code>emulator -accel-check</code>.</li>
+            <li>Create AVD <code>MoneyMap_VSCode_API_35</code> (Pixel 6 / Google APIs x86_64).</li>
+          </ol>
+          <div class="code"><pre><span class="c"># Environment (User or System)</span>
+setx ANDROID_HOME "%LOCALAPPDATA%\Android\Sdk"
+<span class="c"># Add %ANDROID_HOME%\platform-tools and emulator to PATH</span></pre></div>
+
+          <h3>4. Clone, install, env</h3>
+          <div class="code"><pre>git clone https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App.git
+cd TIP_MoneyMap-Finance-Tracker-App
+npm ci
+copy .env.example .env
+<span class="c"># Optional: set GEMINI_API_KEY for online Smart Tips</span></pre></div>
+
+          <h3>5. Emulator + run</h3>
+          <div class="code"><pre><span class="c"># Start AVD from Device Manager, or:</span>
+emulator -avd MoneyMap_VSCode_API_35
+npm run android</pre></div>
+          <p>Optional: VS Code task <strong>MoneyMap: Run on Android emulator</strong> (<code>Ctrl+Shift+B</code>) if the React Native Tools extension is installed.</p>
+        </div>
+
+        <div class="tab-panel" id="panel-mac" role="tabpanel" aria-labelledby="tab-mac">
+          <h3>1. Node 22 via nvm</h3>
+          <div class="code"><pre>curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+. "$HOME/.nvm/nvm.sh"
+nvm install 22
+nvm alias default 22
+node -v</pre></div>
+
+          <h3>2. JDK 21</h3>
+          <div class="code"><pre>brew install openjdk@21
+sudo ln -sfn "$(brew --prefix openjdk@21)/libexec/openjdk.jdk" \
+  /Library/Java/JavaVirtualMachines/openjdk-21.jdk
+export JAVA_HOME="$(/usr/libexec/java_home -v 21)"</pre></div>
+
+          <h3>3. Android SDK</h3>
+          <ol>
+            <li>Install Android Studio; open SDK Manager.</li>
+            <li>Install Platform 35, Build-Tools 35, NDK 27.1, CMake 3.22.1, Emulator, API 35 Google APIs system image.</li>
+            <li>Export paths in <code>~/.zshrc</code>:</li>
+          </ol>
+          <div class="code"><pre>export ANDROID_HOME="$HOME/Library/Android/sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"</pre></div>
+          <div class="code"><pre>avdmanager create avd --name MoneyMap_VSCode_API_35 \
+  --package "system-images;android-35;google_apis;x86_64" \
+  --device pixel_6</pre></div>
+
+          <h3>4. Clone, install, env</h3>
+          <div class="code"><pre>git clone https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App.git
+cd TIP_MoneyMap-Finance-Tracker-App
+npm ci
+cp .env.example .env</pre></div>
+
+          <h3>5. Emulator + run</h3>
+          <div class="code"><pre>emulator -avd MoneyMap_VSCode_API_35 &amp;
+adb wait-for-device
+npm run android</pre></div>
+          <p>iOS is outside v1 scope; Android is the supported target.</p>
+        </div>
+
+        <div class="tab-panel" id="panel-lin" role="tabpanel" aria-labelledby="tab-lin">
+          <h3>1. Node 22 via nvm</h3>
+          <div class="code"><pre>curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+. "$HOME/.nvm/nvm.sh"
+nvm install 22
+nvm alias default 22
+node -v   <span class="c"># v22.23.2 verified</span></pre></div>
+
+          <h3>2. JDK 21 (user-space Temurin)</h3>
+          <div class="code"><pre>mkdir -p "$HOME/.local/share/MoneyMap/toolchains/temurin-21"
+curl -fL -o /tmp/temurin21.tar.gz \
+  "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse?project=jdk"
+tar -xzf /tmp/temurin21.tar.gz \
+  -C "$HOME/.local/share/MoneyMap/toolchains/temurin-21" --strip-components=1
+export JAVA_HOME="$HOME/.local/share/MoneyMap/toolchains/temurin-21"</pre></div>
+
+          <h3>3. Android SDK</h3>
+          <div class="code"><pre>export ANDROID_HOME="$HOME/Android/Sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+<span class="c"># Install cmdline-tools into $ANDROID_HOME/cmdline-tools/latest, then:</span>
+yes | sdkmanager --licenses
+sdkmanager --install \
+  "platform-tools" "platforms;android-35" "build-tools;35.0.0" \
+  "ndk;27.1.12297006" "cmake;3.22.1" "emulator" \
+  "system-images;android-35;google_apis;x86_64"
+echo no | avdmanager create avd --name MoneyMap_VSCode_API_35 \
+  --package "system-images;android-35;google_apis;x86_64" \
+  --device pixel_6 --force</pre></div>
+          <p>Persist env (e.g. <code>~/.moneymap-env.sh</code> sourced from <code>~/.bashrc</code>):</p>
+          <div class="code"><pre>export JAVA_HOME="$HOME/.local/share/MoneyMap/toolchains/temurin-21"
+export ANDROID_HOME="$HOME/Android/Sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"</pre></div>
+          <p>Ensure <code>/dev/kvm</code> is usable (<code>sudo usermod -aG kvm $USER</code>, re-login). Verify: <code>emulator -accel-check</code>.</p>
+
+          <h3>4. Clone, install, env</h3>
+          <div class="code"><pre>git clone https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App.git
+cd TIP_MoneyMap-Finance-Tracker-App
+npm ci
+cp .env.example .env</pre></div>
+
+          <h3>5. Emulator + run</h3>
+          <div class="code"><pre>emulator -avd MoneyMap_VSCode_API_35 -netdelay none -netspeed full &amp;
+adb wait-for-device
+npm run android</pre></div>
+          <p>Full Linux audit notes: <a href="https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/local-environment-audit-linux.md">docs/local-environment-audit-linux.md</a>.</p>
+        </div>
       </div>
 
-      <section id="overview">
-        <div class="section-head">
-          <span class="step-num">01</span>
-          <h2 class="section-title">Overview</h2>
-        </div>
-        <p>
-          MoneyMap Finance Tracker is an Android-first personal finance tracker. It leverages React Native and Expo for its UI layer, and uses a local encrypted SQLCipher database for offline-first data storage.
+      <div class="note note--tip">
+        <span class="note__label">.env</span>
+        <code>GEMINI_API_KEY</code> is optional and only used for online Smart Tips. The SQLCipher key is generated on-device and stored in SecureStore — never placed in <code>.env</code>.
+      </div>
+    </section>
+
+    <!-- Run & verify -->
+    <section id="verify" aria-labelledby="verify-title">
+      <div class="section-head">
+        <span class="step-num" aria-hidden="true">05</span>
+        <h2 class="section-title" id="verify-title">Run &amp; verify</h2>
+      </div>
+
+      <h3>Launch</h3>
+      <div class="code"><pre>npm start          <span class="c"># Metro + dev client</span>
+npm run android    <span class="c"># build/install/launch on device or emulator</span></pre></div>
+
+      <h3 id="quick-verify">Quick verify checklist</h3>
+      <ul class="checklist">
+        <li>
+          <span class="box" aria-hidden="true"></span>
+          <div>
+            <strong>Unit tests</strong> — <code>npm test</code><br>
+            Expect <strong>91 tests</strong> across suites under <code>__tests__/</code> (all green).
+          </div>
+        </li>
+        <li>
+          <span class="box" aria-hidden="true"></span>
+          <div>
+            <strong>Expo doctor</strong> — <code>npx expo-doctor</code><br>
+            Resolve any reported config conflicts before release.
+          </div>
+        </li>
+        <li>
+          <span class="box" aria-hidden="true"></span>
+          <div>
+            <strong>Bundle export</strong> — <code>npx expo export --platform android --clear</code><br>
+            Writes a Hermes bundle under <code>dist/</code> without a device.
+          </div>
+        </li>
+        <li>
+          <span class="box" aria-hidden="true"></span>
+          <div>
+            <strong>Native smoke</strong> — emulator/device + <code>npm run android</code><br>
+            App opens, DatabaseGate hydrates, tabs render, entry saves offline.
+          </div>
+        </li>
+      </ul>
+      <div class="code"><pre>npm ci
+npm test
+npx expo-doctor
+npx expo export --platform android --clear</pre></div>
+    </section>
+
+    <!-- Architecture -->
+    <section id="architecture" aria-labelledby="arch-title">
+      <div class="section-head">
+        <span class="step-num" aria-hidden="true">06</span>
+        <h2 class="section-title" id="arch-title">Architecture</h2>
+      </div>
+      <p>
+        Money flows as <strong>integer minor units</strong> only. UI reads theme tokens
+        (<code>src/theme/tokens.js</code>) — no hardcoded hex in screens.
+      </p>
+
+      <div class="flow" role="img" aria-label="Architecture flowchart: Screen to Store to Repo to SQLCipher; only smartTipsClient may use HTTPS">
+        <div class="flow__node">Screen</div>
+        <span class="flow__arrow" aria-hidden="true">→</span>
+        <div class="flow__node flow__node--store">Store</div>
+        <span class="flow__arrow" aria-hidden="true">→</span>
+        <div class="flow__node">Repo</div>
+        <span class="flow__arrow" aria-hidden="true">→</span>
+        <div class="flow__node flow__node--db">SQLCipher</div>
+        <p class="flow-note">
+          Offline path (default). Money: integer minor units via <code>src/domain/services/money.js</code>
         </p>
-        <div class="note note--accent">
-          <span class="note__label">Status</span>
-          Tasks 1 and 2 of the project plan are complete. The app features the strict Expo development-build shell, an encrypted SQLCipher database, atomic migrations, strict domain models, and the complete Figma UI replicated with high fidelity.
-        </div>
-      </section>
+      </div>
 
-      <section id="prerequisites">
-        <div class="section-head">
-          <span class="step-num">02</span>
-          <h2 class="section-title">Prerequisites</h2>
-        </div>
-        <p>
-          Before attempting to run this project, ensure you have the following installed on your <span class="only-win-i">Windows</span><span class="only-mac-i">Mac</span><span class="only-linux-i">Linux</span> machine:
+      <div class="flow" role="img" aria-label="Network boundary: only smartTipsClient may call HTTPS">
+        <div class="flow__node">App</div>
+        <span class="flow__arrow" aria-hidden="true">↛</span>
+        <div class="flow__node">fetch</div>
+        <span class="flow__arrow" aria-hidden="true">·</span>
+        <div class="flow__node flow__node--net">smartTipsClient only</div>
+        <span class="flow__arrow" aria-hidden="true">→</span>
+        <div class="flow__node">HTTPS / Gemini</div>
+        <p class="flow-note">
+          Only <code>src/remote/smartTipsClient.js</code> may call <code>fetch</code>. Opt-in + consent; anonymized summary only.
         </p>
-        <ul class="checks">
-          <li><strong>Node.js 22 LTS</strong></li>
-          <li><strong>JDK 21</strong></li>
-          <li><strong>Android SDK</strong> with an API 34+ Google APIs x86_64 image</li>
-        </ul>
-        <p>
-          If you plan to develop, we recommend opening the repository in <strong>Visual Studio Code</strong> and accepting the recommended <strong>React Native Tools</strong> extension.
-        </p>
-      </section>
+      </div>
 
-      <section id="install">
-        <div class="section-head">
-          <span class="step-num">03</span>
-          <h2 class="section-title">Installation</h2>
-        </div>
-        <p>Clone the repository and install all Node dependencies.</p>
-        <div class="code">
-          <pre><code><span class="c"># Clone the repository</span>
-<span class="p">git clone https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App.git</span>
-<span class="p">cd TIP_MoneyMap-Finance-Tracker-App</span>
+      <div class="code" aria-label="ASCII architecture diagram">
+        <pre>┌─────────────┐    ┌──────────────┐    ┌────────────┐    ┌───────────┐
+│   Screens   │───▶│ Zustand      │───▶│ Repository │───▶│ SQLCipher │
+│  (tabs UI)  │    │ financeStore │    │   layer    │    │ OP-SQLite │
+└─────────────┘    └──────────────┘    └────────────┘    └───────────┘
+       │                                                        ▲
+       │              SecureStore (DB key) ─────────────────────┘
+       │
+       └── Smart Tips (opt-in)
+              ├── offline: deriveSmartTips (local rules)
+              └── online:  smartTipsClient ──HTTPS──▶ Gemini
+                           (period, totals, ratios only)</pre>
+      </div>
+    </section>
 
-<span class="c"># Install dependencies</span>
-<span class="p">npm install</span></code></pre>
-        </div>
-      </section>
+    <!-- Troubleshooting -->
+    <section id="troubleshooting" aria-labelledby="trouble-title">
+      <div class="section-head">
+        <span class="step-num" aria-hidden="true">07</span>
+        <h2 class="section-title" id="trouble-title">Troubleshooting</h2>
+      </div>
 
-      <section id="run">
-        <div class="section-head">
-          <span class="step-num">04</span>
-          <h2 class="section-title">Run Locally</h2>
+      <details class="trouble">
+        <summary>Expo Go unsupported / SQLCipher native module missing</summary>
+        <div class="trouble-body">
+          <p>Expo Go cannot load OP-SQLite + SQLCipher. Use a <strong>development client</strong>:</p>
+          <div class="code"><pre>npm run android
+<span class="c"># or EAS: eas build --profile development --platform android</span></pre></div>
+          <p>After installing the APK, start Metro with <code>npm start</code> and open the app from the device.</p>
         </div>
-        <p>
-          Because MoneyMap relies on native modules (specifically <code>@op-engineering/op-sqlite</code>), it <strong>cannot</strong> be run using Expo Go. You must compile it natively for Android.
-        </p>
-        <p>
-          <span class="only-win">Open your Android emulator via Android Studio Device Manager, then run:</span>
-          <span class="only-mac">Open your Android emulator via Android Studio Device Manager (or run `emulator -avd [name]`), then run:</span>
-          <span class="only-linux">Open your Android emulator via Android Studio Device Manager, then run:</span>
-        </p>
-        <div class="code">
-          <pre><code><span class="c"># Start the native build process</span>
-<span class="p">npm run android</span></code></pre>
-        </div>
-        <div class="note note--tip">
-          <span class="note__label">Debugging Emulator Issues</span>
-          If you encounter an ADB connection error on Windows (e.g. <code>Error: could not connect to TCP port 5554</code>), you can restart the ADB server by running <code>adb kill-server</code> before attempting the build again.
-        </div>
-      </section>
+      </details>
 
-      <section id="docs">
-        <div class="section-head">
-          <span class="step-num">05</span>
-          <h2 class="section-title">Documentation</h2>
+      <details class="trouble">
+        <summary>Port 8081 in use → use 8082 + adb reverse</summary>
+        <div class="trouble-body">
+          <div class="code"><pre>npx expo start --dev-client --port 8082
+adb reverse tcp:8082 tcp:8082
+<span class="c"># In the dev client, connect to the listed host:8082 URL</span></pre></div>
         </div>
-        <p>Review the team documentation below for architectural decisions, UI records, and environment setups.</p>
-        <ul class="docs">
-          <li>
-            <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/ui-fidelity-implementation.md" class="doc">
-              <span class="doc__label">Record</span>
-              <div class="doc__title">UI Fidelity Implementation</div>
-              <div class="doc__desc">Detailed record of the UI implementation mirroring the Figma spec.</div>
-            </a>
-          </li>
-          <li>
-            <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/local-environment-audit.md" class="doc">
-              <span class="doc__label">Audit</span>
-              <div class="doc__title">Local Environment Audit</div>
-              <div class="doc__desc">Checks and balances for local setup and configuration.</div>
-            </a>
-          </li>
-          <li>
-            <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/Tech%20Stack%20Setup%20Guide.md" class="doc">
-              <span class="doc__label">Guide</span>
-              <div class="doc__title">Tech Stack Setup Guide</div>
-              <div class="doc__desc">Platform-specific installation instructions for macOS, Windows, and Linux.</div>
-            </a>
-          </li>
-          <li>
-            <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/task-02-database-plan.md" class="doc">
-              <span class="doc__label">Plan</span>
-              <div class="doc__title">Task 02 Database Plan</div>
-              <div class="doc__desc">Schema and repository planning for the offline SQLite implementation.</div>
-            </a>
-          </li>
-        </ul>
-      </section>
+      </details>
 
-    </div>
+      <details class="trouble">
+        <summary>Java 25+ breaks Gradle → use JDK 21</summary>
+        <div class="trouble-body">
+          <p>This Expo 54 / AGP stack is validated on <strong>JDK 21</strong>. Java 25+ fails configuration or compilation.</p>
+          <div class="code"><pre>java -version    <span class="c"># must show 21.x</span>
+echo $JAVA_HOME  <span class="c"># must point at JDK 21</span></pre></div>
+          <p>On Linux, prefer the user-space Temurin path under <code>~/.local/share/MoneyMap/toolchains/temurin-21</code>.</p>
+        </div>
+      </details>
+
+      <details class="trouble">
+        <summary>Metro not connecting to the device / emulator</summary>
+        <div class="trouble-body">
+          <ul>
+            <li>Confirm USB debugging or that the emulator is <code>device</code> in <code>adb devices</code>.</li>
+            <li><code>adb reverse tcp:8081 tcp:8081</code> (or your Metro port).</li>
+            <li>Same LAN for physical devices; disable VPN if it blocks local traffic.</li>
+            <li>Reload: shake device → Reload, or <code>r</code> in the Metro terminal.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="trouble">
+        <summary>Gradle download failures / flaky dependencies</summary>
+        <div class="trouble-body">
+          <ul>
+            <li>Retry with a stable network; corporate proxies may need <code>gradle.properties</code> proxy settings.</li>
+            <li>Clear caches if corrupted: delete project <code>android/</code> (CNG regenerates) and re-run <code>npm run android</code>.</li>
+            <li>Ensure disk space for SDK + Gradle caches under <code>~/.gradle</code>.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="trouble">
+        <summary>Biometrics / SecureStore changes need a rebuild</summary>
+        <div class="trouble-body">
+          <p>Native module or config plugin changes (biometrics, notifications, SQLCipher flags) are <strong>not</strong> hot-reloaded. Rebuild the dev client:</p>
+          <div class="code"><pre>npx expo prebuild --platform android --clean
+npm run android</pre></div>
+        </div>
+      </details>
+
+      <details class="trouble">
+        <summary>EAS projectId is still a placeholder</summary>
+        <div class="trouble-body">
+          <p>Release/cloud builds need a real EAS project. Run:</p>
+          <div class="code"><pre>npm install --global eas-cli   <span class="c"># or npx eas-cli</span>
+eas login
+eas init
+<span class="c"># Replace the all-zero extra.eas.projectId in app config</span></pre></div>
+          <p>Do not ship store builds with the placeholder ID.</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- Privacy & release -->
+    <section id="privacy" aria-labelledby="privacy-title">
+      <div class="section-head">
+        <span class="step-num" aria-hidden="true">08</span>
+        <h2 class="section-title" id="privacy-title">Privacy &amp; release</h2>
+      </div>
+      <h3>Smart Tips privacy</h3>
+      <ul>
+        <li>Default <strong>off</strong>. First enable shows a consent sheet.</li>
+        <li>Offline: <code>deriveSmartTips</code> from local budgets and transactions.</li>
+        <li>Online: anonymized summary only (period, totals, category ratios, currency) to Gemini.</li>
+        <li>Never sent: raw transactions, notes, account names or IDs.</li>
+      </ul>
+      <h3>Release</h3>
+      <ul>
+        <li>Package: <code>com.moneymap.financetracker</code></li>
+        <li>Version: <strong>0.1.0</strong> (Tasks 1–18 complete)</li>
+        <li>Android automatic backup disabled (encrypted DB without Keystore key is unreadable)</li>
+        <li>Store credentials and Gemini keys in EAS Secrets — never commit <code>.env</code></li>
+      </ul>
+      <div class="note note--accent">
+        <span class="note__label">Before store upload</span>
+        Complete <a href="https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/release-checklist.md">docs/release-checklist.md</a>,
+        align Play Data safety with <a href="https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/play-data-safety.md">docs/play-data-safety.md</a>,
+        and publish the privacy policy.
+      </div>
+    </section>
+
+    <!-- Docs links -->
+    <section id="docs" aria-labelledby="docs-title">
+      <div class="section-head">
+        <span class="step-num" aria-hidden="true">09</span>
+        <h2 class="section-title" id="docs-title">Docs links</h2>
+      </div>
+      <ul class="doc-grid">
+        <li>
+          <a class="doc-card" href="https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App/blob/main/Tech%20Stack%20Setup%20Guide.md">
+            <strong>Tech Stack Setup Guide.md</strong>
+            <span>Full toolchain, OS notes, verification commands</span>
+          </a>
+        </li>
+        <li>
+          <a class="doc-card" href="https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/privacy-policy.md">
+            <strong>docs/privacy-policy.md</strong>
+            <span>User-facing privacy policy draft</span>
+          </a>
+        </li>
+        <li>
+          <a class="doc-card" href="https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/play-data-safety.md">
+            <strong>docs/play-data-safety.md</strong>
+            <span>Google Play Data safety form answers</span>
+          </a>
+        </li>
+        <li>
+          <a class="doc-card" href="https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/release-checklist.md">
+            <strong>docs/release-checklist.md</strong>
+            <span>Ship checklist for 0.1.0</span>
+          </a>
+        </li>
+        <li>
+          <a class="doc-card" href="https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/local-environment-audit-linux.md">
+            <strong>docs/local-environment-audit-linux.md</strong>
+            <span>Verified Linux Mint / Ubuntu baseline</span>
+          </a>
+        </li>
+        <li>
+          <a class="doc-card" href="https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App">
+            <strong>Repository</strong>
+            <span>github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App</span>
+          </a>
+        </li>
+      </ul>
+    </section>
   </main>
-  
-  <footer class="container">
-    <p>
-      &copy; 2026 MoneyMap Team. <br>
-      This project relies on <a href="https://reactnative.dev/">React Native</a>, <a href="https://expo.dev/">Expo</a>, and <a href="https://github.com/op-engineering/op-sqlite">op-sqlite</a>.
-    </p>
-  </footer>
 
+  <footer>
+    <div class="container footer-grid">
+      <div>
+        <p><strong>MoneyMap Finance Tracker</strong></p>
+        <p class="footer-meta">v0.1.0 · Tasks 1–18 · Offline-first</p>
+      </div>
+      <div>
+        <p>
+          <a href="https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/">Live docs</a>
+          ·
+          <a href="https://github.com/secretlyspy/TIP_MoneyMap-Finance-Tracker-App">Source</a>
+        </p>
+        <p class="footer-meta">Self-contained GitHub Pages site · root index.html</p>
+      </div>
+    </div>
+  </footer>
 </body>
 </html>

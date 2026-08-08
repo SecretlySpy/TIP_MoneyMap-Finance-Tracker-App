@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { DashedButton } from "../components/Buttons";
+import { EmptyState } from "../components/EmptyState";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
@@ -11,7 +12,7 @@ import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 const DEFAULT_LEAD_DAYS = 7;
-// Recurring list with offline add flow; OS push notifications remain optional later.
+// Recurring list with local reminder scheduling when enabled in Settings.
 export function RecurringScreen({ navigation }) {
     const theme = useTheme(useUiStore((state) => state.themePreference));
     const currencySymbol = useUiStore((state) => state.currencySymbol);
@@ -106,9 +107,15 @@ export function RecurringScreen({ navigation }) {
         Upcoming Bills
       </Text>
 
-      {bills.length === 0 ? (<Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body }}>
-          No recurring bills yet. Add one to track upcoming payments offline.
-        </Text>) : (bills.map((bill) => (<Pressable key={bill.id} accessibilityHint="Long press to delete this bill" accessibilityRole="button" onLongPress={() => {
+      {bills.length === 0 ? (
+        <EmptyState
+          actionLabel="＋ Add recurring bill"
+          emoji="🔔"
+          message="Track rent, load, and subscriptions. Optional local reminders fire before each due date."
+          onAction={() => setStep("name")}
+          title="No recurring bills yet"
+        />
+      ) : (bills.map((bill) => (<Pressable key={bill.id} accessibilityHint="Long press to delete this bill" accessibilityRole="button" onLongPress={() => {
                 Alert.alert(bill.name, "Remove this recurring bill?", [
                     { text: "Cancel", style: "cancel" },
                     {

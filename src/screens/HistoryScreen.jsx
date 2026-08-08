@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { Chip } from "../components/Chip";
-import { PrimaryButton } from "../components/Buttons";
+import { EmptyState } from "../components/EmptyState";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { TransactionRow } from "../components/TransactionRow";
@@ -14,39 +14,15 @@ import { useTheme } from "../theme/tokens";
 export function HistoryBody({ groups, onAdd, onDeleteTransaction }) {
     const theme = useTheme();
     if (groups.length === 0) {
-        return (<View style={{ alignItems: "center", flex: 1, justifyContent: "center", paddingVertical: theme.spacing.xxl }}>
-        <View style={{
-                alignItems: "center",
-                backgroundColor: theme.colors.tint,
-                borderRadius: theme.radii.round,
-                height: theme.sizes.emptyCircle,
-                justifyContent: "center",
-                width: theme.sizes.emptyCircle,
-            }}>
-          <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.entryAmount }}>🧾</Text>
-        </View>
-        <Text style={{
-                color: theme.colors.text,
-                fontFamily: theme.fonts.bold,
-                fontSize: theme.typeScale.emptyTitle,
-                marginTop: theme.spacing.lg,
-            }}>
-          No transactions yet
-        </Text>
-        <Text style={{
-                color: theme.colors.sub,
-                fontFamily: theme.fonts.regular,
-                fontSize: theme.typeScale.body,
-                lineHeight: theme.spacing.screen,
-                marginTop: theme.spacing.md,
-                textAlign: "center",
-            }}>
-          Transactions you log will show up here.{"\n"}Start by adding your first one.
-        </Text>
-        <PrimaryButton onPress={onAdd} style={{ alignSelf: "center", height: theme.sizes.secondaryButton, marginTop: theme.spacing.lg, width: theme.sizes.emptyActionWidth }}>
-          ＋ Add your first transaction
-        </PrimaryButton>
-      </View>);
+        return (
+          <EmptyState
+            actionLabel="＋ Add your first transaction"
+            emoji="🧾"
+            message={"Transactions you log will show up here.\nStart by adding your first one."}
+            onAction={onAdd}
+            title="No transactions yet"
+          />
+        );
     }
     return (<View style={{ gap: theme.spacing.xl }}>
       {groups.map((group) => (<View key={group.id} style={{ gap: theme.spacing.sm }}>

@@ -21,13 +21,27 @@ const PICKER_TYPES = [
  * @param {string} uri
  * @param {'csv'|'xlsx'} format
  */
+/**
+ * Read a document-picker URI. Uses expo-file-system when possible.
+ * Local `fetch(fileUri)` is a device filesystem fallback only — not remote networking.
+ * Outbound HTTPS remains isolated to `src/remote/smartTipsClient.js`.
+ */
 async function readUriAsImportContent(uri, format) {
   if (format === "csv") {
-    const response = await fetch(uri);
-    if (!response.ok) {
-      throw new Error("Could not read the selected file.");
+    try {
+      const FileSystem = await import("expo-file-system/legacy");
+      const text = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      return { kind: "csv", content: text };
+    } catch {
+      // Local file URI only (document picker cache).
+      const response = await fetch(uri);
+      if (!response.ok) {
+        throw new Error("Could not read the selected file.");
+      }
+      return { kind: "csv", content: await response.text() };
     }
-    return { kind: "csv", content: await response.text() };
   }
 
   // Prefer base64 via expo-file-system/legacy for binary xlsx on device.
@@ -38,6 +52,7 @@ async function readUriAsImportContent(uri, format) {
     });
     return { kind: "xlsx", content: base64 };
   } catch {
+    // Local file URI only (document picker cache).
     const response = await fetch(uri);
     if (!response.ok) {
       throw new Error("Could not read the selected spreadsheet.");

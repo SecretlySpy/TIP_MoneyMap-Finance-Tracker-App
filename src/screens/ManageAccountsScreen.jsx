@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
+import { EmptyState } from "../components/EmptyState";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
@@ -52,8 +53,15 @@ export function ManageAccountsScreen({ navigation }) {
           Manage accounts
         </Text>
       </View>
+      {active.length === 0 ? (
+        <EmptyState
+          emoji="🏦"
+          message="Default Cash, Card, and E-wallet accounts appear after the first launch. Restore a backup if they are missing."
+          title="No active accounts"
+        />
+      ) : (
       <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.lg }}>
-        {active.map((account) => (<View key={account.id} style={{ gap: theme.spacing.sm }}>
+        {active.map((account) => (<View key={account.id} style={{ gap: theme.spacing.sm, borderBottomColor: theme.colors.outline, borderBottomWidth: theme.spacing.hairline, paddingBottom: theme.spacing.md }}>
             <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
               <View style={{ flex: 1, gap: theme.spacing.xxs }}>
                 <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
@@ -65,12 +73,12 @@ export function ManageAccountsScreen({ navigation }) {
               </View>
             </View>
             <View style={{ flexDirection: "row", gap: theme.spacing.md }}>
-              <Pressable accessibilityRole="button" onPress={() => setRenameId(account.id)}>
+              <Pressable accessibilityRole="button" hitSlop={theme.spacing.sm} onPress={() => setRenameId(account.id)} style={{ minHeight: 44, justifyContent: "center" }}>
                 <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
                   Rename
                 </Text>
               </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => setBalanceId(account.id)}>
+              <Pressable accessibilityRole="button" hitSlop={theme.spacing.sm} onPress={() => setBalanceId(account.id)} style={{ minHeight: 44, justifyContent: "center" }}>
                 <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
                   Edit starting balance
                 </Text>
@@ -78,6 +86,7 @@ export function ManageAccountsScreen({ navigation }) {
             </View>
           </View>))}
       </SectionCard>
+      )}
       <TextPromptModal confirmLabel="Rename" initialValue={active.find((account) => account.id === renameId)?.name ?? ""} onCancel={() => setRenameId(null)} onConfirm={(value) => void handleRename(value)} placeholder="Account name" title="Rename account" visible={renameId !== null}/>
       <TextPromptModal confirmLabel="Save" initialValue={(() => {
             const account = active.find((item) => item.id === balanceId);
