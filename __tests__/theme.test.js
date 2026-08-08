@@ -1,4 +1,4 @@
-import { getTheme } from "../src/theme/tokens";
+import { getTheme, resolveThemeMode } from "../src/theme/tokens";
 describe("approved Figma theme tokens", () => {
     it("matches the exact light palette", () => {
         const theme = getTheme("light");
@@ -14,5 +14,13 @@ describe("approved Figma theme tokens", () => {
         expect(theme.colors.surface).toBe("#1A211F");
         expect(theme.colors.primary).toBe("#3DBF9A");
         expect(theme.colors.text).toBe("#E8ECEA");
+    });
+    it("resolveThemeMode honors explicit preference over system", () => {
+        expect(resolveThemeMode("dark", "light")).toBe("dark");
+        expect(resolveThemeMode("light", "dark")).toBe("light");
+        expect(resolveThemeMode("system", "dark")).toBe("dark");
+        expect(resolveThemeMode("system", "light")).toBe("light");
+        expect(resolveThemeMode(undefined, "dark")).toBe("dark");
+        expect(resolveThemeMode(null, null)).toBe("light");
     });
 });

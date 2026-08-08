@@ -20,8 +20,10 @@ The Pages site is the polished setup guide: root [`index.html`](./index.html) (s
 | Task 16 Smart Tips online Gemini (opt-in) | Done |
 | Task 17 polish | Done |
 | Task 18 release prep docs | Done (EAS project ID still placeholder until `eas init`) |
+| Dark-mode theme consistency | Done (`useTheme` reads `themePreference`) |
+| Student Eats Near Me | Done (Overpass/Nominatim + ranking + optional AI) |
 
-**v0.1.0** — Tasks 1–18 complete.
+**v0.1.0** — Tasks 1–18 complete + Student Eats.
 
 ## Quick start
 
@@ -38,7 +40,8 @@ Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or th
 - Screens → Zustand stores → repositories → SQLCipher
 - Money is always **integer minor units** (`src/domain/services/money.js`)
 - Theme tokens only (`src/theme/tokens.js`) — no hardcoded hex in screens
-- **Only** `src/remote/smartTipsClient.js` may call `fetch`
+- Bare `useTheme()` reads `themePreference` from `uiStore` (shared components stay dark-mode correct)
+- Outbound HTTPS only from `src/remote/*` (`smartTipsClient`, `placesClient`, `eatsTipsClient`)
 
 ## Smart Tips privacy
 
@@ -46,6 +49,14 @@ Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or th
 - Offline: `deriveSmartTips` from local budgets/transactions.
 - Online: anonymized summary only (period, totals, category ratios, currency) to Gemini.
 - Never: raw transactions, notes, account names/IDs.
+
+## Student Eats Near Me
+
+- Dashboard → **Student Eats** (location permission only when opened).
+- Places via Overpass (Nominatim fallback); ranked by distance + price + rating + student heuristics.
+- Mini-map is on-device relative plot (no map SDK).
+- Fallback origin: TIP Quezon City campus. Coordinates never persisted.
+- Optional AI tips reuse Smart Tips consent; payload uses distance **bands** only (no lat/lon).
 
 ## Release
 

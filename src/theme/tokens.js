@@ -1,4 +1,5 @@
 import { useColorScheme } from "react-native";
+import { useUiStore } from "../store/uiStore";
 // The palette mirrors the approved Figma variables so screens never own colors.
 export const palettes = {
     light: {
@@ -174,11 +175,29 @@ const themes = {
 export function getTheme(mode) {
     return themes[mode];
 }
-// Every UI component uses this hook so system light/dark changes update in one pass.
-export function useTheme(preference = "system") {
-    const colorScheme = useColorScheme();
+
+/**
+ * Resolve effective mode from preference + system scheme (pure — unit-testable).
+ * @param {"system"|"light"|"dark"|undefined|null} preference
+ * @param {"light"|"dark"|null|undefined} systemScheme
+ * @returns {"light"|"dark"}
+ */
+export function resolveThemeMode(preference, systemScheme) {
     if (preference === "light" || preference === "dark") {
-        return themes[preference];
+        return preference;
     }
-    return themes[colorScheme === "dark" ? "dark" : "light"];
+    return systemScheme === "dark" ? "dark" : "light";
+}
+
+/**
+ * Every UI component uses this hook.
+ * - No arg → reads `themePreference` from uiStore (fixes shared components).
+ * - Explicit "system" | "light" | "dark" → overrides store (screens/tests).
+ */
+export function useTheme(preference) {
+    const colorScheme = useColorScheme();
+    // Always subscribe so store theme changes re-render shared components.
+    const storePreference = useUiStore((state) => state.themePreference);
+    const resolvedPreference = preference === undefined ? storePreference : preference;
+    return themes[resolveThemeMode(resolvedPreference, colorScheme)];
 }

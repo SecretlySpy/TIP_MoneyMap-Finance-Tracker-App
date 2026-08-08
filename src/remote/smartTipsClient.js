@@ -2,8 +2,8 @@ import Constants from "expo-constants";
 import { budgetSummary, buildBudgetCards, spendingByCategory } from "../domain/services/financeView";
 
 /**
- * THE ONLY MODULE ALLOWED TO CALL fetch IN THIS APP.
- * Smart Tips online layer (FR-10b). Every call must be gated by smartTipsEnabled.
+ * Dedicated Smart Tips network client (FR-10b).
+ * Outbound HTTPS is limited to src/remote/* modules. Every call must be gated by smartTipsEnabled + consent.
  */
 
 const GEMINI_ENDPOINT =

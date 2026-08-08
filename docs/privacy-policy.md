@@ -21,9 +21,18 @@ We do **not** operate a MoneyMap account server. There is no cloud sync of your 
 
 | Permission | Why |
 |---|---|
-| Internet | Only for optional Smart Tips (Gemini). No network calls when Smart Tips is off. |
+| Internet | Optional Smart Tips (Gemini), Student Eats place search (OpenStreetMap Overpass/Nominatim), and optional AI meal tips. Core finance features work offline. |
 | Notifications | Local bill reminders only (not push/FCM marketing). |
 | Biometric / fingerprint | Optional app unlock. |
+| Location (when in use) | **Only** while using **Student Eats Near Me**. Used ephemerally to rank nearby meals. **Never stored** on device or sent as precise coordinates to AI. Denied permission falls back to TIP Quezon City campus area. |
+
+## Student Eats Near Me
+
+- Opened from the Dashboard. Location permission is requested **only when you enter this screen**.
+- Place data comes from free OpenStreetMap services (Overpass, with Nominatim fallback).
+- Ranking (distance, price level, rating, student heuristics) runs on-device.
+- Optional AI meal tips use the same Smart Tips consent gate and send only an **anonymized** list (place names, distance bands like “near/walkable”, price levels, cuisine labels, optional daily food budget minor units). **Never** latitude/longitude.
+- Short-lived in-memory cache only; no permanent location history.
 
 ## Smart Tips (optional, opt-in)
 

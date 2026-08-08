@@ -30,6 +30,7 @@ const uiFiles = [
   "src/screens/RecurringScreen.jsx",
   "src/screens/SettingsScreen.jsx",
   "src/screens/SmartTipsScreen.jsx",
+  "src/screens/StudentEatsScreen.jsx",
 ];
 
 describe("static UI fidelity boundaries", () => {
@@ -44,19 +45,19 @@ describe("static UI fidelity boundaries", () => {
     expect(violations).toEqual([]);
   });
 
-  it("keeps the Smart Tips UI offline and free of direct fetch calls", () => {
-    const smartTipsSource = readFileSync(join(root, "src/screens/SmartTipsScreen.jsx"), "utf8");
-    expect(smartTipsSource).not.toMatch(/\bfetch\s*\(/);
-    // Network fetch is isolated to the remote client module only.
-    const remoteClient = readFileSync(join(root, "src/remote/smartTipsClient.js"), "utf8");
-    expect(remoteClient).toMatch(/\bfetch\b/);
+  it("keeps screens free of direct fetch; remote clients own networking", () => {
     const screensDir = join(root, "src/screens");
-    // No other screen may call fetch directly.
     for (const name of readdirSync(screensDir)) {
       if (!name.endsWith(".js") && !name.endsWith(".jsx")) continue;
-      if (name === "SmartTipsScreen.jsx") continue;
       const src = readFileSync(join(screensDir, name), "utf8");
       expect(src).not.toMatch(/\bfetch\s*\(/);
+    }
+    const remoteDir = join(root, "src/remote");
+    const remoteFiles = readdirSync(remoteDir).filter((n) => n.endsWith(".js"));
+    expect(remoteFiles.length).toBeGreaterThanOrEqual(2);
+    for (const name of remoteFiles) {
+      const src = readFileSync(join(remoteDir, name), "utf8");
+      expect(src).toMatch(/\bfetch\b/);
     }
   });
 

@@ -19,7 +19,9 @@
         "INTERNET",
         "POST_NOTIFICATIONS",
         "USE_BIOMETRIC",
-        "USE_FINGERPRINT"
+        "USE_FINGERPRINT",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
       ]
     },
     "plugins": [
@@ -64,6 +66,12 @@
         {
           "color": "#2563EB",
           "defaultChannel": "moneymap-reminders"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "MoneyMap uses your location only while you browse Student Eats Near Me, to rank budget meals nearby. Location is never saved."
         }
       ]
     ],

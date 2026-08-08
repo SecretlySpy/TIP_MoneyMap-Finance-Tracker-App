@@ -1683,3 +1683,89 @@ v0.1.0 student finance tracker; Tasks 1–18 complete in application code. QA au
 ## 4. Verification Status
 - Prior baseline: 91/91 tests green; expo-doctor one config warning (addressed in app.config.js)
 - This session: code/docs changes applied; re-run tests locally if agent shell is denied
+
+# Module / File: src/theme/tokens.js
+## Function: useTheme / resolveThemeMode
+- **Purpose**: Single theme entry so shared components honor uiStore.themePreference (dark-mode fix).
+- **Inputs**:
+  - `preference` (`"system"|"light"|"dark"|undefined`): optional override; undefined → store
+  - system scheme via `useColorScheme`
+- **Outputs**: theme object `{ mode, colors, fonts, radii, shadows, sizes, spacing, typeScale }`
+- **Dependencies**: `useUiStore` (themePreference), React Native `useColorScheme`
+- **Behavior**: Always subscribes to store; explicit light/dark wins; system follows OS
+- **Side Effects**: none
+- **DSA Used**: O(1) palette lookup
+- **Data Analysis Notes**: n/a
+- **Responsive & Accessibility Notes**: dark palette keeps text/sub contrast on surfaces
+- **Security Notes**: none
+- **Verification Status**: `resolveThemeMode` unit tests; bare `useTheme()` used by ScreenContainer/Buttons/etc.
+
+# Module / File: src/domain/services/eatsRanking.js
+## Function: rankPlaces / scorePlace / buildAnonymizedEatsPayload
+- **Purpose**: Pure Student Eats ranking + anonymized AI payload (no coords in AI path)
+- **Inputs**: Overpass-like elements, origin lat/lon, optional maxDistanceM/limit
+- **Outputs**: ranked places with distanceM, priceLevel, rating, score; AI payload with distanceBand
+- **Dependencies**: none (pure)
+- **Behavior**: Haversine distance; price/rating heuristics; weighted score; strip tags from output
+- **Side Effects**: none
+- **DSA Used**: O(n log n) sort; haversine O(1) per pair
+- **Data Analysis Notes**: weights distance 40% price 25% rating 20% student 15%
+- **Responsive & Accessibility Notes**: formatDistance for list UI
+- **Security Notes**: assertAnonymizedEatsPayload rejects lat/lon leakage
+- **Verification Status**: __tests__/eatsRanking.test.js
+
+# Module / File: src/remote/placesClient.js
+## Function: fetchNearbyEats
+- **Purpose**: Overpass food amenities + Nominatim fallback; 10-minute memory cache
+- **Inputs**: origin, radiusM, fetchImpl (test seam)
+- **Outputs**: `{ places, origin, source, fromCache, errorMessage }`
+- **Dependencies**: eatsRanking.rankPlaces, global fetch
+- **Behavior**: POST Overpass; on fail Nominatim; cache by rounded origin (~100m)
+- **Side Effects**: HTTPS to OSM; in-memory cache only
+- **DSA Used**: Map cache O(1)
+- **Data Analysis Notes**: n/a
+- **Responsive & Accessibility Notes**: n/a
+- **Security Notes**: User-Agent set; no API key; coords not persisted
+- **Verification Status**: __tests__/placesClient.test.js
+
+# Module / File: src/remote/eatsTipsClient.js
+## Function: fetchEatsAiTips
+- **Purpose**: Optional Gemini tips for eats; same consent gate as Smart Tips
+- **Inputs**: enabled, consentAccepted, places, currencySymbol, dailyFoodBudgetMinor
+- **Outputs**: tip cards or null
+- **Dependencies**: buildAnonymizedEatsPayload, Gemini via fetch
+- **Behavior**: skip if no consent/key; parse JSON array tips
+- **Side Effects**: HTTPS when gated; 30m cache
+- **DSA Used**: n/a
+- **Data Analysis Notes**: n/a
+- **Responsive & Accessibility Notes**: n/a
+- **Security Notes**: no precise coordinates in payload
+- **Verification Status**: payload shape covered via eatsRanking assert tests
+
+# Module / File: src/services/locationService.js
+## Function: requestEatsLocationPermission / resolveEatsOrigin
+- **Purpose**: Ephemeral location for Student Eats; TIP QC fallback
+- **Inputs**: optional LocationImpl test seam
+- **Outputs**: `{ latitude, longitude, label, isFallback, permission }`
+- **Dependencies**: dynamic `expo-location` import
+- **Behavior**: request on feature entry; never write coords to SecureStore/DB
+- **Side Effects**: OS permission dialog only when feature opened
+- **DSA Used**: n/a
+- **Data Analysis Notes**: TIP_QC_CAMPUS ≈ 14.62548, 121.06135
+- **Responsive & Accessibility Notes**: n/a
+- **Security Notes**: coords not persisted
+- **Verification Status**: reasoned; module absent → campus fallback
+
+# Module / File: src/screens/StudentEatsScreen.jsx
+## Function: StudentEatsScreen
+- **Purpose**: UI for nearby student eats + mini-map + optional AI tips
+- **Inputs**: navigation
+- **Outputs**: JSX list/map
+- **Dependencies**: placesClient, locationService, eatsTipsClient, theme tokens, finance tips for food budget
+- **Behavior**: permission → origin → fetch/rank → display; refresh control
+- **Side Effects**: network via remote clients; no permanent location write
+- **DSA Used**: n/a
+- **Data Analysis Notes**: shows daily food budget from deriveSmartTips when available
+- **Responsive & Accessibility Notes**: EmptyState; loading spinner; back/refresh 44px targets
+- **Security Notes**: privacy footer copy; AI only if Smart Tips consented
+- **Verification Status**: static hex/fetch tests include this screen

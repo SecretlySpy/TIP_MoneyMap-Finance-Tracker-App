@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
+import { EmptyState } from "../components/EmptyState";
 import { ProgressBar } from "../components/ProgressBar";
 import { MonthChip } from "../components/MonthChip";
 import { ScreenContainer } from "../components/ScreenContainer";
@@ -15,7 +16,7 @@ import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 // The Dashboard is a faithful flexible translation of Figma frame 7:2.
 export function DashboardScreen({ navigation }) {
-    const theme = useTheme(useUiStore((state) => state.themePreference));
+    const theme = useTheme();
     const currencySymbol = useUiStore((state) => state.currencySymbol);
     const remindersEnabled = useUiStore((state) => state.remindersEnabled);
     const smartTipsEnabled = useUiStore((state) => state.smartTipsEnabled);
@@ -125,20 +126,56 @@ export function DashboardScreen({ navigation }) {
             </Text>) : null}
         </Pressable>) : null}
 
-      {smartTipsEnabled ? (<Pressable accessibilityRole="button" onPress={() => navigation.navigate("SmartTips")} style={{
-                backgroundColor: theme.colors.tint,
-                borderRadius: theme.radii.row,
-                padding: theme.spacing.lg,
-            }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm }}>
+        {smartTipsEnabled ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate("SmartTips")}
+            style={{
+              backgroundColor: theme.colors.tint,
+              borderRadius: theme.radii.row,
+              flexGrow: 1,
+              minWidth: "46%",
+              padding: theme.spacing.lg,
+            }}
+          >
+            <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
+              ✨ Smart Tips
+            </Text>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny, marginTop: theme.spacing.xxs }}>
+              From your spending
+            </Text>
+          </Pressable>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => navigation.navigate("StudentEats")}
+          style={{
+            backgroundColor: theme.colors.tint,
+            borderRadius: theme.radii.row,
+            flexGrow: 1,
+            minWidth: "46%",
+            padding: theme.spacing.lg,
+          }}
+        >
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
-            ✨ Open Smart Tips (from your spending)
+            🍜 Student Eats
           </Text>
-        </Pressable>) : null}
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny, marginTop: theme.spacing.xxs }}>
+            Budget meals near TIP QC
+          </Text>
+        </Pressable>
+      </View>
 
       <SectionCard shadowed style={{ gap: theme.spacing.lg }}>
         <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.cardHeader }}>
           Spending by Category
         </Text>
+        {spending.totalMinor <= 0 ? (
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
+            No expenses this month yet — your donut fills as you log spends.
+          </Text>
+        ) : null}
         <SpendingDonut segments={donutSegments} totalMinor={spending.totalMinor > 0 ? spending.totalMinor : totals.expenseMinor}/>
       </SectionCard>
 
@@ -153,9 +190,15 @@ export function DashboardScreen({ navigation }) {
             </Text>
           </Pressable>
         </View>
-        {budgetSnapshots.length === 0 ? (<Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
-            No budgets for this month yet.
-          </Text>) : (budgetSnapshots.map((budget) => (<View key={budget.name} style={{ gap: theme.spacing.compact }}>
+        {budgetSnapshots.length === 0 ? (
+          <EmptyState
+            actionLabel="Add a budget"
+            emoji="📊"
+            message="Set category limits to track overspend risk this month."
+            onAction={() => tabNavigation?.navigate("Budgets", { screen: "BudgetsOverview" })}
+            title="No budgets yet"
+          />
+        ) : (budgetSnapshots.map((budget) => (<View key={budget.name} style={{ gap: theme.spacing.compact }}>
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
                   {budget.name}
@@ -184,9 +227,15 @@ export function DashboardScreen({ navigation }) {
             </Text>
           </Pressable>
         </View>
-        {recent.length === 0 ? (<Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
-            No transactions yet. Tap + to add one.
-          </Text>) : (recent.map((transaction) => <TransactionRow key={transaction.id} {...transaction}/>))}
+        {recent.length === 0 ? (
+          <EmptyState
+            actionLabel="＋ Add transaction"
+            emoji="🧾"
+            message="Log allowance and daily spends to fill this list."
+            onAction={() => navigation.navigate("Entry")}
+            title="No transactions yet"
+          />
+        ) : (recent.map((transaction) => <TransactionRow key={transaction.id} {...transaction}/>))}
       </SectionCard>
     </ScreenContainer>);
 }

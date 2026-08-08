@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
+import { EmptyState } from "../components/EmptyState";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { deriveSmartTips } from "../domain/services/tips";
@@ -20,7 +21,7 @@ function formatCopy(copy, currencySymbol) {
 
 // Offline rules always available; optional Gemini layer when enabled + consented + online.
 export function SmartTipsScreen({ navigation }) {
-  const theme = useTheme(useUiStore((state) => state.themePreference));
+  const theme = useTheme();
   const currencySymbol = useUiStore((state) => state.currencySymbol);
   const smartTipsEnabled = useUiStore((state) => state.smartTipsEnabled);
   const smartTipsConsentAccepted = useUiStore((state) => state.smartTipsConsentAccepted);
@@ -245,9 +246,11 @@ export function SmartTipsScreen({ navigation }) {
       </Text>
 
       {displayTips.length === 0 ? (
-        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body }}>
-          No tips yet. Log transactions and budgets to unlock student-friendly suggestions.
-        </Text>
+        <EmptyState
+          emoji="✨"
+          message="Log transactions and budgets to unlock student-friendly suggestions. Everything stays on-device until you opt into online tips."
+          title="No tips yet"
+        />
       ) : (
         displayTips.map((tip) => (
           <SectionCard

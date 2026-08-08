@@ -18,6 +18,7 @@ import { ImportScreen } from "../screens/ImportScreen";
 import { RecurringScreen } from "../screens/RecurringScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { SmartTipsScreen } from "../screens/SmartTipsScreen";
+import { StudentEatsScreen } from "../screens/StudentEatsScreen";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 const RootStack = createNativeStackNavigator();
@@ -31,6 +32,7 @@ function HomeNavigator() {
       <HomeStack.Screen name="Dashboard" component={DashboardScreen}/>
       <HomeStack.Screen name="Entry" component={EntryScreen} options={{ animation: "slide_from_bottom" }}/>
       <HomeStack.Screen name="SmartTips" component={SmartTipsScreen}/>
+      <HomeStack.Screen name="StudentEats" component={StudentEatsScreen}/>
     </HomeStack.Navigator>);
 }
 function HistoryNavigator() {

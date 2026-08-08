@@ -5,6 +5,7 @@
  * @property {undefined} Dashboard
  * @property {undefined} Entry
  * @property {undefined} SmartTips
+ * @property {undefined} StudentEats
  *
  * @typedef {Object} HistoryStackParamList
  * @property {undefined} HistoryList
