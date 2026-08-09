@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { initializeDatabase } from "../db/client";
 import { AccountRepository, BudgetRepository, CategoryRepository, GoalRepository, RecurringRepository, TransactionRepository, } from "../db/repositories";
+import { canArchiveAccount, canDeleteCategory, canRenameCategory, } from "../domain/services/entityGuards";
 import { accountChipLabel, toMonthYear, } from "../domain/services/financeView";
 import { runRecurringCatchUp } from "../services/recurringCatchUp";
 import { registerFinanceSnapshotProvider, syncRemindersFromStores } from "./uiStore";
@@ -267,6 +268,135 @@ export const useFinanceStore = create((set, get) => ({
         return updated;
     },
     updateBudgetLimit: async (input) => get().addBudget(input),
+    renameCategory: async (id, name) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const existing = get().categories.find((category) => category.id === id);
+        if (existing === undefined) {
+            throw new Error("Category not found.");
+        }
+        const check = canRenameCategory(name, existing.type, get().categories, id);
+        if (!check.ok) {
+            throw new Error(check.reason);
+        }
+        const updated = await new CategoryRepository(database).update(id, {
+            name: check.name,
+            isCustom: true,
+        });
+        if (updated === null) {
+            throw new Error("Category could not be renamed.");
+        }
+        await get().refresh();
+        return updated;
+    },
+    deleteCategory: async (id) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const guard = canDeleteCategory(id, {
+            transactions: get().transactions,
+            budgets: get().budgets,
+            recurringRules: get().recurringRules,
+        });
+        if (!guard.ok) {
+            throw new Error(guard.reason);
+        }
+        await new CategoryRepository(database).delete(id);
+        await get().refresh();
+    },
+    createAccount: async (input) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const name = String(input.name ?? "").trim();
+        if (name.length === 0) {
+            throw new Error("Account name is required.");
+        }
+        const created = await new AccountRepository(database).create({
+            name,
+            type: input.type,
+            startingBalanceMinor: input.startingBalanceMinor ?? 0,
+            isArchived: false,
+        });
+        await get().refresh();
+        return created;
+    },
+    archiveAccount: async (id) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const guard = canArchiveAccount(id, { accounts: get().accounts });
+        if (!guard.ok) {
+            throw new Error(guard.reason);
+        }
+        const updated = await new AccountRepository(database).update(id, { isArchived: true });
+        if (updated === null) {
+            throw new Error("Account could not be archived.");
+        }
+        await get().refresh();
+        return updated;
+    },
+    updateRecurringRule: async (id, patch) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const updated = await new RecurringRepository(database).update(id, patch);
+        if (updated === null) {
+            throw new Error("Recurring bill could not be updated.");
+        }
+        await get().refresh();
+        return updated;
+    },
+    renameGoal: async (id, name) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const trimmed = String(name ?? "").trim();
+        if (trimmed.length === 0) {
+            throw new Error("Goal name is required.");
+        }
+        const updated = await new GoalRepository(database).update(id, { name: trimmed });
+        if (updated === null) {
+            throw new Error("Goal could not be renamed.");
+        }
+        await get().refresh();
+        return updated;
+    },
+    updateGoal: async (id, patch) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const updated = await new GoalRepository(database).update(id, patch);
+        if (updated === null) {
+            throw new Error("Goal could not be updated.");
+        }
+        await get().refresh();
+        return updated;
+    },
+    deleteGoal: async (id) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        await new GoalRepository(database).delete(id);
+        await get().refresh();
+    },
     /**
      * Bulk-insert already-validated import rows inside one transaction.
      * Auto-creates missing categories and account types. Returns a summary object

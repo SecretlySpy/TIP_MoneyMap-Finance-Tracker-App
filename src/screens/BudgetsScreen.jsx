@@ -7,67 +7,166 @@ import { EmptyState } from "../components/EmptyState";
 import { MonthChip } from "../components/MonthChip";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { TextPromptModal } from "../components/TextPromptModal";
-import { budgetSummary, buildBudgetCards, categoriesForType, } from "../domain/services/financeView";
+import { budgetSummary, buildBudgetCards, categoriesForType } from "../domain/services/financeView";
 import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
-// The budget list demonstrates normal, warning, and over states from frame 13:40.
+
 export function BudgetsScreen({ navigation }) {
-    const theme = useTheme(useUiStore((state) => state.themePreference));
-    const currencySymbol = useUiStore((state) => state.currencySymbol);
-    const budgets = useFinanceStore((state) => state.budgets);
-    const categories = useFinanceStore((state) => state.categories);
-    const transactions = useFinanceStore((state) => state.transactions);
-    const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
-    const addBudget = useFinanceStore((state) => state.addBudget);
-    const deleteBudgetByCategoryName = useFinanceStore((state) => state.deleteBudgetByCategoryName);
-    const [adding, setAdding] = useState(false);
-    const [pendingCategory, setPendingCategory] = useState(null);
-    const [showLimitPrompt, setShowLimitPrompt] = useState(false);
-    const [editingLimit, setEditingLimit] = useState(null);
-    const { categoriesById } = useMemo(() => mapsFromState({ accounts: [], categories }), [categories]);
-    const cards = useMemo(() => buildBudgetCards(budgets, transactions, categoriesById, selectedMonthYear), [budgets, transactions, categoriesById, selectedMonthYear]);
-    const summary = useMemo(() => budgetSummary(cards), [cards]);
-    const beginAddBudget = () => {
-        const expenseCategories = categoriesForType(categories, "EXPENSE");
-        const usedIds = new Set(budgets
-            .filter((budget) => budget.monthYear === selectedMonthYear)
-            .map((budget) => budget.categoryId));
-        const nextCategory = expenseCategories.find((category) => !usedIds.has(category.id));
-        if (nextCategory === undefined) {
-            Alert.alert("Budgets complete", "Every expense category already has a budget this month.");
+  const theme = useTheme();
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
+  const budgets = useFinanceStore((state) => state.budgets);
+  const categories = useFinanceStore((state) => state.categories);
+  const transactions = useFinanceStore((state) => state.transactions);
+  const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
+  const addBudget = useFinanceStore((state) => state.addBudget);
+  const addCategory = useFinanceStore((state) => state.addCategory);
+  const renameCategory = useFinanceStore((state) => state.renameCategory);
+  const deleteBudgetByCategoryName = useFinanceStore((state) => state.deleteBudgetByCategoryName);
+
+  const [busy, setBusy] = useState(false);
+  const [step, setStep] = useState(null); // null | 'name' | 'limit' | 'rename'
+  const [pendingCategoryName, setPendingCategoryName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [editingLimitName, setEditingLimitName] = useState(null);
+
+  const { categoriesById } = useMemo(
+    () => mapsFromState({ accounts: [], categories }),
+    [categories],
+  );
+  const cards = useMemo(
+    () => buildBudgetCards(budgets, transactions, categoriesById, selectedMonthYear),
+    [budgets, transactions, categoriesById, selectedMonthYear],
+  );
+  const summary = useMemo(() => budgetSummary(cards), [cards]);
+
+  const beginAddBudget = () => {
+    setPendingCategoryName("");
+    setEditingLimitName(null);
+    setStep("name");
+  };
+
+  const handleNameConfirm = (value) => {
+    const name = value.trim();
+    if (name.length === 0) {
+      Alert.alert("Name required", "Enter a category name for this budget (e.g. Food, School).");
+      return;
+    }
+    const monthBudgets = budgets.filter((b) => b.monthYear === selectedMonthYear);
+    const existingCat = categories.find(
+      (c) => c.type === "EXPENSE" && c.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (existingCat) {
+      const already = monthBudgets.some((b) => b.categoryId === existingCat.id);
+      if (already) {
+        Alert.alert("Already exists", `“${existingCat.name}” already has a budget this month.`);
+        return;
+      }
+    }
+    setPendingCategoryName(name);
+    setStep("limit");
+  };
+
+  const handleLimitConfirm = async (value) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const limitMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
+      if (limitMinor <= 0) {
+        throw new Error("Enter a positive budget limit.");
+      }
+      if (editingLimitName) {
+        await addBudget({
+          categoryName: editingLimitName,
+          limitMinor,
+          monthYear: selectedMonthYear,
+        });
+      } else {
+        const name = pendingCategoryName.trim();
+        let category = categories.find(
+          (c) => c.type === "EXPENSE" && c.name.toLowerCase() === name.toLowerCase(),
+        );
+        if (!category) {
+          category = await addCategory({ name, type: "EXPENSE" });
+        }
+        await addBudget({
+          categoryName: category.name,
+          limitMinor,
+          monthYear: selectedMonthYear,
+        });
+      }
+      setStep(null);
+      setPendingCategoryName("");
+      setEditingLimitName(null);
+    } catch (error) {
+      Alert.alert("Budget failed", error instanceof Error ? error.message : "Could not save budget.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRenameConfirm = async (value) => {
+    if (editingCategoryId === null || busy) return;
+    setBusy(true);
+    try {
+      await renameCategory(editingCategoryId, value);
+      setStep(null);
+      setEditingCategoryId(null);
+    } catch (error) {
+      Alert.alert("Rename failed", error instanceof Error ? error.message : "Could not rename.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openBudgetActions = (budget) => {
+    const category = categories.find(
+      (c) => c.type === "EXPENSE" && c.name === budget.name,
+    );
+    Alert.alert(budget.name, "Manage this budget.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Edit limit",
+        onPress: () => {
+          setEditingLimitName(budget.name);
+          setPendingCategoryName(budget.name);
+          setStep("limit");
+        },
+      },
+      {
+        text: "Rename category",
+        onPress: () => {
+          if (!category) {
+            Alert.alert("Not found", "Category could not be resolved.");
             return;
-        }
-        setPendingCategory(nextCategory.name);
-        setShowLimitPrompt(true);
-    };
-    const handleLimitConfirm = async (value) => {
-        if (pendingCategory === null || adding) {
-            return;
-        }
-        setAdding(true);
-        try {
-            const limitMinor = parseDecimalToMinor(value.replace(/[₱$,]/g, "") || "0");
-            if (limitMinor <= 0) {
-                throw new Error("Enter a positive budget limit.");
-            }
-            await addBudget({
-                categoryName: pendingCategory,
-                limitMinor,
-                monthYear: selectedMonthYear,
-            });
-            setShowLimitPrompt(false);
-            setPendingCategory(null);
-        }
-        catch (error) {
-            Alert.alert("Add budget failed", error instanceof Error ? error.message : "Could not add budget.");
-        }
-        finally {
-            setAdding(false);
-        }
-    };
-    return (<ScreenContainer contentContainerStyle={{ gap: theme.spacing.lg }} testID="budgets-screen">
+          }
+          setEditingCategoryId(category.id);
+          setStep("rename");
+        },
+      },
+      {
+        text: "Delete budget",
+        style: "destructive",
+        onPress: () => {
+          void deleteBudgetByCategoryName(budget.name, selectedMonthYear).catch((error) => {
+            Alert.alert("Delete failed", error instanceof Error ? error.message : "Could not delete.");
+          });
+        },
+      },
+    ]);
+  };
+
+  const limitInitial = (() => {
+    if (editingLimitName) {
+      const card = cards.find((c) => c.name === editingLimitName);
+      return ((card?.limitMinor ?? 500_000) / 100).toFixed(2);
+    }
+    return "5000.00";
+  })();
+
+  return (
+    <ScreenContainer contentContainerStyle={{ gap: theme.spacing.lg }} testID="budgets-screen">
       <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
         <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.screenTitle }}>
           Budgets
@@ -75,7 +174,7 @@ export function BudgetsScreen({ navigation }) {
         <MonthChip />
       </View>
       <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
-        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label, flex: 1 }}>
+        <Text style={{ color: theme.colors.sub, flex: 1, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
           {formatMinor(summary.spentMinor, { currencySymbol, showCents: false })} of{" "}
           {formatMinor(summary.limitMinor, { currencySymbol, showCents: false })} total budget spent
         </Text>
@@ -85,49 +184,80 @@ export function BudgetsScreen({ navigation }) {
           </Text>
         </Pressable>
       </View>
+
       {cards.length === 0 ? (
         <EmptyState
           actionLabel="＋ Add budget"
           emoji="📊"
-          message="Set a monthly limit per category to see progress bars and overspend warnings."
+          message="Name a category (or type a new one) and set a monthly limit."
           onAction={beginAddBudget}
           title="No budgets this month"
         />
-      ) : (cards.map((budget) => (<Pressable key={budget.name} accessibilityHint="Long press to edit or delete this budget" accessibilityRole="button" onLongPress={() => {
-                Alert.alert(budget.name, "Edit limit or remove this budget.", [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                        text: "Edit limit",
-                        onPress: () => {
-                            setEditingLimit(budget.name);
-                            setPendingCategory(budget.name);
-                            setShowLimitPrompt(true);
-                        },
-                    },
-                    {
-                        text: "Delete",
-                        style: "destructive",
-                        onPress: () => {
-                            void deleteBudgetByCategoryName(budget.name, selectedMonthYear).catch((error) => {
-                                Alert.alert("Delete failed", error instanceof Error ? error.message : "Could not delete budget.");
-                            });
-                        },
-                    },
-                ]);
-            }}>
-            <BudgetCard {...budget} currencySymbol={currencySymbol}/>
-          </Pressable>)))}
-      <DashedButton disabled={adding} onPress={beginAddBudget}>
-        {adding ? "Adding…" : "＋ Add budget"}
-      </DashedButton>
-      <TextPromptModal confirmLabel="Save budget" initialValue={editingLimit === null
-            ? "5000.00"
-            : ((cards.find((card) => card.name === editingLimit)?.limitMinor ?? 500_000) / 100).toFixed(2)} keyboardType="decimal-pad" message={pendingCategory === null ? undefined : `Monthly limit for ${pendingCategory}`} onCancel={() => {
-            setShowLimitPrompt(false);
-            setPendingCategory(null);
-            setEditingLimit(null);
-        }} onConfirm={(value) => {
-            void handleLimitConfirm(value).then(() => setEditingLimit(null));
-        }} placeholder="5000.00" title={editingLimit === null ? "Budget limit" : "Edit budget limit"} visible={showLimitPrompt}/>
-    </ScreenContainer>);
+      ) : (
+        cards.map((budget) => (
+          <Pressable
+            key={budget.name}
+            accessibilityHint="Long press to edit, rename, or delete"
+            accessibilityRole="button"
+            onLongPress={() => openBudgetActions(budget)}
+          >
+            <BudgetCard {...budget} currencySymbol={currencySymbol} />
+          </Pressable>
+        ))
+      )}
+
+      {cards.length > 0 ? (
+        <DashedButton disabled={busy} onPress={beginAddBudget}>
+          {busy ? "Saving…" : "＋ Add budget"}
+        </DashedButton>
+      ) : null}
+
+      <TextPromptModal
+        confirmLabel="Next"
+        message="Existing expense category or a new custom name."
+        onCancel={() => {
+          setStep(null);
+          setPendingCategoryName("");
+        }}
+        onConfirm={handleNameConfirm}
+        placeholder="Food, School, Load…"
+        title="Budget category name"
+        visible={step === "name"}
+      />
+      <TextPromptModal
+        confirmLabel="Save"
+        initialValue={limitInitial}
+        keyboardType="decimal-pad"
+        message={
+          editingLimitName
+            ? `Monthly limit for ${editingLimitName}`
+            : `Monthly limit for ${pendingCategoryName || "this category"}`
+        }
+        onCancel={() => {
+          setStep(null);
+          setPendingCategoryName("");
+          setEditingLimitName(null);
+        }}
+        onConfirm={(value) => void handleLimitConfirm(value)}
+        placeholder="5000.00"
+        title={editingLimitName ? "Edit budget limit" : "Budget limit"}
+        visible={step === "limit"}
+      />
+      <TextPromptModal
+        confirmLabel="Rename"
+        initialValue={
+          categories.find((c) => c.id === editingCategoryId)?.name ?? ""
+        }
+        message="Renames the category everywhere (budgets, history, entry)."
+        onCancel={() => {
+          setStep(null);
+          setEditingCategoryId(null);
+        }}
+        onConfirm={(value) => void handleRenameConfirm(value)}
+        placeholder="Category name"
+        title="Rename category"
+        visible={step === "rename"}
+      />
+    </ScreenContainer>
+  );
 }

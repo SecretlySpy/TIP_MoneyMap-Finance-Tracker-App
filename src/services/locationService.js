@@ -18,7 +18,16 @@ async function loadLocationModule() {
     return locationModulePromise;
   }
   locationModulePromise = import("expo-location")
-    .then((mod) => mod)
+    .then((mod) => {
+      const api = mod?.default ?? mod;
+      // Real package exposes requestForegroundPermissionsAsync; stub does too.
+      // Prefer real GPS only when getCurrentPositionAsync is not the stub thrower —
+      // both work; resolveEatsOrigin handles getCurrentPosition failures via TIP QC.
+      if (typeof api?.getForegroundPermissionsAsync !== "function") {
+        return null;
+      }
+      return api;
+    })
     .catch(() => null);
   return locationModulePromise;
 }

@@ -19,15 +19,25 @@ export function GoalsScreen({ navigation }) {
   const goals = useFinanceStore((state) => state.goals);
   const addGoal = useFinanceStore((state) => state.addGoal);
   const contributeToGoal = useFinanceStore((state) => state.contributeToGoal);
-  const archiveGoal = useFinanceStore((state) => state.archiveGoal);
+  const renameGoal = useFinanceStore((state) => state.renameGoal);
+  const updateGoal = useFinanceStore((state) => state.updateGoal);
+  const deleteGoal = useFinanceStore((state) => state.deleteGoal);
 
   const [showCreate, setShowCreate] = useState(false);
   const [createStep, setCreateStep] = useState("name");
   const [draftName, setDraftName] = useState("");
   const [contributeId, setContributeId] = useState(null);
+  const [renameId, setRenameId] = useState(null);
+  const [targetId, setTargetId] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const displayGoals = useMemo(() => sortGoalsForDisplay(goals ?? []), [goals]);
+
+  const beginCreate = () => {
+    setCreateStep("name");
+    setDraftName("");
+    setShowCreate(true);
+  };
 
   const handleCreateName = (name) => {
     const trimmed = name.trim();
@@ -44,9 +54,7 @@ export function GoalsScreen({ navigation }) {
     setBusy(true);
     try {
       const targetMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
-      if (targetMinor <= 0) {
-        throw new Error("Enter a positive target amount.");
-      }
+      if (targetMinor <= 0) throw new Error("Enter a positive target amount.");
       await addGoal({ name: draftName, targetMinor });
       setShowCreate(false);
       setCreateStep("name");
@@ -63,9 +71,7 @@ export function GoalsScreen({ navigation }) {
     setBusy(true);
     try {
       const amountMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
-      if (amountMinor <= 0) {
-        throw new Error("Enter a positive amount.");
-      }
+      if (amountMinor <= 0) throw new Error("Enter a positive amount.");
       await contributeToGoal(contributeId, amountMinor);
       setContributeId(null);
     } catch (error) {
@@ -74,6 +80,73 @@ export function GoalsScreen({ navigation }) {
       setBusy(false);
     }
   };
+
+  const handleRename = async (value) => {
+    if (renameId === null || busy) return;
+    setBusy(true);
+    try {
+      await renameGoal(renameId, value);
+      setRenameId(null);
+    } catch (error) {
+      Alert.alert("Rename failed", error instanceof Error ? error.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleTarget = async (value) => {
+    if (targetId === null || busy) return;
+    setBusy(true);
+    try {
+      const targetMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
+      if (targetMinor <= 0) throw new Error("Enter a positive target.");
+      await updateGoal(targetId, { targetMinor });
+      setTargetId(null);
+    } catch (error) {
+      Alert.alert("Update failed", error instanceof Error ? error.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openGoalMenu = (goal) => {
+    Alert.alert(goal.name, "Manage this savings goal.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Rename",
+        onPress: () => setRenameId(goal.id),
+      },
+      {
+        text: "Edit target",
+        onPress: () => setTargetId(goal.id),
+      },
+      {
+        text: "Contribute",
+        onPress: () => setContributeId(goal.id),
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          Alert.alert("Delete goal?", "This cannot be undone.", [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: () => {
+                void deleteGoal(goal.id).catch((error) => {
+                  Alert.alert("Delete failed", error instanceof Error ? error.message : "Unknown error");
+                });
+              },
+            },
+          ]);
+        },
+      },
+    ]);
+  };
+
+  const targetGoal = (goals ?? []).find((g) => g.id === targetId);
+  const renameGoalRow = (goals ?? []).find((g) => g.id === renameId);
 
   return (
     <ScreenContainer contentContainerStyle={{ gap: theme.spacing.xl }} testID="goals-screen">
@@ -94,60 +167,37 @@ export function GoalsScreen({ navigation }) {
         <EmptyState
           actionLabel="＋ Create a goal"
           emoji="🎯"
-          message="Save for tuition, gadgets, or emergency cash — progress stays on this device."
-          onAction={() => {
-            setCreateStep("name");
-            setShowCreate(true);
-          }}
+          message="Name your goal and set a target — progress stays on this device."
+          onAction={beginCreate}
           title="No goals yet"
         />
       ) : (
         displayGoals.map((goal) => (
-          <SectionCard key={goal.id} padding={theme.spacing.lg} style={{ gap: theme.spacing.md }}>
-            <GoalCard
-              currencySymbol={currencySymbol}
-              currentMinor={goal.currentMinor}
-              deadlineEpochMillis={goal.deadlineEpochMillis}
-              isComplete={goal.isComplete}
-              isOverdue={goal.isOverdue}
-              name={goal.name}
-              onContribute={() => setContributeId(goal.id)}
-              progressPercent={goal.progressPercent}
-              targetMinor={goal.targetMinor}
-            />
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                Alert.alert(goal.name, "Archive this goal?", [
-                  { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Archive",
-                    style: "destructive",
-                    onPress: () => {
-                      void archiveGoal(goal.id).catch((error) => {
-                        Alert.alert("Archive failed", error instanceof Error ? error.message : "Unknown error");
-                      });
-                    },
-                  },
-                ]);
-              }}
-            >
-              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
-                Archive goal
-              </Text>
-            </Pressable>
-          </SectionCard>
+          <Pressable
+            key={goal.id}
+            accessibilityHint="Long press for rename, edit target, contribute, or delete"
+            accessibilityRole="button"
+            onLongPress={() => openGoalMenu(goal)}
+          >
+            <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.md }}>
+              <GoalCard
+                currencySymbol={currencySymbol}
+                currentMinor={goal.currentMinor}
+                deadlineEpochMillis={goal.deadlineEpochMillis}
+                isComplete={goal.isComplete}
+                isOverdue={goal.isOverdue}
+                name={goal.name}
+                onContribute={() => setContributeId(goal.id)}
+                progressPercent={goal.progressPercent}
+                targetMinor={goal.targetMinor}
+              />
+            </SectionCard>
+          </Pressable>
         ))
       )}
 
       {displayGoals.length > 0 ? (
-        <DashedButton
-          disabled={busy}
-          onPress={() => {
-            setCreateStep("name");
-            setShowCreate(true);
-          }}
-        >
+        <DashedButton disabled={busy} onPress={beginCreate}>
           ＋ Add goal
         </DashedButton>
       ) : null}
@@ -190,6 +240,25 @@ export function GoalsScreen({ navigation }) {
         placeholder="100.00"
         title="Contribute"
         visible={contributeId !== null}
+      />
+      <TextPromptModal
+        confirmLabel="Rename"
+        initialValue={renameGoalRow?.name ?? ""}
+        onCancel={() => setRenameId(null)}
+        onConfirm={(value) => void handleRename(value)}
+        placeholder="Goal name"
+        title="Rename goal"
+        visible={renameId !== null}
+      />
+      <TextPromptModal
+        confirmLabel="Save"
+        initialValue={targetGoal ? (targetGoal.targetMinor / 100).toFixed(2) : "5000.00"}
+        keyboardType="decimal-pad"
+        onCancel={() => setTargetId(null)}
+        onConfirm={(value) => void handleTarget(value)}
+        placeholder="5000.00"
+        title="Edit target"
+        visible={targetId !== null}
       />
     </ScreenContainer>
   );

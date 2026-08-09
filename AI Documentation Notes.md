@@ -1810,3 +1810,23 @@ v0.1.0 student finance tracker; Tasks 1–18 complete in application code. QA au
 - **Order**: Balance → SafeToSpend → Reminders → Tips teaser/Eats → Goals → Donut → Budgets empty CTA → Recent empty CTA
 - **Smart Tips off**: teaser card routes to Settings to enable
 - **Entry**: recent category chips + amount/note templates
+
+# Module / File: src/domain/services/entityGuards.js
+## Function: canDeleteCategory / canArchiveAccount / canRenameCategory
+- **Purpose**: Pure guards for manage-screen CRUD (block delete-in-use; ≥1 active account; unique category names)
+- **Inputs**: ids + in-memory collections from financeStore
+- **Outputs**: `{ ok: true }` or `{ ok: false, reason }`
+- **Side Effects**: none
+- **Verification Status**: __tests__/entityGuards.test.js
+
+# Module / File: financeStore entity CRUD (2026-08-09)
+## Function: renameCategory, deleteCategory, createAccount, archiveAccount, updateRecurringRule, renameGoal, updateGoal, deleteGoal
+- **Purpose**: Full manage CRUD for budgets/categories/accounts/recurring/goals
+- **Behavior**:
+  - Budgets: custom category name on create (addCategory if needed) + limit; long-press edit/rename/delete; single Add CTA when empty
+  - Recurring: rename (note), edit amount/lead, delete; single Add when empty
+  - Accounts: create (name+type), rename, balance, archive (≥1 active)
+  - Categories: rename, delete if unused
+  - Goals: rename, edit target, contribute, delete; single Add when empty
+- **Security Notes**: FK RESTRICT preserved; delete blocked with user-facing reason
+- **Verification Status**: guards unit-tested; screens wired

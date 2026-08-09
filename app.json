@@ -67,12 +67,6 @@
           "color": "#2563EB",
           "defaultChannel": "moneymap-reminders"
         }
-      ],
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "MoneyMap uses your location only while you browse Student Eats Near Me, to rank budget meals nearby. Location is never saved."
-        }
       ]
     ],
     "extra": {
