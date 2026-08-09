@@ -58,6 +58,7 @@
  * @property {boolean} isActive
  * @property {boolean} reminderEnabled
  * @property {number} reminderLeadDays
+ * @property {string | null} [icon] custom emoji for display
  *
  * @typedef {Omit<RecurringRule, 'id'>} NewRecurringRule
  * @typedef {Partial<NewRecurringRule>} RecurringRuleUpdate

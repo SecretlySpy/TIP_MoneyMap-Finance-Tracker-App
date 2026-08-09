@@ -16,9 +16,18 @@ export function ScreenContainer({ children, contentContainerStyle, floating, saf
         contentContainerStyle,
     ];
     return (<SafeAreaView edges={safeBottom ? ["top", "bottom", "left", "right"] : ["top", "left", "right"]} style={{ flex: 1, backgroundColor: theme.colors.bg }} testID={testID}>
-      {scroll ? (<ScrollView contentContainerStyle={contentStyle} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      {scroll ? (
+        <ScrollView
+          contentContainerStyle={contentStyle}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+        >
           {children}
-        </ScrollView>) : (<View style={[{ flex: 1 }, contentStyle]}>{children}</View>)}
+        </ScrollView>
+      ) : (
+        <View style={[{ flex: 1 }, contentStyle]}>{children}</View>
+      )}
       {floating}
     </SafeAreaView>);
 }

@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { initializeDatabase } from "../db/client";
 import { AccountRepository, BudgetRepository, CategoryRepository, GoalRepository, RecurringRepository, TransactionRepository, } from "../db/repositories";
-import { canArchiveAccount, canDeleteCategory, canRenameCategory, } from "../domain/services/entityGuards";
+import { RECURRING_REMINDER_LEAD_DAYS } from "../domain/services/emoji";
+import { canDeleteAccount, canDeleteCategory, canRenameCategory, } from "../domain/services/entityGuards";
 import { accountChipLabel, toMonthYear, } from "../domain/services/financeView";
 import { runRecurringCatchUp } from "../services/recurringCatchUp";
 import { registerFinanceSnapshotProvider, syncRemindersFromStores } from "./uiStore";
@@ -206,10 +207,22 @@ export const useFinanceStore = create((set, get) => ({
         if (database === null) {
             throw new Error("Database is not ready.");
         }
-        const category = findCategory(get().categories, input.categoryName, "EXPENSE");
+        const categoryName = input.categoryName
+            ?? (get().categories.find((c) => c.type === "EXPENSE" && c.name === "Bills")?.name)
+            ?? get().categories.find((c) => c.type === "EXPENSE")?.name;
+        if (!categoryName) {
+            throw new Error("Add an expense category before creating a recurring bill.");
+        }
+        const category = findCategory(get().categories, categoryName, "EXPENSE");
         const account = findAccount(get().accounts, "CASH");
-        const nextRun = new Date();
-        nextRun.setDate(nextRun.getDate() + Math.max(input.leadDays, 1));
+        const leadDays = RECURRING_REMINDER_LEAD_DAYS;
+        let nextRunEpochMillis = input.dueEpochMillis;
+        if (!Number.isSafeInteger(nextRunEpochMillis)) {
+            const nextRun = new Date();
+            nextRun.setHours(12, 0, 0, 0);
+            nextRun.setDate(nextRun.getDate() + leadDays);
+            nextRunEpochMillis = nextRun.getTime();
+        }
         const payload = {
             amountMinor: input.amountMinor,
             type: "EXPENSE",
@@ -217,10 +230,11 @@ export const useFinanceStore = create((set, get) => ({
             accountId: account.id,
             note: input.name,
             frequency: "MONTHLY",
-            nextRunEpochMillis: nextRun.getTime(),
+            nextRunEpochMillis,
             isActive: true,
             reminderEnabled: true,
-            reminderLeadDays: input.leadDays,
+            reminderLeadDays: leadDays,
+            icon: input.icon ?? null,
         };
         const created = await new RecurringRepository(database).create(payload);
         await get().refresh();
@@ -238,6 +252,14 @@ export const useFinanceStore = create((set, get) => ({
         }
         const existing = get().categories.find((category) => category.name.toLowerCase() === name.toLowerCase() && category.type === input.type);
         if (existing) {
+            // Optionally refresh custom emoji on existing category when provided.
+            if (input.icon && input.icon !== existing.icon) {
+                const updated = await new CategoryRepository(database).update(existing.id, {
+                    icon: input.icon.trim(),
+                });
+                await get().refresh();
+                return updated ?? existing;
+            }
             return existing;
         }
         const created = await new CategoryRepository(database).create({
@@ -328,23 +350,24 @@ export const useFinanceStore = create((set, get) => ({
         await get().refresh();
         return created;
     },
-    archiveAccount: async (id) => {
+    deleteAccount: async (id) => {
         await get().ensureHydrated();
         const database = databaseRef;
         if (database === null) {
             throw new Error("Database is not ready.");
         }
-        const guard = canArchiveAccount(id, { accounts: get().accounts });
+        const guard = canDeleteAccount(id, {
+            accounts: get().accounts,
+            transactions: get().transactions,
+            recurringRules: get().recurringRules,
+        });
         if (!guard.ok) {
             throw new Error(guard.reason);
         }
-        const updated = await new AccountRepository(database).update(id, { isArchived: true });
-        if (updated === null) {
-            throw new Error("Account could not be archived.");
-        }
+        await new AccountRepository(database).delete(id);
         await get().refresh();
-        return updated;
     },
+    archiveAccount: async (id) => get().deleteAccount(id),
     updateRecurringRule: async (id, patch) => {
         await get().ensureHydrated();
         const database = databaseRef;
@@ -560,9 +583,9 @@ export const useFinanceStore = create((set, get) => ({
                     continue;
                 }
                 const nextId = await insertReturningId(tx, `INSERT INTO recurring_rules (
-             amount_minor, type, category_id, account_id, note, frequency,
-             next_run_epoch_millis, is_active, reminder_enabled, reminder_lead_days
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+              amount_minor, type, category_id, account_id, note, frequency,
+              next_run_epoch_millis, is_active, reminder_enabled, reminder_lead_days, icon
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
                     rule.amountMinor,
                     rule.type,
                     categoryId,
@@ -573,6 +596,7 @@ export const useFinanceStore = create((set, get) => ({
                     rule.isActive ? 1 : 0,
                     rule.reminderEnabled ? 1 : 0,
                     rule.reminderLeadDays,
+                    rule.icon ?? null,
                 ]);
                 recurringIdMap.set(rule.id, nextId);
             }

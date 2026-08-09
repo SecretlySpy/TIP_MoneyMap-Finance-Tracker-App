@@ -1,5 +1,6 @@
 import {
   canArchiveAccount,
+  canDeleteAccount,
   canDeleteCategory,
   canRenameCategory,
 } from "../src/domain/services/entityGuards";
@@ -24,13 +25,57 @@ describe("entityGuards", () => {
     expect(blocked.reason).toMatch(/1 recurring rule/);
   });
 
-  it("requires at least one active account when archiving", () => {
+  it("requires at least one active account when deleting", () => {
     const accounts = [
       { id: 1, isArchived: false },
       { id: 2, isArchived: true },
     ];
-    expect(canArchiveAccount(1, { accounts }).ok).toBe(false);
-    expect(canArchiveAccount(2, { accounts: [{ id: 1, isArchived: false }, { id: 2, isArchived: false }] }).ok).toBe(true);
+    expect(canDeleteAccount(1, { accounts }).ok).toBe(false);
+    expect(
+      canDeleteAccount(2, {
+        accounts: [
+          { id: 1, isArchived: false },
+          { id: 2, isArchived: false },
+        ],
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("blocks account delete when used by transactions or recurring rules", () => {
+    const accounts = [
+      { id: 1, isArchived: false },
+      { id: 2, isArchived: false },
+    ];
+    expect(
+      canDeleteAccount(1, {
+        accounts,
+        transactions: [{ accountId: 1 }],
+        recurringRules: [],
+      }).ok,
+    ).toBe(false);
+    expect(
+      canDeleteAccount(1, {
+        accounts,
+        transactions: [],
+        recurringRules: [{ accountId: 1 }],
+      }).reason,
+    ).toMatch(/1 recurring rule/);
+    expect(
+      canDeleteAccount(1, {
+        accounts,
+        transactions: [],
+        recurringRules: [],
+      }),
+    ).toEqual({ ok: true });
+  });
+
+  it("canArchiveAccount delegates to canDeleteAccount", () => {
+    const accounts = [
+      { id: 1, isArchived: false },
+      { id: 2, isArchived: false },
+    ];
+    expect(canArchiveAccount(1, { accounts }).ok).toBe(true);
+    expect(canArchiveAccount(1, { accounts: [{ id: 1, isArchived: false }] }).ok).toBe(false);
   });
 
   it("validates category rename uniqueness", () => {

@@ -110,19 +110,36 @@ export function GoalsScreen({ navigation }) {
   };
 
   const openGoalMenu = (goal) => {
+    // Android Alert shows at most 3 buttons — keep Cancel | Edit | Delete.
     Alert.alert(goal.name, "Manage this savings goal.", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Rename",
-        onPress: () => setRenameId(goal.id),
-      },
-      {
-        text: "Edit target",
-        onPress: () => setTargetId(goal.id),
-      },
-      {
-        text: "Contribute",
-        onPress: () => setContributeId(goal.id),
+        text: "Edit",
+        onPress: () => {
+          Alert.alert(goal.name, "What do you want to change?", [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Rename",
+              onPress: () => setRenameId(goal.id),
+            },
+            {
+              text: "More…",
+              onPress: () => {
+                Alert.alert(goal.name, "Edit details", [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Target",
+                    onPress: () => setTargetId(goal.id),
+                  },
+                  {
+                    text: "Contribute",
+                    onPress: () => setContributeId(goal.id),
+                  },
+                ]);
+              },
+            },
+          ]);
+        },
       },
       {
         text: "Delete",
@@ -167,7 +184,7 @@ export function GoalsScreen({ navigation }) {
         <EmptyState
           actionLabel="＋ Create a goal"
           emoji="🎯"
-          message="Name your goal and set a target — progress stays on this device."
+          message="Name your goal and set a target — progress stays on this device. Long-press a card to edit or delete."
           onAction={beginCreate}
           title="No goals yet"
         />
@@ -177,6 +194,7 @@ export function GoalsScreen({ navigation }) {
             key={goal.id}
             accessibilityHint="Long press for rename, edit target, contribute, or delete"
             accessibilityRole="button"
+            delayLongPress={350}
             onLongPress={() => openGoalMenu(goal)}
           >
             <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.md }}>
@@ -197,9 +215,14 @@ export function GoalsScreen({ navigation }) {
       )}
 
       {displayGoals.length > 0 ? (
-        <DashedButton disabled={busy} onPress={beginCreate}>
-          ＋ Add goal
-        </DashedButton>
+        <>
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
+            Tip: press and hold a goal card for Edit or Delete.
+          </Text>
+          <DashedButton disabled={busy} onPress={beginCreate}>
+            ＋ Add goal
+          </DashedButton>
+        </>
       ) : null}
 
       <TextPromptModal

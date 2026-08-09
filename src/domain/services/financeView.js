@@ -1,3 +1,5 @@
+import { categoryEmoji as resolveCategoryEmoji, resolveDisplayEmoji } from "./emoji";
+
 const MONTH_LABELS = [
     "Jan",
     "Feb",
@@ -12,27 +14,7 @@ const MONTH_LABELS = [
     "Nov",
     "Dec",
 ];
-const CATEGORY_EMOJI = {
-    Food: "🍜",
-    Transport: "🚌",
-    School: "📚",
-    "Load/Data": "📱",
-    Shopping: "🛍️",
-    Entertainment: "🎮",
-    Fun: "🎮",
-    Bills: "🧾",
-    Health: "💊",
-    Other: "📦",
-    Allowance: "💵",
-    "Part-time": "💼",
-    Scholarship: "🎓",
-    Gifts: "🎁",
-    Income: "💼",
-    Internet: "🌐",
-    Rent: "🏠",
-    Netflix: "📺",
-    Water: "💧",
-};
+
 const ACCOUNT_LABEL = {
     CASH: "Cash",
     CARD: "Card",
@@ -67,7 +49,7 @@ export function shiftMonthYear(monthYear, delta) {
     return toMonthYear(date);
 }
 export function categoryEmoji(name) {
-    return CATEGORY_EMOJI[name] ?? "📦";
+    return resolveCategoryEmoji(name);
 }
 export function accountLabel(type) {
     return ACCOUNT_LABEL[type];
@@ -189,7 +171,7 @@ export function buildBudgetCards(budgets, transactions, categoriesById, monthYea
         const percent = budget.limitMinor <= 0 ? 0 : Math.round((spentMinor / budget.limitMinor) * 100);
         const name = category?.name ?? "Budget";
         return {
-            emoji: categoryEmoji(name),
+            emoji: resolveDisplayEmoji({ icon: category?.icon, name }),
             limitMinor: budget.limitMinor,
             name,
             percent,
@@ -257,9 +239,10 @@ export function buildRecurringBills(rules, categoriesById) {
             id: String(rule.id),
             amountMinor: rule.amountMinor,
             due: `${MONTH_LABELS[dueDate.getMonth()]} ${dueDate.getDate()}`,
-            emoji: categoryEmoji(name),
+            emoji: resolveDisplayEmoji({ icon: rule.icon, name }),
             leadDays: rule.reminderLeadDays,
             name,
+            nextRunEpochMillis: rule.nextRunEpochMillis,
         };
     });
 }

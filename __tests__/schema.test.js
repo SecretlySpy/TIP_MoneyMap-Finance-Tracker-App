@@ -38,7 +38,7 @@ describe("database schema and seed", () => {
         expect(migration).toEqual({
             previousVersion: 0,
             currentVersion: LATEST_SCHEMA_VERSION,
-            appliedVersions: [1, 2],
+            appliedVersions: [1, 2, 3],
         });
         expect(tables.rows.map(({ name }) => name)).toEqual([
             "accounts",

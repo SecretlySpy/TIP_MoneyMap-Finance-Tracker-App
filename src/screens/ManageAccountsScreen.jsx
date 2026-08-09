@@ -25,7 +25,7 @@ export function ManageAccountsScreen({ navigation }) {
   const accounts = useFinanceStore((state) => state.accounts);
   const updateAccount = useFinanceStore((state) => state.updateAccount);
   const createAccount = useFinanceStore((state) => state.createAccount);
-  const archiveAccount = useFinanceStore((state) => state.archiveAccount);
+  const deleteAccount = useFinanceStore((state) => state.deleteAccount);
 
   const [renameId, setRenameId] = useState(null);
   const [balanceId, setBalanceId] = useState(null);
@@ -79,15 +79,15 @@ export function ManageAccountsScreen({ navigation }) {
     }
   };
 
-  const handleArchive = (account) => {
-    Alert.alert(account.name, "Archive this account? It will hide from pickers but keep history.", [
+  const handleDelete = (account) => {
+    Alert.alert(`Delete “${account.name}”?`, "Permanently removes this account. Blocked if it still has transactions or bills.", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Archive",
+        text: "Delete",
         style: "destructive",
         onPress: () => {
-          void archiveAccount(account.id).catch((error) => {
-            Alert.alert("Archive failed", error instanceof Error ? error.message : "Could not archive.");
+          void deleteAccount(account.id).catch((error) => {
+            Alert.alert("Delete failed", error instanceof Error ? error.message : "Could not delete.");
           });
         },
       },
@@ -157,11 +157,11 @@ export function ManageAccountsScreen({ navigation }) {
                 <Pressable
                   accessibilityRole="button"
                   hitSlop={theme.spacing.sm}
-                  onPress={() => handleArchive(account)}
+                  onPress={() => handleDelete(account)}
                   style={{ justifyContent: "center", minHeight: 44 }}
                 >
                   <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
-                    Archive
+                    Delete
                   </Text>
                 </Pressable>
               </View>

@@ -14,6 +14,7 @@ function mapRecurringRule(row) {
         isActive: readBoolean(row, "is_active"),
         reminderEnabled: readBoolean(row, "reminder_enabled"),
         reminderLeadDays: readInteger(row, "reminder_lead_days"),
+        icon: typeof row.icon === "string" ? row.icon : null,
     };
 }
 function validateRecurringRule(rule) {
@@ -32,9 +33,9 @@ export class RecurringRepository {
     async create(rule) {
         validateRecurringRule(rule);
         const id = await insertRow(this.database, `INSERT INTO recurring_rules (
-         amount_minor, type, category_id, account_id, note, frequency,
-         next_run_epoch_millis, is_active, reminder_enabled, reminder_lead_days
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+          amount_minor, type, category_id, account_id, note, frequency,
+          next_run_epoch_millis, is_active, reminder_enabled, reminder_lead_days, icon
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
             rule.amountMinor,
             rule.type,
             rule.categoryId,
@@ -45,6 +46,7 @@ export class RecurringRepository {
             rule.isActive ? 1 : 0,
             rule.reminderEnabled ? 1 : 0,
             rule.reminderLeadDays,
+            rule.icon ?? null,
         ]);
         return requireCreatedEntity(await this.getById(id), "Recurring rule");
     }
@@ -93,6 +95,9 @@ export class RecurringRepository {
         if (patch.reminderLeadDays !== undefined) {
             assertNonNegativeInteger(patch.reminderLeadDays, "reminderLeadDays");
             assignments.push({ column: "reminder_lead_days", value: patch.reminderLeadDays });
+        }
+        if (patch.icon !== undefined) {
+            assignments.push({ column: "icon", value: patch.icon });
         }
         const didUpdate = await updateRow(this.database, "recurring_rules", id, assignments);
         return didUpdate ? this.getById(id) : null;

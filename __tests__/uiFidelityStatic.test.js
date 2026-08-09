@@ -9,6 +9,7 @@ const uiFiles = [
   "src/components/Chip.jsx",
   "src/components/DatabaseGate.jsx",
   "src/components/EmptyState.jsx",
+  "src/components/EmojiPickerRow.jsx",
   "src/components/GoalCard.jsx",
   "src/components/OptionChipRow.jsx",
   "src/components/SafeToSpendCard.jsx",

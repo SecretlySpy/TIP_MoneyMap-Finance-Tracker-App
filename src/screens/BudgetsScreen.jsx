@@ -3,11 +3,14 @@ import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { BudgetCard } from "../components/BudgetCard";
 import { DashedButton } from "../components/Buttons";
+import { EmojiPickerRow } from "../components/EmojiPickerRow";
 import { EmptyState } from "../components/EmptyState";
 import { MonthChip } from "../components/MonthChip";
 import { ScreenContainer } from "../components/ScreenContainer";
+import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
-import { budgetSummary, buildBudgetCards, categoriesForType } from "../domain/services/financeView";
+import { BUDGET_BILL_EMOJI_PRESETS } from "../domain/services/emoji";
+import { budgetSummary, buildBudgetCards } from "../domain/services/financeView";
 import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -26,8 +29,9 @@ export function BudgetsScreen({ navigation }) {
   const deleteBudgetByCategoryName = useFinanceStore((state) => state.deleteBudgetByCategoryName);
 
   const [busy, setBusy] = useState(false);
-  const [step, setStep] = useState(null); // null | 'name' | 'limit' | 'rename'
+  const [step, setStep] = useState(null); // name | emoji | limit | rename
   const [pendingCategoryName, setPendingCategoryName] = useState("");
+  const [pendingEmoji, setPendingEmoji] = useState(BUDGET_BILL_EMOJI_PRESETS[0]);
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [editingLimitName, setEditingLimitName] = useState(null);
 
@@ -43,6 +47,7 @@ export function BudgetsScreen({ navigation }) {
 
   const beginAddBudget = () => {
     setPendingCategoryName("");
+    setPendingEmoji(BUDGET_BILL_EMOJI_PRESETS[0]);
     setEditingLimitName(null);
     setStep("name");
   };
@@ -65,7 +70,7 @@ export function BudgetsScreen({ navigation }) {
       }
     }
     setPendingCategoryName(name);
-    setStep("limit");
+    setStep("emoji");
   };
 
   const handleLimitConfirm = async (value) => {
@@ -88,7 +93,9 @@ export function BudgetsScreen({ navigation }) {
           (c) => c.type === "EXPENSE" && c.name.toLowerCase() === name.toLowerCase(),
         );
         if (!category) {
-          category = await addCategory({ name, type: "EXPENSE" });
+          category = await addCategory({ name, type: "EXPENSE", icon: pendingEmoji });
+        } else if (pendingEmoji) {
+          category = await addCategory({ name: category.name, type: "EXPENSE", icon: pendingEmoji });
         }
         await addBudget({
           categoryName: category.name,
@@ -121,37 +128,62 @@ export function BudgetsScreen({ navigation }) {
   };
 
   const openBudgetActions = (budget) => {
+    // Android Alert shows at most 3 buttons — keep Cancel | Edit | Delete.
     const category = categories.find(
       (c) => c.type === "EXPENSE" && c.name === budget.name,
     );
     Alert.alert(budget.name, "Manage this budget.", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Edit limit",
+        text: "Edit",
         onPress: () => {
-          setEditingLimitName(budget.name);
-          setPendingCategoryName(budget.name);
-          setStep("limit");
+          Alert.alert(budget.name, "What do you want to change?", [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Edit limit",
+              onPress: () => {
+                setEditingLimitName(budget.name);
+                setPendingCategoryName(budget.name);
+                setStep("limit");
+              },
+            },
+            {
+              text: "Rename",
+              onPress: () => {
+                if (!category) {
+                  Alert.alert("Not found", "Category could not be resolved.");
+                  return;
+                }
+                setEditingCategoryId(category.id);
+                setStep("rename");
+              },
+            },
+          ]);
         },
       },
       {
-        text: "Rename category",
-        onPress: () => {
-          if (!category) {
-            Alert.alert("Not found", "Category could not be resolved.");
-            return;
-          }
-          setEditingCategoryId(category.id);
-          setStep("rename");
-        },
-      },
-      {
-        text: "Delete budget",
+        text: "Delete",
         style: "destructive",
         onPress: () => {
-          void deleteBudgetByCategoryName(budget.name, selectedMonthYear).catch((error) => {
-            Alert.alert("Delete failed", error instanceof Error ? error.message : "Could not delete.");
-          });
+          Alert.alert(
+            `Delete “${budget.name}”?`,
+            "Removes this month’s budget limit. Transactions stay in history.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Delete",
+                style: "destructive",
+                onPress: () => {
+                  void deleteBudgetByCategoryName(budget.name, selectedMonthYear).catch((error) => {
+                    Alert.alert(
+                      "Delete failed",
+                      error instanceof Error ? error.message : "Could not delete.",
+                    );
+                  });
+                },
+              },
+            ],
+          );
         },
       },
     ]);
@@ -189,7 +221,7 @@ export function BudgetsScreen({ navigation }) {
         <EmptyState
           actionLabel="＋ Add budget"
           emoji="📊"
-          message="Name a category (or type a new one) and set a monthly limit."
+          message="Name a category, pick an icon, and set a monthly limit. Long-press a card to edit or delete."
           onAction={beginAddBudget}
           title="No budgets this month"
         />
@@ -197,8 +229,10 @@ export function BudgetsScreen({ navigation }) {
         cards.map((budget) => (
           <Pressable
             key={budget.name}
-            accessibilityHint="Long press to edit, rename, or delete"
+            accessibilityHint="Long press to edit limit, rename category, or delete"
+            accessibilityLabel={budget.name}
             accessibilityRole="button"
+            delayLongPress={350}
             onLongPress={() => openBudgetActions(budget)}
           >
             <BudgetCard {...budget} currencySymbol={currencySymbol} />
@@ -207,9 +241,14 @@ export function BudgetsScreen({ navigation }) {
       )}
 
       {cards.length > 0 ? (
-        <DashedButton disabled={busy} onPress={beginAddBudget}>
-          {busy ? "Saving…" : "＋ Add budget"}
-        </DashedButton>
+        <>
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
+            Tip: press and hold a budget card for Edit or Delete.
+          </Text>
+          <DashedButton disabled={busy} onPress={beginAddBudget}>
+            {busy ? "Saving…" : "＋ Add budget"}
+          </DashedButton>
+        </>
       ) : null}
 
       <TextPromptModal
@@ -224,6 +263,32 @@ export function BudgetsScreen({ navigation }) {
         title="Budget category name"
         visible={step === "name"}
       />
+
+      {step === "emoji" ? (
+        <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.lg }}>
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+            Icon for “{pendingCategoryName}”
+          </Text>
+          <EmojiPickerRow onChange={setPendingEmoji} value={pendingEmoji} />
+          <DashedButton
+            onPress={() => setStep("limit")}
+          >
+            Next: set limit
+          </DashedButton>
+          <Pressable
+            onPress={() => {
+              setStep(null);
+              setPendingCategoryName("");
+            }}
+            style={{ minHeight: 44, justifyContent: "center" }}
+          >
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, textAlign: "center" }}>
+              Cancel
+            </Text>
+          </Pressable>
+        </SectionCard>
+      ) : null}
+
       <TextPromptModal
         confirmLabel="Save"
         initialValue={limitInitial}

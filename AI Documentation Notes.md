@@ -1812,21 +1812,30 @@ v0.1.0 student finance tracker; Tasks 1–18 complete in application code. QA au
 - **Entry**: recent category chips + amount/note templates
 
 # Module / File: src/domain/services/entityGuards.js
-## Function: canDeleteCategory / canArchiveAccount / canRenameCategory
+## Function: canDeleteCategory / canDeleteAccount / canArchiveAccount / canRenameCategory
 - **Purpose**: Pure guards for manage-screen CRUD (block delete-in-use; ≥1 active account; unique category names)
 - **Inputs**: ids + in-memory collections from financeStore
 - **Outputs**: `{ ok: true }` or `{ ok: false, reason }`
+- **Behavior**:
+  - `canDeleteAccount`: fail if no other non-archived account remains; fail if any transaction.accountId or recurringRule.accountId matches
+  - `canArchiveAccount` delegates to `canDeleteAccount`
 - **Side Effects**: none
 - **Verification Status**: __tests__/entityGuards.test.js
 
 # Module / File: financeStore entity CRUD (2026-08-09)
-## Function: renameCategory, deleteCategory, createAccount, archiveAccount, updateRecurringRule, renameGoal, updateGoal, deleteGoal
+## Function: renameCategory, deleteCategory, createAccount, deleteAccount, archiveAccount, updateRecurringRule, renameGoal, updateGoal, deleteGoal
 - **Purpose**: Full manage CRUD for budgets/categories/accounts/recurring/goals
 - **Behavior**:
-  - Budgets: custom category name on create (addCategory if needed) + limit; long-press edit/rename/delete; single Add CTA when empty
-  - Recurring: rename (note), edit amount/lead, delete; single Add when empty
-  - Accounts: create (name+type), rename, balance, archive (≥1 active)
+  - Budgets/Recurring/Goals: long-press only (delayLongPress 350) → Alert menu with edit options + Delete (second confirm); no always-visible Edit/Delete rows
+  - Accounts: create (name+type), rename, balance, hard delete via `deleteAccount` + `AccountRepository.delete` (blocked if last account or used by tx/rules); `archiveAccount` aliases `deleteAccount`
   - Categories: rename, delete if unused
-  - Goals: rename, edit target, contribute, delete; single Add when empty
 - **Security Notes**: FK RESTRICT preserved; delete blocked with user-facing reason
 - **Verification Status**: guards unit-tested; screens wired
+
+# Module / File: src/domain/services/emoji.js + EmojiPickerRow
+## Function: resolveDisplayEmoji / parseLocalDateToNoonEpoch / RECURRING_REMINDER_LEAD_DAYS
+- **Purpose**: Custom emoji for budgets (category.icon) and bills (recurring_rules.icon); fixed 14-day reminder lead
+- **Behavior**: Prefer emoji icon over name map; due date YYYY-MM-DD → local noon epoch; fire = due − 14d @ 09:00
+- **Schema**: v3 adds recurring_rules.icon
+- **UI**: Budgets create name→emoji→limit; Recurring name→emoji→amount→due; long-press delete on both
+- **Verification Status**: __tests__/emojiAndDueDate.test.js

@@ -2,17 +2,23 @@ import { useMemo, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { DashedButton } from "../components/Buttons";
+import { EmojiPickerRow } from "../components/EmojiPickerRow";
 import { EmptyState } from "../components/EmptyState";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
+import {
+  BUDGET_BILL_EMOJI_PRESETS,
+  RECURRING_REMINDER_LEAD_DAYS,
+  defaultDueDateISO,
+  formatLocalDateISO,
+  parseLocalDateToNoonEpoch,
+} from "../domain/services/emoji";
 import { buildRecurringBills, categoriesForType, nextReminderPreview } from "../domain/services/financeView";
 import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
-
-const DEFAULT_LEAD_DAYS = 7;
 
 export function RecurringScreen({ navigation }) {
   const theme = useTheme();
@@ -27,8 +33,11 @@ export function RecurringScreen({ navigation }) {
   const deleteRecurringById = useFinanceStore((state) => state.deleteRecurringById);
 
   const [busy, setBusy] = useState(false);
-  const [step, setStep] = useState(null); // name | amount | rename | editAmount | lead
+  const [step, setStep] = useState(null);
+  // name | emoji | amount | due | rename | editAmount | editDue
   const [draftName, setDraftName] = useState("");
+  const [draftEmoji, setDraftEmoji] = useState(BUDGET_BILL_EMOJI_PRESETS[7]);
+  const [draftAmount, setDraftAmount] = useState(0);
   const [activeBillId, setActiveBillId] = useState(null);
 
   const { categoriesById } = useMemo(
@@ -43,11 +52,13 @@ export function RecurringScreen({ navigation }) {
 
   const beginAdd = () => {
     setDraftName("");
+    setDraftEmoji(BUDGET_BILL_EMOJI_PRESETS[7]);
+    setDraftAmount(0);
     setActiveBillId(null);
     setStep("name");
   };
 
-  const handleAmountConfirm = async (value) => {
+  const finishCreate = async (dueIso) => {
     if (busy) return;
     const expenseCategories = categoriesForType(categories, "EXPENSE");
     const preferred =
@@ -58,19 +69,19 @@ export function RecurringScreen({ navigation }) {
     }
     setBusy(true);
     try {
-      const amountMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
-      if (amountMinor <= 0) {
-        throw new Error("Enter a positive bill amount.");
-      }
+      const dueEpochMillis = parseLocalDateToNoonEpoch(dueIso);
       const name = draftName.trim() || preferred.name;
       await addRecurringBill({
-        amountMinor,
+        amountMinor: draftAmount,
         categoryName: preferred.name,
-        leadDays: DEFAULT_LEAD_DAYS,
         name,
+        icon: draftEmoji,
+        dueEpochMillis,
+        leadDays: RECURRING_REMINDER_LEAD_DAYS,
       });
       setStep(null);
       setDraftName("");
+      setDraftAmount(0);
     } catch (error) {
       Alert.alert("Add bill failed", error instanceof Error ? error.message : "Could not add bill.");
     } finally {
@@ -113,57 +124,87 @@ export function RecurringScreen({ navigation }) {
     }
   };
 
-  const handleLead = async (value) => {
+  const handleEditDue = async (value) => {
     if (activeBillId === null || busy) return;
     setBusy(true);
     try {
-      const days = Math.floor(Number(value));
-      if (!Number.isFinite(days) || days < 0) {
-        throw new Error("Enter days as 0 or a positive whole number.");
-      }
-      await updateRecurringRule(activeBillId, { reminderLeadDays: days });
+      const dueEpochMillis = parseLocalDateToNoonEpoch(value);
+      await updateRecurringRule(activeBillId, {
+        nextRunEpochMillis: dueEpochMillis,
+        reminderLeadDays: RECURRING_REMINDER_LEAD_DAYS,
+        reminderEnabled: true,
+      });
       setStep(null);
       setActiveBillId(null);
     } catch (error) {
-      Alert.alert("Update failed", error instanceof Error ? error.message : "Could not update.");
+      Alert.alert("Update failed", error instanceof Error ? error.message : "Could not update due date.");
     } finally {
       setBusy(false);
     }
   };
 
   const openBillActions = (bill) => {
+    // Android Alert shows at most 3 buttons — keep Cancel | Edit | Delete.
     const id = Number(bill.id);
     Alert.alert(bill.name, "Manage this recurring bill.", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Rename",
+        text: "Edit",
         onPress: () => {
-          setActiveBillId(id);
-          setDraftName(bill.name);
-          setStep("rename");
-        },
-      },
-      {
-        text: "Edit amount",
-        onPress: () => {
-          setActiveBillId(id);
-          setStep("editAmount");
-        },
-      },
-      {
-        text: "Edit reminder days",
-        onPress: () => {
-          setActiveBillId(id);
-          setStep("lead");
+          Alert.alert(bill.name, "What do you want to change?", [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Rename",
+              onPress: () => {
+                setActiveBillId(id);
+                setDraftName(bill.name);
+                setStep("rename");
+              },
+            },
+            {
+              text: "More…",
+              onPress: () => {
+                Alert.alert(bill.name, "Edit details", [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Amount",
+                    onPress: () => {
+                      setActiveBillId(id);
+                      setStep("editAmount");
+                    },
+                  },
+                  {
+                    text: "Due date",
+                    onPress: () => {
+                      setActiveBillId(id);
+                      setStep("editDue");
+                    },
+                  },
+                ]);
+              },
+            },
+          ]);
         },
       },
       {
         text: "Delete",
         style: "destructive",
         onPress: () => {
-          void deleteRecurringById(id).catch((error) => {
-            Alert.alert("Delete failed", error instanceof Error ? error.message : "Could not delete.");
-          });
+          Alert.alert("Delete bill?", `Remove “${bill.name}”? This cannot be undone.`, [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: () => {
+                void deleteRecurringById(id).catch((error) => {
+                  Alert.alert(
+                    "Delete failed",
+                    error instanceof Error ? error.message : "Could not delete.",
+                  );
+                });
+              },
+            },
+          ]);
         },
       },
     ]);
@@ -198,7 +239,11 @@ export function RecurringScreen({ navigation }) {
           {notificationHint
             ?? "Notification permission denied. Upcoming bills still show in the app."}
         </Text>
-      ) : null}
+      ) : (
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+          Reminders fire {RECURRING_REMINDER_LEAD_DAYS} days before each bill’s due date.
+        </Text>
+      )}
 
       {reminder !== null && remindersEnabled ? (
         <View
@@ -236,7 +281,7 @@ export function RecurringScreen({ navigation }) {
         <EmptyState
           actionLabel="＋ Add recurring bill"
           emoji="🔔"
-          message="Name your bill (Internet, Rent…) and set the amount. Long-press later to edit."
+          message="Name, icon, amount, and due date. You’ll be reminded 14 days before. Long-press a card to edit or delete."
           onAction={beginAdd}
           title="No recurring bills yet"
         />
@@ -244,8 +289,10 @@ export function RecurringScreen({ navigation }) {
         bills.map((bill) => (
           <Pressable
             key={bill.id}
-            accessibilityHint="Long press to rename, edit, or delete"
+            accessibilityHint="Long press to rename, edit amount or due date, or delete"
+            accessibilityLabel={bill.name}
             accessibilityRole="button"
+            delayLongPress={350}
             onLongPress={() => openBillActions(bill)}
           >
             <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.md, minHeight: theme.sizes.billCard }}>
@@ -298,9 +345,14 @@ export function RecurringScreen({ navigation }) {
       )}
 
       {bills.length > 0 ? (
-        <DashedButton disabled={busy} onPress={beginAdd}>
-          {busy ? "Saving…" : "＋ Add recurring bill"}
-        </DashedButton>
+        <>
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
+            Tip: press and hold a bill card for Edit or Delete.
+          </Text>
+          <DashedButton disabled={busy} onPress={beginAdd}>
+            {busy ? "Saving…" : "＋ Add recurring bill"}
+          </DashedButton>
+        </>
       ) : null}
 
       <TextPromptModal
@@ -312,22 +364,57 @@ export function RecurringScreen({ navigation }) {
         }}
         onConfirm={(value) => {
           setDraftName(value.trim() || "Monthly bill");
-          setStep("amount");
+          setStep("emoji");
         }}
         placeholder="Internet"
         title="Bill name"
         visible={step === "name"}
       />
+
+      {step === "emoji" ? (
+        <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.lg }}>
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+            Icon for “{draftName}”
+          </Text>
+          <EmojiPickerRow onChange={setDraftEmoji} value={draftEmoji} />
+          <DashedButton onPress={() => setStep("amount")}>Next: amount</DashedButton>
+          <Pressable onPress={() => setStep(null)} style={{ minHeight: 44, justifyContent: "center" }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, textAlign: "center" }}>
+              Cancel
+            </Text>
+          </Pressable>
+        </SectionCard>
+      ) : null}
+
       <TextPromptModal
-        confirmLabel="Save bill"
+        confirmLabel="Next"
         initialValue="1000.00"
         keyboardType="decimal-pad"
         message={`Amount for ${draftName || "this bill"}`}
         onCancel={() => setStep(null)}
-        onConfirm={(value) => void handleAmountConfirm(value)}
+        onConfirm={(value) => {
+          try {
+            const amountMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
+            if (amountMinor <= 0) throw new Error("Enter a positive bill amount.");
+            setDraftAmount(amountMinor);
+            setStep("due");
+          } catch (error) {
+            Alert.alert("Invalid amount", error instanceof Error ? error.message : "Try again.");
+          }
+        }}
         placeholder="1000.00"
         title="Bill amount"
         visible={step === "amount"}
+      />
+      <TextPromptModal
+        confirmLabel="Save bill"
+        initialValue={defaultDueDateISO(RECURRING_REMINDER_LEAD_DAYS)}
+        message={`Due date (YYYY-MM-DD). Reminder fires ${RECURRING_REMINDER_LEAD_DAYS} days before.`}
+        onCancel={() => setStep(null)}
+        onConfirm={(value) => void finishCreate(value)}
+        placeholder="2026-09-01"
+        title="Due date"
+        visible={step === "due"}
       />
       <TextPromptModal
         confirmLabel="Rename"
@@ -356,17 +443,20 @@ export function RecurringScreen({ navigation }) {
       />
       <TextPromptModal
         confirmLabel="Save"
-        initialValue={String(activeRule?.reminderLeadDays ?? DEFAULT_LEAD_DAYS)}
-        keyboardType="number-pad"
-        message="Days before due date to remind you."
+        initialValue={
+          activeRule
+            ? formatLocalDateISO(activeRule.nextRunEpochMillis)
+            : defaultDueDateISO(RECURRING_REMINDER_LEAD_DAYS)
+        }
+        message={`Due date (YYYY-MM-DD). Reminder stays ${RECURRING_REMINDER_LEAD_DAYS} days before.`}
         onCancel={() => {
           setStep(null);
           setActiveBillId(null);
         }}
-        onConfirm={(value) => void handleLead(value)}
-        placeholder="7"
-        title="Reminder lead days"
-        visible={step === "lead"}
+        onConfirm={(value) => void handleEditDue(value)}
+        placeholder="2026-09-01"
+        title="Edit due date"
+        visible={step === "editDue"}
       />
     </ScreenContainer>
   );

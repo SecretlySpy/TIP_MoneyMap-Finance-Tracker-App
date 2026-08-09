@@ -1,6 +1,6 @@
 import { seedInitialData } from "./seed";
 import { DataIntegrityError, readInteger } from "./validation";
-export const LATEST_SCHEMA_VERSION = 2;
+export const LATEST_SCHEMA_VERSION = 3;
 const CREATE_SCHEMA_STATEMENTS = [
     `CREATE TABLE accounts (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,11 +31,12 @@ const CREATE_SCHEMA_STATEMENTS = [
      frequency TEXT NOT NULL CHECK (frequency IN ('DAILY', 'WEEKLY', 'MONTHLY')),
      next_run_epoch_millis INTEGER NOT NULL,
      is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
-     reminder_enabled INTEGER NOT NULL DEFAULT 0 CHECK (reminder_enabled IN (0, 1)),
-     reminder_lead_days INTEGER NOT NULL DEFAULT 3 CHECK (reminder_lead_days >= 0),
-     FOREIGN KEY (category_id, type) REFERENCES categories (id, type) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     FOREIGN KEY (account_id) REFERENCES accounts (id) ON UPDATE RESTRICT ON DELETE RESTRICT
-   ) STRICT`,
+      reminder_enabled INTEGER NOT NULL DEFAULT 0 CHECK (reminder_enabled IN (0, 1)),
+      reminder_lead_days INTEGER NOT NULL DEFAULT 3 CHECK (reminder_lead_days >= 0),
+      icon TEXT,
+      FOREIGN KEY (category_id, type) REFERENCES categories (id, type) ON UPDATE RESTRICT ON DELETE RESTRICT,
+      FOREIGN KEY (account_id) REFERENCES accounts (id) ON UPDATE RESTRICT ON DELETE RESTRICT
+    ) STRICT`,
     `CREATE TABLE transactions (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
@@ -100,6 +101,18 @@ const MIGRATIONS = [
         async apply(database) {
             for (const statement of CREATE_GOALS_STATEMENTS) {
                 await database.execute(statement);
+            }
+        },
+    },
+    {
+        version: 3,
+        name: "add recurring_rules.icon for custom bill emoji",
+        async apply(database) {
+            // Fresh v1 CREATE already includes icon; ALTER only when upgrading older DBs.
+            const cols = await database.execute("PRAGMA table_info(recurring_rules)");
+            const hasIcon = (cols.rows ?? []).some((row) => row.name === "icon");
+            if (!hasIcon) {
+                await database.execute("ALTER TABLE recurring_rules ADD COLUMN icon TEXT");
             }
         },
     },
