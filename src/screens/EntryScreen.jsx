@@ -5,7 +5,8 @@ import { Chip } from "../components/Chip";
 import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { TextPromptModal } from "../components/TextPromptModal";
-import { accountChipLabel, categoriesForType, categoryEmoji, toMonthYear, } from "../domain/services/financeView";
+import { accountChipLabel, categoriesForType, toMonthYear, } from "../domain/services/financeView";
+import { resolveDisplayEmoji } from "../domain/services/emoji";
 import { formatMinor, parseDecimalToMinor, updateMoneyInput } from "../domain/services/money";
 import { listAccountChips, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -62,13 +63,17 @@ export function EntryScreen({ navigation }) {
                 { label: "Part-time", amount: "500", note: "Shift pay", category: "Part-time" },
             ];
         }
+        // Labels follow the chosen currency symbol instead of a hardcoded peso sign.
         return [
-            { label: "Lunch ₱80", amount: "80", note: "Lunch", category: "Food" },
-            { label: "Jeep ₱15", amount: "15", note: "Commute", category: "Transport" },
-            { label: "Load ₱50", amount: "50", note: "Mobile load", category: "Bills" },
-            { label: "Coffee ₱120", amount: "120", note: "Coffee", category: "Food" },
-        ];
-    }, [transactionType]);
+            { name: "Lunch", amount: "80", note: "Lunch", category: "Food" },
+            { name: "Jeep", amount: "15", note: "Commute", category: "Transport" },
+            { name: "Load", amount: "50", note: "Mobile load", category: "Bills" },
+            { name: "Coffee", amount: "120", note: "Coffee", category: "Food" },
+        ].map((template) => ({
+            ...template,
+            label: `${template.name} ${currencySymbol}${template.amount}`,
+        }));
+    }, [transactionType, currencySymbol]);
     const applyTemplate = (template) => {
         setAmountInput(template.amount);
         if (template.note) setNote(template.note);
@@ -77,16 +82,24 @@ export function EntryScreen({ navigation }) {
         }
     };
     const categoryCells = useMemo(() => {
-        const cells = typeCategories.slice(0, 7).map((category) => ({
-            emoji: categoryEmoji(category.name),
+        // A12: no longer capped at 7 -- every category stays reachable, the grid just grows.
+        const cells = typeCategories.map((category) => ({
+            emoji: resolveDisplayEmoji({ icon: category.icon, name: category.name }),
             label: category.name,
         }));
         cells.push({ emoji: "+", label: "New" });
-        while (cells.length > 0 && cells.length % 4 !== 0) {
+        while (cells.length % 4 !== 0) {
             cells.push({ emoji: "", label: "" });
         }
-        return cells.slice(0, 8);
+        return cells;
     }, [typeCategories]);
+    const categoryRows = useMemo(() => {
+        const rows = [];
+        for (let index = 0; index < categoryCells.length; index += 4) {
+            rows.push(categoryCells.slice(index, index + 4));
+        }
+        return rows;
+    }, [categoryCells]);
     useEffect(() => {
         const first = typeCategories[0];
         if (first === undefined) {
@@ -224,7 +237,7 @@ export function EntryScreen({ navigation }) {
         <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
           Category
         </Text>
-        {[categoryCells.slice(0, 4), categoryCells.slice(4, 8)].map((row, rowIndex) => (<View key={`category-row-${rowIndex}`} style={{ flexDirection: "row", gap: theme.spacing.md }}>
+        {categoryRows.map((row, rowIndex) => (<View key={`category-row-${rowIndex}`} style={{ flexDirection: "row", gap: theme.spacing.md }}>
             {row.map((category, cellIndex) => {
                 if (category.label === "") {
                     return <View key={`empty-${rowIndex}-${cellIndex}`} style={{ flex: 1 }}/>;

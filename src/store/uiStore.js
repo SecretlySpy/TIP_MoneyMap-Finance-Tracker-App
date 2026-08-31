@@ -1,6 +1,6 @@
 import { AppState } from "react-native";
 import { create } from "zustand";
-import { clearPin, hasStoredPin, setPin, tryLocalAuthentication, verifyPin, } from "../services/appLock";
+import { clearPin, getPinLockoutStatus, hasStoredPin, setPin, tryLocalAuthentication, verifyPinWithLockout, } from "../services/appLock";
 import { getReminderPermissionStatus, syncBillReminderNotifications, } from "../services/notificationScheduler";
 import { DEFAULT_PREFERENCES, loadPreferences, savePreferences, } from "../services/preferences";
 let preferencesPromise = null;
@@ -164,12 +164,13 @@ export const useUiStore = create((set, get) => ({
         await persist(get());
     },
     unlockWithPin: async (pin) => {
-        const ok = await verifyPin(pin);
-        if (ok) {
+        const result = await verifyPinWithLockout(pin);
+        if (result.ok) {
             set({ isLocked: false });
         }
-        return ok;
+        return result;
     },
+    readPinLockout: async () => getPinLockoutStatus(),
     unlockWithBiometrics: async () => {
         const result = await tryLocalAuthentication();
         if (result === "success") {

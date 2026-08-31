@@ -1839,3 +1839,303 @@ v0.1.0 student finance tracker; Tasks 1–18 complete in application code. QA au
 - **Schema**: v3 adds recurring_rules.icon
 - **UI**: Budgets create name→emoji→limit; Recurring name→emoji→amount→due; long-press delete on both
 - **Verification Status**: __tests__/emojiAndDueDate.test.js
+
+
+# QA Audit — 2026-08-31
+
+## Purpose
+Full-project quality audit of MoneyMap v0.1.0, benchmarked against standard expense-tracker
+behaviour, with remediation. Covers `src/` (~10.7k lines), the test suite, dependency health,
+and Android release configuration. Written for a reader with no prior conversation context.
+
+## BLUF
+The suite was green and the README said "Done", but that signal was hollow: coverage is
+confined to pure functions, and the defects clustered exactly where there are no tests — the
+Zustand store, the screens, and the backup round trip. **Restoring a backup permanently
+destroyed every savings goal**, the Dashboard donut **misreported category spend whenever a
+category named "Other" was in the top three** (it is a seeded default), and **every new user
+was greeted with a red "Over committed"**. All three are fixed and pinned by tests. Two
+items remain open and need a decision: a known-vulnerable `xlsx` parser handling untrusted
+files, and six Tier-C feature gaps (most importantly, transactions cannot be backdated).
+
+---
+
+## Verification
+
+- **Executed**
+  - `npx jest --runInBand` — baseline, then after each tier, then final.
+  - **Baseline**: 20 suites passed, **3 suites could not run at all**, 98 tests.
+  - **After dependency repair**: 23/23 suites, 117 tests.
+  - **Final**: **25/25 suites, 141 tests, 0 failures.**
+  - `npm install` (from the existing lockfile; `package.json` and `package-lock.json` verified
+    byte-identical afterwards via `git status --porcelain`).
+  - `npm audit` — 23 advisories (10 high, 13 moderate).
+  - Parse-check of every edited file through the project's own Babel + `babel-preset-expo`.
+  - **Regression proof**: the new `__tests__/qaRegressions.test.js` was run against the
+    pre-audit `src/` (via `git stash`) — **13 of its 20 assertions fail** there and all 20 pass
+    after the fixes. The 7 that pass in both directions are deliberate "still behaves
+    correctly" guards against over-correction.
+
+- **Observed**
+  - `spendingByCategory` with spend `{Food 5000, Transport 3000, Other 2000, Health 1000, Fun 500}`
+    (true total 11,500) returned segments summing to **13,500**, with the "Other" slice at
+    **5,500** instead of 3,500.
+  - `computeSafeToSpend` with entirely empty inputs returned `state: "over"`, `safeMinor: 0`.
+  - `buildBackup` output contained no `goals` key while `restoreBackup` ran `DELETE FROM savings_goals`.
+
+- **Reasoned only (not executed)** — the app requires an Android dev build; Expo Go is
+  unsupported because of SQLCipher (`src/db/client.js` refuses to start unless `isSQLCipher()`),
+  so no screen could be driven here. The following are code-read findings and their fixes are
+  unverified at runtime: every screen interaction, navigation, `FLAG_SECURE`, notification
+  scheduling, biometric prompts, SQLCipher migration v3→v4, document picker, and share sheets.
+
+- **Not verified**
+  - Migration v4 against a real pre-existing encrypted database on device.
+  - The `FLAG_SECURE` plugin against a real `prebuild` (its string injection is unit-tested; the
+    Gradle/prebuild integration is not).
+  - Whether `Share.share({ url })` renders acceptably across Android share targets.
+
+- **Residual risk**
+  - `xlsx@0.18.5` remains vulnerable and reachable (see 🔴-2). Unfixed by design decision needed.
+  - Tier-C gaps are unaddressed by choice; the largest is the inability to backdate a transaction.
+  - No automated coverage exists for screens or the store; the new tests raise the floor but the
+    structural gap remains (see "Test coverage gap").
+
+---
+
+## Findings
+
+Severity per AGENTS.md §5. "Fixed" means the code changed **and** a test pins it, unless noted.
+
+### 🔴 Critical
+
+**🔴-1 · Restoring a backup permanently destroyed every savings goal — FIXED**
+- **Where**: `buildBackup` in `src/services/dataTransfer.js`; `restoreBackup` in `src/store/financeStore.js`.
+- **Mechanism**: `restoreBackup` wipes the database inside one transaction, including
+  `DELETE FROM savings_goals`, then re-inserts accounts, categories, recurring rules,
+  transactions and budgets. `buildBackup` never serialized goals, so there was nothing to
+  re-insert. Silent and irreversible, on a feature labelled "Backup data".
+- **Repro**: create a savings goal → Settings → Backup data → Restore from backup → goal is gone.
+- **Fix**: `buildBackup` emits `goals`; `parseBackup` reads them as **optional** so pre-existing
+  v1 backups still parse (no version bump, no reader breakage); `restoreBackup` re-inserts them;
+  `SettingsScreen` passes `goals` into `buildBackup`.
+- **Pinned by**: `qaRegressions.test.js` → "savings goals survive a backup/restore round trip" (4 assertions).
+
+**🔴-2 · Known-vulnerable spreadsheet parser handling untrusted files — OPEN, needs your decision**
+- **Where**: `xlsx@0.18.5`, imported by `src/domain/services/importParser.js`.
+- **Advisories**: GHSA-4r6h-8v6p-xvw6 Prototype Pollution (CVSS **7.8**, fixed in ≥0.19.3) and
+  GHSA-5pgg-2g8v-p4x9 ReDoS (CVSS **7.5**, fixed in ≥0.20.2).
+- **Why it matters here**: this is not a transitive build-time dependency. It parses
+  **user-supplied `.xlsx` files** chosen through the document picker — precisely the input these
+  advisories describe.
+- **Why it is still open**: `npm audit fix` cannot resolve it. SheetJS stopped publishing to npm
+  after 0.18.5; the vendor's supported channel is their own CDN. The remedy changes the install
+  source, so it is your call rather than a silent edit:
+  ```
+  npm uninstall xlsx
+  npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
+  ```
+  `importParser.js` needs no code change — the API is compatible. Re-run `npm test` afterwards.
+- **Interim mitigation**: none applied. Excel import is opt-in and local, which limits but does
+  not remove exposure.
+
+### 🟠 Major
+
+**🟠-1 · Dashboard donut misreported category spend — FIXED**
+- **Where**: `spendingByCategory`, `src/domain/services/financeView.js`.
+- **Mechanism**: after taking the top 3 categories, the code appended an extra `["Other", …]` row
+  whose value already included any existing "Other" entry, then summed all rows into a Map — so a
+  category literally named "Other" was counted twice. **"Other" is one of the seeded defaults**
+  (`ENTRY_CATEGORY_SEED`), so any month with 4+ spending categories was affected.
+- **Measured**: segments summed to 13,500 against a true 11,500; the "Other" slice read 5,500
+  instead of 3,500. The percentages then summed to 117, and the existing normalisation step
+  quietly subtracted the 17-point excess **from the largest slice** — so Food displayed 26% when
+  its true share was 43%. The normalisation masked the symptom while corrupting a second slice.
+- **Blast radius**: the Dashboard donut, and `buildAnonymizedSmartTipsPayload.categorySpendRatios`
+  — i.e. wrong ratios were being sent to Gemini for users who enabled Smart Tips.
+- **Fix**: build the Map from the top rows once, then fold the tail into "Other" with a single
+  additive `set`.
+- **Pinned by**: `qaRegressions.test.js` → "does not double-count a category named Other" (4 assertions).
+
+**🟠-2 · Every new user was told they were "Over committed" — FIXED**
+- **Where**: `computeSafeToSpend`, `src/domain/services/safeToSpend.js`; `SafeToSpendCard.jsx`.
+- **Mechanism**: with no budgets, `limitMinor` is 0 → `remainingBudgetsMinor` 0 → `safeMinor` 0,
+  and the branch `if (safeMinor <= 0) state = "over"` fired. The card clamps its display with
+  `Math.max(0, safeMinor)`, so the first-run dashboard read **"SAFE TO SPEND ₱0 · Over committed"**
+  in red. An unconfigured state was rendered as a failure state.
+- **Fix**: new `"unset"` state when there are no budgets, no bills and no goal reserves. The card
+  shows "—" with "Add a monthly budget and this shows what is left to spend."
+- **Pinned by**: `qaRegressions.test.js` → 3 assertions, including guards that real overspend still reports `over`.
+
+**🟠-3 · Six declared dependencies were absent from `node_modules` — FIXED**
+- **Missing**: `expo-background-task`, `expo-file-system`, `expo-local-authentication`,
+  `expo-notifications`, `expo-task-manager`, `xlsx`.
+- **Impact**: 3 test suites (`appLock`, `theme`, `importParser`) **could not run at all** — the
+  "green suite" was green because the failures were invisible as suite-level load errors. These
+  packages back app lock/biometrics, bill reminders, background catch-up, file import/export and
+  Excel parsing, so the app could not have built either.
+- **Fix**: `npm install` restored all six from the existing lockfile at their pinned versions.
+  `package.json` and `package-lock.json` were verified unchanged.
+- **Note**: `README.md` claims "npm test (91 tests)". Actual baseline was 98 passing with 3
+  suites unrunnable. README corrected.
+
+**🟠-4 · Export and backup could fail on real datasets — FIXED**
+- **Where**: `shareText` in `src/services/dataTransfer.js`, used by both Settings actions.
+- **Mechanism**: the entire CSV/JSON payload was passed as `Share.share({ message })`, an Intent
+  extra. Android's binder transaction limit (~1 MB, less in practice) truncates or throws once a
+  user has a few thousand rows — and `expo-file-system` was already a dependency, unused for export.
+- **Fix**: new `shareDocument()` writes a timestamped file to the cache directory and shares its
+  URI, falling back to the old inline-text path if the filesystem module is unavailable. New
+  `exportFileName()` produces e.g. `moneymap-transactions-2026-08-31.csv`.
+- **Unverified**: the share sheet itself needs a device.
+
+**🟠-5 · Destructive restore had no confirmation — FIXED**
+- **Where**: `PasteImportScreen.jsx`.
+- **Mechanism**: tapping "Restore backup" deleted every transaction, budget, bill, category,
+  account and goal immediately. The only warning was a line of helper text.
+- **Fix**: a destructive `Alert` that names what will be deleted and what will be restored
+  (with row counts) before anything is touched.
+
+**🟠-6 · The PIN gate accepted unlimited guesses — FIXED**
+- **Where**: `src/services/appLock.js`, `src/screens/AppLockScreen.jsx`.
+- **Mechanism**: a 4-digit PIN is a 10,000-value keyspace with no attempt limit, no cooldown and
+  no lockout. Anyone holding an unlocked phone could exhaust it.
+- **Fix**: a persisted, escalating lockout — 5 free attempts, then 30s / 60s / 5m / 15m / 1h,
+  stored in SecureStore so a restart cannot reset it, cleared on success and on PIN change. The
+  keypad refuses input during a cooldown and shows a live countdown.
+- **Pinned by**: `qaRegressions.test.js` → 3 assertions on the pure `pinLockoutSeconds` ladder.
+- **Related, NOT fixed (by design)**: the PIN is hashed with a single round of salted SHA-256.
+  A slow KDF would be materially better, but `expo-crypto` exposes only digests. The hash lives
+  in Android Keystore-backed storage, so extraction requires root. Recorded as accepted risk.
+- **Related, NOT fixed**: there is no "forgot PIN" recovery. A user who forgets it loses access
+  to the app entirely. This needs a product decision, not a patch.
+
+**🟠-7 · No screenshot or recents protection — FIXED (unverified on device)**
+- **Mechanism**: `app.json` set no `FLAG_SECURE`, so balances were rendered into the Android
+  recents thumbnail and were freely screenshottable/recordable — the standard posture for a
+  finance app is to block this.
+- **Fix**: new config plugin `plugins/withAndroidSecureScreen.js` injecting `FLAG_SECURE` into
+  `MainActivity.onCreate` before `super.onCreate`, following the two existing plugins' style.
+  Idempotent across repeated prebuilds, fails loudly if `onCreate` cannot be located, and carries
+  a `SECURE_SCREEN_ENABLED` switch because it also blocks the user's own screenshots.
+- **Pinned by**: `__tests__/androidSecureScreenPlugin.test.js` (4 assertions, Kotlin + Java + idempotency + failure).
+
+### 🟡 Minor — all FIXED
+
+| # | Finding | Resolution |
+|---|---|---|
+| 🟡-1 | CSV paste import reported **"Imported [object Object] transactions."** — the store returns a summary object with a `valueOf` shim, but a template literal uses the string hint, so `toString()` won | Read `summary.created` explicitly |
+| 🟡-2 | History's month chip only stepped **backwards**, stranding the user in a past month | Replaced with the shared `MonthChip` (tap back, long-press forward, with a11y hint) |
+| 🟡-3 | Monthly bills **drifted**: a bill due the 31st clamped to Feb 28 and then advanced from 28 forever | Added `anchor_day` (schema **v4**, nullable, additive) + anchor-aware `advanceNextRunEpochMillis`; persisted after each catch-up. The pre-existing test actually **asserted the buggy behaviour** — corrected, with the un-anchored 2-arg call kept backwards compatible |
+| 🟡-4 | Category emoji were **inconsistent**: Budgets used the stored `icon`, Entry and Manage Categories used a name-only lookup, so a custom icon appeared in one place only | All three now use the existing `resolveDisplayEmoji({ icon, name })` |
+| 🟡-5 | The Entry category grid was hard-capped at **7 categories** + "New"; an 8th was unreachable | Grid grows in rows of 4 |
+| 🟡-6 | Archived accounts' **transactions still counted** toward Total Balance while their opening balance did not, so archiving skewed the headline number | `computeDashboardTotals` now excludes both, consistently |
+| 🟡-7 | Filter chips (30px) and account chips (33px) fell short of the 44dp touch-target guideline | Added `hitSlop` to `Chip` and `Toggle` — visual grid preserved, target enlarged |
+| 🟡-8 | Every text prompt was **unbounded**; a pasted wall of text would break list rows | `TextPromptModal` takes `maxLength` (default 60) |
+| 🟡-9 | Quick-entry templates hardcoded **₱** regardless of the chosen currency | Labels built from the active `currencySymbol` |
+| 🟡-10 | `parseDecimalToMinor("")` silently returned **0**, letting blank input through as a valid amount | Now throws `RangeError` |
+
+### 🟢 Nit / documented, not changed
+
+- **`databaseKey.js` uses a placeholder keychain service** `com.example.financetracker.database-key`
+  while the package is `com.moneymap.financetracker`. **Deliberately left alone** — `keychainService`
+  forms part of the SecureStore entry's identity, and that entry holds the only key that can
+  decrypt `moneymap.sqlite`. Renaming it without a read-old/write-new migration would destroy
+  every existing user's data. A prominent DO-NOT-RENAME comment was added at the declaration.
+- EAS `projectId` is still all-zeros (already tracked in `README.md`).
+
+---
+
+## Tier B — capability the schema paid for but the UI never exposed (all FIXED)
+
+These were not feature requests: the data model, repositories and pure helpers already supported
+them, and the code paths were unreachable.
+
+- **Recurring rules** hardcoded `frequency: "MONTHLY"`, `type: "EXPENSE"`, the "Bills" category,
+  the CASH account, and a fixed 14-day reminder lead — despite the schema allowing
+  DAILY/WEEKLY/MONTHLY, INCOME rules, any category/account, and a per-rule lead. The create sheet
+  now offers frequency, category and reminder lead; the actions menu gained **Pause/Resume**
+  (`is_active`, previously unreachable); cards show the real frequency, a "Paused" badge, and the
+  actual reminder setting. Paused rules are still listed so they can be resumed, and are excluded
+  from due-reminder computation and the preview banner.
+- **Goal deadlines** could never be set, so `deadline_epoch_millis`, the `isOverdue` flag and the
+  deadline sort branch in `goals.js` were all dead. Added a deadline editor (blank clears it).
+- **`archiveAccount` was an alias for a hard delete**, and `canDeleteAccount` blocks any account
+  with history — so `is_archived` was unreachable and an old account could never be hidden.
+  Archive now means archive, with an ARCHIVED section and Restore.
+- **Dead code put to work**: `applyGoalContribution` now drives goal-completion feedback
+  ("Goal reached 🎉", including overflow); `archiveGoal` is offered for completed goals.
+- **Negative opening balances** were rejected by `parseDecimalToMinor`, so a credit card carrying
+  debt could not be represented even though the column permits it. Added an opt-in
+  `{ allowNegative: true }` used only by the account-balance field.
+
+---
+
+## Tier C — standard features still absent (REPORTED, NOT BUILT)
+
+Benchmarked against
+[NerdWallet](https://www.nerdwallet.com/finance/learn/best-expense-tracker-apps),
+[RipenApps' 15 must-haves](https://ripenapps.com/blog/expense-tracking-app-features/),
+and [date-picker UX guidance](https://cieden.com/book/atoms/date-picker/date-picker-ui).
+These are feature builds and product decisions, not defect repair.
+
+| Gap | Evidence | Severity |
+|---|---|---|
+| **Cannot backdate a transaction** — `addTransaction` hardcodes `Date.now()`; Entry shows a static "Today" label with no date picker | `financeStore.js` `addTransaction` | 🟠 — the largest deviation from standard behaviour; cash spend is routinely logged late |
+| **Cannot edit a transaction** — `TransactionRepository.update` is fully implemented and unreachable; History offers only long-press delete | `transactionRepository.js` | 🟠 — every benchmarked app supports it |
+| **No transaction search** — the 🔍 button is labelled "Clear history filters"; the category filter cycles one tap per category (10+ taps to reach the last) | `HistoryScreen.jsx` | 🟠 |
+| **Custom accounts are decorative** — Entry chips come from the fixed 3-type `DEFAULT_ACCOUNTS`, and `findAccount` resolves by *type*, so a second EWALLET account never receives a transaction | `financeStore.js` `findAccount`, `listAccountChips` | 🟠 |
+| **Goal contributions never touch the ledger** yet Safe-to-Spend reserves against them | `contributeToGoal` | 🟡 |
+| No account transfers · no budget rollover/copy-last-month · no import de-duplication · no "delete all data" reset · no forgot-PIN recovery | — | 🟡 |
+
+---
+
+## Test coverage gap
+
+`jest.config.js` `collectCoverageFrom` includes only `src/db/**`, `src/domain/**` and
+`src/services/**`. It **excludes `src/screens`, `src/store`, `src/components` and
+`src/navigation` entirely** — and `__tests__/uiComponents.test.jsx` is 32 lines. Every 🔴 and
+most 🟠 findings above lived in those excluded directories. A green suite was never evidence
+about them.
+
+Recommended next step: integration tests for `financeStore` against the existing
+`better-sqlite3` harness in `__tests__/support/testDatabase.js` — particularly `restoreBackup`,
+`importCsvRows` and the recurring catch-up, which are the highest-risk untested paths.
+
+---
+
+## Manual device checklist (requires `npm run android` with a dev client)
+
+Nothing below could be executed here.
+
+1. **Migration**: install over a v3 database → confirm it opens and `PRAGMA user_version` is 4.
+2. **Backup round trip**: create 2 goals → Backup data → Restore → both goals return.
+3. **Restore guard**: tap Restore → confirm the dialog lists row counts → Cancel → data intact.
+4. **Donut**: log spend in 5 categories including "Other" → slices sum to the month total.
+5. **First run**: fresh install → Safe-to-Spend shows "—", not a red "Over committed".
+6. **PIN lockout**: 6 wrong PINs → 30s cooldown with countdown → force-quit → cooldown persists.
+7. **FLAG_SECURE**: attempt a screenshot and check the recents thumbnail — both should be blocked.
+8. **Export**: with 1,000+ transactions, export CSV → a file is shared, not truncated text.
+9. **Recurring**: create a weekly rule and a bill due the 31st → pause/resume → confirm March lands on the 31st.
+10. **Entry grid**: add an 8th expense category → confirm it is selectable.
+
+---
+
+## Files changed
+
+- **Domain/services**: `financeView.js`, `safeToSpend.js`, `recurringCatchUp.js` (domain + service),
+  `money.js`, `dataTransfer.js`, `appLock.js`, `reminders.js`
+- **Data**: `db/schema.js` (**migration v4**), `db/repositories/recurringRepository.js`, `db/databaseKey.js` (comment only)
+- **Store**: `store/financeStore.js`, `store/uiStore.js`
+- **Screens**: `PasteImportScreen`, `SettingsScreen`, `HistoryScreen`, `EntryScreen`,
+  `ManageCategoriesScreen`, `ManageAccountsScreen`, `GoalsScreen`, `RecurringScreen`, `AppLockScreen`
+- **Components**: `SafeToSpendCard`, `Chip`, `Toggle`, `TextPromptModal`
+- **Config**: `app.json`, new `plugins/withAndroidSecureScreen.js`
+- **Tests**: new `__tests__/qaRegressions.test.js` (20), new `__tests__/androidSecureScreenPlugin.test.js` (4),
+  updated `schema.test.js` and `recurringCatchUp.test.js`
+
+## Open decisions for the maintainer
+1. **`xlsx` migration to the SheetJS CDN** (🔴-2) — command above; needs network + a test run.
+2. **Tier C scope** — backdating and transaction editing are the two that most affect daily use.
+3. **Forgot-PIN recovery** — currently there is none; losing the PIN loses the app.
+4. **`FLAG_SECURE`** — confirm you want user screenshots blocked; flip `SECURE_SCREEN_ENABLED` if not.

@@ -4,7 +4,7 @@ import { useTheme } from "../theme/tokens";
 import { AppText as Text } from "./AppText";
 import { PrimaryButton } from "./Buttons";
 // Android-friendly text prompt used where Alert.prompt is unavailable.
-export function TextPromptModal({ cancelLabel = "Cancel", confirmLabel = "Save", initialValue = "", keyboardType = "default", message, onCancel, onConfirm, placeholder, title, visible, }) {
+export function TextPromptModal({ cancelLabel = "Cancel", confirmLabel = "Save", initialValue = "", keyboardType = "default", maxLength = 60, message, onCancel, onConfirm, placeholder, title, visible, }) {
     const theme = useTheme();
     const [value, setValue] = useState(initialValue);
     useEffect(() => {
@@ -34,7 +34,7 @@ export function TextPromptModal({ cancelLabel = "Cancel", confirmLabel = "Save",
           {message !== undefined ? (<Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body }}>
               {message}
             </Text>) : null}
-          <TextInput autoFocus keyboardType={keyboardType} onChangeText={setValue} placeholder={placeholder} placeholderTextColor={theme.colors.sub} style={{
+          <TextInput autoFocus keyboardType={keyboardType} maxLength={maxLength} onChangeText={setValue} placeholder={placeholder} placeholderTextColor={theme.colors.sub} style={{
             borderColor: theme.colors.outline,
             borderRadius: theme.radii.row,
             borderWidth: theme.spacing.hairline,

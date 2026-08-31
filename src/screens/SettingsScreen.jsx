@@ -4,7 +4,7 @@ import { OptionChipRow } from "../components/OptionChipRow";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { Toggle } from "../components/Toggle";
-import { buildBackup, buildTransactionsCsv, serializeBackup, shareText, } from "../services/dataTransfer";
+import { buildBackup, buildTransactionsCsv, exportFileName, serializeBackup, shareDocument, } from "../services/dataTransfer";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -78,6 +78,7 @@ export function SettingsScreen({ navigation }) {
     const transactions = useFinanceStore((state) => state.transactions);
     const budgets = useFinanceStore((state) => state.budgets);
     const recurringRules = useFinanceStore((state) => state.recurringRules);
+    const goals = useFinanceStore((state) => state.goals);
     const tabNavigation = navigation.getParent();
     const rootNavigation = tabNavigation?.getParent();
     const trailingText = (value) => (<Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
@@ -104,7 +105,11 @@ export function SettingsScreen({ navigation }) {
         try {
             const { accountsById, categoriesById } = mapsFromState({ accounts, categories });
             const csv = buildTransactionsCsv(transactions, categoriesById, accountsById);
-            await shareText("MoneyMap CSV export", csv);
+            await shareDocument(
+                "MoneyMap CSV export",
+                exportFileName("moneymap-transactions", "csv"),
+                csv,
+            );
         }
         catch (error) {
             Alert.alert("Export failed", error instanceof Error ? error.message : "Could not share CSV.");
@@ -112,8 +117,12 @@ export function SettingsScreen({ navigation }) {
     };
     const handleBackup = async () => {
         try {
-            const backup = buildBackup({ accounts, categories, transactions, budgets, recurringRules });
-            await shareText("MoneyMap backup", serializeBackup(backup));
+            const backup = buildBackup({ accounts, categories, transactions, budgets, recurringRules, goals });
+            await shareDocument(
+                "MoneyMap backup",
+                exportFileName("moneymap-backup", "json"),
+                serializeBackup(backup),
+            );
         }
         catch (error) {
             Alert.alert("Backup failed", error instanceof Error ? error.message : "Could not share backup.");

@@ -18,6 +18,20 @@ export function PasteImportScreen({ navigation, route }) {
     const helper = mode === "backup"
         ? "Paste a MoneyMap JSON backup below. This replaces local finance data."
         : "Paste CSV rows with header: date,type,amount,category,account,note";
+    const runRestore = async (backup) => {
+        setBusy(true);
+        try {
+            await restoreBackup(backup);
+            Alert.alert("Restore complete", "Your backup was applied on this device.");
+            navigation.goBack();
+        }
+        catch (error) {
+            Alert.alert("Restore failed", error instanceof Error ? error.message : "Unknown error");
+        }
+        finally {
+            setBusy(false);
+        }
+    };
     const handleImport = async () => {
         if (text.trim().length === 0) {
             Alert.alert("Nothing to import", "Paste data first.");
@@ -27,14 +41,34 @@ export function PasteImportScreen({ navigation, route }) {
         try {
             if (mode === "backup") {
                 const backup = parseBackup(text);
-                await restoreBackup(backup);
-                Alert.alert("Restore complete", "Your backup was applied on this device.");
+                // Restore is destructive and irreversible: confirm before deleting local data.
+                const counts = [
+                    `${backup.transactions.length} transaction${backup.transactions.length === 1 ? "" : "s"}`,
+                    `${backup.budgets.length} budget${backup.budgets.length === 1 ? "" : "s"}`,
+                    `${backup.recurringRules.length} bill${backup.recurringRules.length === 1 ? "" : "s"}`,
+                    `${backup.goals.length} goal${backup.goals.length === 1 ? "" : "s"}`,
+                ].join(", ");
+                setBusy(false);
+                Alert.alert(
+                    "Replace all local data?",
+                    `This permanently deletes every transaction, budget, bill, category, account, and savings goal on this device, then restores ${counts} from the backup. This cannot be undone.`,
+                    [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                            text: "Replace",
+                            style: "destructive",
+                            onPress: () => { void runRestore(backup); },
+                        },
+                    ],
+                );
+                return;
             }
-            else {
-                const rows = parseTransactionsCsv(text);
-                const count = await importCsvRows(rows);
-                Alert.alert("Import complete", `Imported ${count} transaction${count === 1 ? "" : "s"}.`);
-            }
+            const rows = parseTransactionsCsv(text);
+            const summary = await importCsvRows(rows);
+            const created = typeof summary === "object" && summary !== null
+                ? summary.created
+                : Number(summary);
+            Alert.alert("Import complete", `Imported ${created} transaction${created === 1 ? "" : "s"}.`);
             navigation.goBack();
         }
         catch (error) {

@@ -207,15 +207,21 @@ export const useFinanceStore = create((set, get) => ({
         if (database === null) {
             throw new Error("Database is not ready.");
         }
+        const type = input.type === "INCOME" ? "INCOME" : "EXPENSE";
         const categoryName = input.categoryName
-            ?? (get().categories.find((c) => c.type === "EXPENSE" && c.name === "Bills")?.name)
-            ?? get().categories.find((c) => c.type === "EXPENSE")?.name;
+            ?? (get().categories.find((c) => c.type === type && c.name === (type === "INCOME" ? "Allowance" : "Bills"))?.name)
+            ?? get().categories.find((c) => c.type === type)?.name;
         if (!categoryName) {
-            throw new Error("Add an expense category before creating a recurring bill.");
+            throw new Error(`Add a${type === "INCOME" ? "n income" : "n expense"} category before creating a recurring rule.`);
         }
-        const category = findCategory(get().categories, categoryName, "EXPENSE");
-        const account = findAccount(get().accounts, "CASH");
-        const leadDays = RECURRING_REMINDER_LEAD_DAYS;
+        const category = findCategory(get().categories, categoryName, type);
+        const account = findAccount(get().accounts, input.accountType ?? "CASH");
+        const leadDays = Number.isInteger(input.leadDays) && input.leadDays >= 0
+            ? input.leadDays
+            : RECURRING_REMINDER_LEAD_DAYS;
+        const frequency = ["DAILY", "WEEKLY", "MONTHLY"].includes(input.frequency)
+            ? input.frequency
+            : "MONTHLY";
         let nextRunEpochMillis = input.dueEpochMillis;
         if (!Number.isSafeInteger(nextRunEpochMillis)) {
             const nextRun = new Date();
@@ -225,16 +231,17 @@ export const useFinanceStore = create((set, get) => ({
         }
         const payload = {
             amountMinor: input.amountMinor,
-            type: "EXPENSE",
+            type,
             categoryId: category.id,
             accountId: account.id,
             note: input.name,
-            frequency: "MONTHLY",
+            frequency,
             nextRunEpochMillis,
             isActive: true,
-            reminderEnabled: true,
+            reminderEnabled: input.reminderEnabled !== false,
             reminderLeadDays: leadDays,
             icon: input.icon ?? null,
+            anchorDay: new Date(nextRunEpochMillis).getDate(),
         };
         const created = await new RecurringRepository(database).create(payload);
         await get().refresh();
@@ -367,7 +374,40 @@ export const useFinanceStore = create((set, get) => ({
         await new AccountRepository(database).delete(id);
         await get().refresh();
     },
-    archiveAccount: async (id) => get().deleteAccount(id),
+    /**
+     * Hide an account without touching its history. Unlike delete, this is allowed for
+     * accounts that already have transactions -- that is the whole point of archiving.
+     */
+    archiveAccount: async (id) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const remaining = get().accounts.filter((account) => !account.isArchived && account.id !== id);
+        if (remaining.length === 0) {
+            throw new Error("Keep at least one active account.");
+        }
+        const updated = await new AccountRepository(database).update(id, { isArchived: true });
+        if (updated === null) {
+            throw new Error("Account could not be archived.");
+        }
+        await get().refresh();
+        return updated;
+    },
+    unarchiveAccount: async (id) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const updated = await new AccountRepository(database).update(id, { isArchived: false });
+        if (updated === null) {
+            throw new Error("Account could not be restored.");
+        }
+        await get().refresh();
+        return updated;
+    },
     updateRecurringRule: async (id, patch) => {
         await get().ensureHydrated();
         const database = databaseRef;
@@ -584,8 +624,8 @@ export const useFinanceStore = create((set, get) => ({
                 }
                 const nextId = await insertReturningId(tx, `INSERT INTO recurring_rules (
               amount_minor, type, category_id, account_id, note, frequency,
-              next_run_epoch_millis, is_active, reminder_enabled, reminder_lead_days, icon
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+              next_run_epoch_millis, is_active, reminder_enabled, reminder_lead_days, icon, anchor_day
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
                     rule.amountMinor,
                     rule.type,
                     categoryId,
@@ -597,6 +637,7 @@ export const useFinanceStore = create((set, get) => ({
                     rule.reminderEnabled ? 1 : 0,
                     rule.reminderLeadDays,
                     rule.icon ?? null,
+                    rule.anchorDay ?? null,
                 ]);
                 recurringIdMap.set(rule.id, nextId);
             }
@@ -628,6 +669,19 @@ export const useFinanceStore = create((set, get) => ({
                 }
                 await tx.execute(`INSERT INTO budgets (category_id, month_year, limit_minor)
            VALUES (?, ?, ?)`, [categoryId, budget.monthYear, budget.limitMinor]);
+            }
+            // savings_goals is deleted above; without this loop every goal is lost on restore.
+            for (const goal of backup.goals ?? []) {
+                await tx.execute(`INSERT INTO savings_goals (
+              name, target_minor, current_minor, deadline_epoch_millis, is_archived, created_epoch_millis
+            ) VALUES (?, ?, ?, ?, ?, ?)`, [
+                    goal.name,
+                    goal.targetMinor,
+                    goal.currentMinor,
+                    goal.deadlineEpochMillis ?? null,
+                    goal.isArchived ? 1 : 0,
+                    goal.createdEpochMillis,
+                ]);
             }
         });
         await get().refresh();

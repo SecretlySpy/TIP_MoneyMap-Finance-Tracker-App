@@ -25,9 +25,34 @@ describe("advanceNextRunEpochMillis", () => {
     expect(feb.getMonth()).toBe(1);
     expect(feb.getDate()).toBe(28);
 
+    // Without an anchor the clamped day is all we know, so 28 carries forward.
     const mar = new Date(advanceNextRunEpochMillis(feb.getTime(), "MONTHLY"));
     expect(mar.getMonth()).toBe(2);
     expect(mar.getDate()).toBe(28);
+  });
+
+  it("keeps the intended day-of-month when an anchor survives a short month", () => {
+    const jan31 = atLocal(2026, 0, 31, 10);
+    const feb = new Date(advanceNextRunEpochMillis(jan31, "MONTHLY", 31));
+    expect(feb.getMonth()).toBe(1);
+    expect(feb.getDate()).toBe(28);
+
+    // Regression: previously drifted to Mar 28 and never returned to the 31st.
+    const mar = new Date(advanceNextRunEpochMillis(feb.getTime(), "MONTHLY", 31));
+    expect(mar.getMonth()).toBe(2);
+    expect(mar.getDate()).toBe(31);
+
+    const apr = new Date(advanceNextRunEpochMillis(mar.getTime(), "MONTHLY", 31));
+    expect(apr.getMonth()).toBe(3);
+    expect(apr.getDate()).toBe(30);
+  });
+
+  it("advances monthly across a year boundary", () => {
+    const dec31 = atLocal(2026, 11, 31, 10);
+    const jan = new Date(advanceNextRunEpochMillis(dec31, "MONTHLY", 31));
+    expect(jan.getFullYear()).toBe(2027);
+    expect(jan.getMonth()).toBe(0);
+    expect(jan.getDate()).toBe(31);
   });
 });
 

@@ -62,6 +62,9 @@ export function transactionInMonth(transaction, monthYear) {
     return toMonthYear(date) === monthYear;
 }
 export function computeDashboardTotals(accounts, transactions, monthYear) {
+    const activeAccountIds = new Set(accounts
+        .filter((account) => !account.isArchived)
+        .map((account) => account.id));
     const starting = accounts
         .filter((account) => !account.isArchived)
         .reduce((sum, account) => sum + account.startingBalanceMinor, 0);
@@ -70,6 +73,15 @@ export function computeDashboardTotals(accounts, transactions, monthYear) {
     let monthIncome = 0;
     let monthExpense = 0;
     for (const transaction of transactions) {
+        // An archived account contributes neither its opening balance nor its history;
+        // counting one without the other made Total Balance drift on archive.
+        // Unknown accountIds (e.g. pre-mapped fixtures) still count.
+        if (transaction.accountId !== undefined
+            && accounts.length > 0
+            && !activeAccountIds.has(transaction.accountId)
+            && accounts.some((account) => account.id === transaction.accountId)) {
+            continue;
+        }
         if (transaction.type === "INCOME") {
             lifetimeIncome += transaction.amountMinor;
             if (transactionInMonth(transaction, monthYear)) {
@@ -127,12 +139,15 @@ export function spendingByCategory(transactions, categoriesById, monthYear) {
     const top = ranked.slice(0, 3);
     const rest = ranked.slice(3);
     const restTotal = rest.reduce((sum, [, value]) => sum + value, 0);
-    const rows = restTotal > 0
-        ? [...top, ["Other", (top.find(([label]) => label === "Other")?.[1] ?? 0) + restTotal]]
-        : top;
+    // Build the map once from the top rows, then fold the remainder into a single
+    // "Other" bucket. Appending an extra row here would double-count a category that
+    // is itself named "Other" (it is one of the seeded defaults).
     const merged = new Map();
-    for (const [label, value] of rows) {
+    for (const [label, value] of top) {
         merged.set(label, (merged.get(label) ?? 0) + value);
+    }
+    if (restTotal > 0) {
+        merged.set("Other", (merged.get("Other") ?? 0) + restTotal);
     }
     const segments = [...merged.entries()].map(([label, spentMinor], index) => ({
         color: CHART_COLORS[index % CHART_COLORS.length],
@@ -227,27 +242,45 @@ export function groupHistory(transactions, categoriesById, accountsById, monthYe
 export function categoriesForType(categories, type) {
     return categories.filter((category) => category.type === type);
 }
+const FREQUENCY_LABEL = {
+    DAILY: "Daily",
+    WEEKLY: "Weekly",
+    MONTHLY: "Monthly",
+};
+// Paused rules are still listed so they can be resumed; active ones sort first.
 export function buildRecurringBills(rules, categoriesById) {
     return rules
-        .filter((rule) => rule.isActive)
-        .sort((left, right) => left.nextRunEpochMillis - right.nextRunEpochMillis)
+        .slice()
+        .sort((left, right) => {
+        if (left.isActive !== right.isActive) {
+            return left.isActive ? -1 : 1;
+        }
+        return left.nextRunEpochMillis - right.nextRunEpochMillis;
+    })
         .map((rule) => {
         const category = categoriesById.get(rule.categoryId);
         const name = rule.note?.trim() || category?.name || "Bill";
         const dueDate = new Date(rule.nextRunEpochMillis);
+        const frequencyLabel = FREQUENCY_LABEL[rule.frequency] ?? "Monthly";
         return {
             id: String(rule.id),
             amountMinor: rule.amountMinor,
             due: `${MONTH_LABELS[dueDate.getMonth()]} ${dueDate.getDate()}`,
             emoji: resolveDisplayEmoji({ icon: rule.icon, name }),
+            frequency: rule.frequency ?? "MONTHLY",
+            frequencyLabel: rule.isActive ? frequencyLabel : `${frequencyLabel} · Paused`,
+            isActive: rule.isActive !== false,
             leadDays: rule.reminderLeadDays,
             name,
             nextRunEpochMillis: rule.nextRunEpochMillis,
+            reminderEnabled: rule.reminderEnabled !== false,
+            type: rule.type ?? "EXPENSE",
         };
     });
 }
 export function nextReminderPreview(bills) {
-    const first = bills[0];
+    // Paused rules and rules with reminders off must not drive the preview banner.
+    const first = bills.find((bill) => bill.isActive !== false && bill.reminderEnabled !== false);
     if (!first) {
         return null;
     }

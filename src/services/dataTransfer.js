@@ -12,6 +12,8 @@ export function buildBackup(snapshot) {
         transactions: snapshot.transactions,
         budgets: snapshot.budgets,
         recurringRules: snapshot.recurringRules,
+        // Goals are wiped by restoreBackup, so they must round-trip or they are lost.
+        goals: snapshot.goals ?? [],
     };
 }
 export function serializeBackup(backup) {
@@ -47,6 +49,9 @@ export function parseBackup(raw) {
         transactions: Array.isArray(record.transactions) ? record.transactions : [],
         budgets: Array.isArray(record.budgets) ? record.budgets : [],
         recurringRules: Array.isArray(record.recurringRules) ? record.recurringRules : [],
+        // Optional for backward compatibility: v1 backups written before goals
+        // were included simply restore none rather than failing to parse.
+        goals: Array.isArray(record.goals) ? record.goals : [],
     };
 }
 function escapeCsv(value) {
@@ -208,4 +213,43 @@ export function parseTransactionsCsv(raw) {
 }
 export async function shareText(title, message) {
     await Share.share({ title, message });
+}
+/**
+ * Share a generated export as a file when possible, else fall back to inline text.
+ * @param {string} title dialog title
+ * @param {string} fileName e.g. "moneymap-export.csv"
+ * @param {string} contents file body
+ * @returns {Promise<'file'|'text'>} which path was used
+ */
+export async function shareDocument(title, fileName, contents) {
+    try {
+        const FileSystem = await import("expo-file-system/legacy");
+        const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+        if (!directory) {
+            throw new Error("No writable directory.");
+        }
+        const uri = `${directory}${fileName}`;
+        await FileSystem.writeAsStringAsync(uri, contents, {
+            encoding: FileSystem.EncodingType.UTF8,
+        });
+        await Share.share({ title, url: uri, message: title });
+        return "file";
+    }
+    catch {
+        // Intent-extra path: fine for small exports, the only option without expo-file-system.
+        await Share.share({ title, message: contents });
+        return "text";
+    }
+}
+/**
+ * Timestamped export filename, e.g. moneymap-transactions-2026-08-31.csv
+ * @param {string} prefix
+ * @param {string} extension
+ * @param {Date} [now]
+ */
+export function exportFileName(prefix, extension, now = new Date()) {
+    const year = now.getFullYear();
+    const month = `${now.getMonth() + 1}`.padStart(2, "0");
+    const day = `${now.getDate()}`.padStart(2, "0");
+    return `${prefix}-${year}-${month}-${day}.${extension}`;
 }

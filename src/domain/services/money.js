@@ -29,15 +29,24 @@ export function formatTransactionAmount(amountMinor, type, showCents = true, cur
     return `${sign}${formatMinor(amountMinor, { currencySymbol, showCents, sign: "never" })}`;
 }
 // Decimal keypad text is parsed without floating-point currency arithmetic.
-export function parseDecimalToMinor(input) {
+// B4: opening balances may legitimately be negative (a card carrying debt), so the
+// caller opts in rather than every amount field silently accepting a minus sign.
+export function parseDecimalToMinor(input, options = {}) {
     const normalized = input.trim();
-    if (!/^\d*(?:\.\d{0,2})?$/.test(normalized)) {
+    const { allowNegative = false } = options;
+    if (normalized.length === 0) {
+        throw new RangeError("Enter a monetary amount.");
+    }
+    const negative = allowNegative && normalized.startsWith("-");
+    const digits = negative ? normalized.slice(1) : normalized;
+    if (digits.length === 0 || !/^\d*(?:\.\d{0,2})?$/.test(digits)) {
         throw new RangeError("Enter a monetary amount with at most two decimal places.");
     }
-    const [wholeText = "0", centsText = ""] = normalized.split(".");
+    const [wholeText = "0", centsText = ""] = digits.split(".");
     const whole = Number(wholeText || "0");
     const cents = Number(centsText.padEnd(2, "0") || "0");
-    const amountMinor = whole * 100 + cents;
+    const magnitude = whole * 100 + cents;
+    const amountMinor = negative ? -magnitude : magnitude;
     assertMinorUnits(amountMinor);
     return amountMinor;
 }

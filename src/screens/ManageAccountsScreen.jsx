@@ -26,6 +26,8 @@ export function ManageAccountsScreen({ navigation }) {
   const updateAccount = useFinanceStore((state) => state.updateAccount);
   const createAccount = useFinanceStore((state) => state.createAccount);
   const deleteAccount = useFinanceStore((state) => state.deleteAccount);
+  const archiveAccount = useFinanceStore((state) => state.archiveAccount);
+  const unarchiveAccount = useFinanceStore((state) => state.unarchiveAccount);
 
   const [renameId, setRenameId] = useState(null);
   const [balanceId, setBalanceId] = useState(null);
@@ -35,6 +37,25 @@ export function ManageAccountsScreen({ navigation }) {
   const [busy, setBusy] = useState(false);
 
   const active = accounts.filter((account) => !account.isArchived);
+  const archived = accounts.filter((account) => account.isArchived);
+
+  const handleArchive = (account) => {
+    Alert.alert(
+      `Archive "${account.name}"?`,
+      "Hides the account from entry and balances. Its transactions stay in History and it can be restored later.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Archive",
+          onPress: () => {
+            void archiveAccount(account.id).catch((error) => {
+              Alert.alert("Archive failed", error instanceof Error ? error.message : "Could not archive.");
+            });
+          },
+        },
+      ],
+    );
+  };
 
   const handleRename = async (name) => {
     if (renameId === null || name.trim().length === 0) {
@@ -52,7 +73,11 @@ export function ManageAccountsScreen({ navigation }) {
   const handleBalance = async (value) => {
     if (balanceId === null) return;
     try {
-      const amountMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
+      // A card account can legitimately open in debt.
+      const amountMinor = parseDecimalToMinor(
+        value.replace(/[₱$,\s]/g, "") || "0",
+        { allowNegative: true },
+      );
       await updateAccount({ id: balanceId, startingBalanceMinor: amountMinor });
       setBalanceId(null);
     } catch (error) {
@@ -157,6 +182,16 @@ export function ManageAccountsScreen({ navigation }) {
                 <Pressable
                   accessibilityRole="button"
                   hitSlop={theme.spacing.sm}
+                  onPress={() => handleArchive(account)}
+                  style={{ justifyContent: "center", minHeight: 44 }}
+                >
+                  <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
+                    Archive
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  hitSlop={theme.spacing.sm}
                   onPress={() => handleDelete(account)}
                   style={{ justifyContent: "center", minHeight: 44 }}
                 >
@@ -174,6 +209,37 @@ export function ManageAccountsScreen({ navigation }) {
         <DashedButton disabled={busy} onPress={() => setCreateStep("name")}>
           ＋ Add account
         </DashedButton>
+      ) : null}
+
+      {archived.length > 0 ? (
+        <View style={{ gap: theme.spacing.sm }}>
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+            ARCHIVED
+          </Text>
+          <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.lg }}>
+            {archived.map((account) => (
+              <View key={account.id} style={{ alignItems: "center", flexDirection: "row", gap: theme.spacing.md }}>
+                <Text style={{ color: theme.colors.sub, flex: 1, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+                  {accountChipLabel(account.type)} · {account.name}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  hitSlop={theme.spacing.sm}
+                  onPress={() => {
+                    void unarchiveAccount(account.id).catch((error) => {
+                      Alert.alert("Restore failed", error instanceof Error ? error.message : "Could not restore.");
+                    });
+                  }}
+                  style={{ justifyContent: "center", minHeight: 44 }}
+                >
+                  <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
+                    Restore
+                  </Text>
+                </Pressable>
+              </View>
+            ))}
+          </SectionCard>
+        </View>
       ) : null}
 
       {createStep === "type" ? (
@@ -221,7 +287,7 @@ export function ManageAccountsScreen({ navigation }) {
           return (account.startingBalanceMinor / 100).toFixed(2);
         })()}
         keyboardType="decimal-pad"
-        message="Starting balance is added to your total balance."
+        message="Starting balance is added to your total balance. Use a leading minus for card debt, e.g. -1500.00."
         onCancel={() => setBalanceId(null)}
         onConfirm={(value) => void handleBalance(value)}
         placeholder="0.00"

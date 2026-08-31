@@ -1,6 +1,6 @@
 import { seedInitialData } from "./seed";
 import { DataIntegrityError, readInteger } from "./validation";
-export const LATEST_SCHEMA_VERSION = 3;
+export const LATEST_SCHEMA_VERSION = 4;
 const CREATE_SCHEMA_STATEMENTS = [
     `CREATE TABLE accounts (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,6 +34,7 @@ const CREATE_SCHEMA_STATEMENTS = [
       reminder_enabled INTEGER NOT NULL DEFAULT 0 CHECK (reminder_enabled IN (0, 1)),
       reminder_lead_days INTEGER NOT NULL DEFAULT 3 CHECK (reminder_lead_days >= 0),
       icon TEXT,
+      anchor_day INTEGER CHECK (anchor_day IS NULL OR (anchor_day >= 1 AND anchor_day <= 31)),
       FOREIGN KEY (category_id, type) REFERENCES categories (id, type) ON UPDATE RESTRICT ON DELETE RESTRICT,
       FOREIGN KEY (account_id) REFERENCES accounts (id) ON UPDATE RESTRICT ON DELETE RESTRICT
     ) STRICT`,
@@ -114,6 +115,21 @@ const MIGRATIONS = [
             if (!hasIcon) {
                 await database.execute("ALTER TABLE recurring_rules ADD COLUMN icon TEXT");
             }
+        },
+    },
+    {
+        version: 4,
+        name: "add recurring_rules.anchor_day so monthly bills keep their due day",
+        async apply(database) {
+            // Fresh v1 CREATE already includes anchor_day; ALTER only when upgrading.
+            const cols = await database.execute("PRAGMA table_info(recurring_rules)");
+            const hasAnchorDay = (cols.rows ?? []).some((row) => row.name === "anchor_day");
+            if (!hasAnchorDay) {
+                await database.execute("ALTER TABLE recurring_rules ADD COLUMN anchor_day INTEGER");
+            }
+            // Left NULL on purpose: next_run is stored at local noon, so deriving the day
+            // in SQLite (UTC) would be wrong near the date line. The catch-up service
+            // adopts the current run's day and persists it on first use instead.
         },
     },
 ];

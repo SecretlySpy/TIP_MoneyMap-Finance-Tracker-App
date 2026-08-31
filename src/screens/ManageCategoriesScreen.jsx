@@ -5,7 +5,7 @@ import { DashedButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
-import { categoryEmoji } from "../domain/services/financeView";
+import { resolveDisplayEmoji } from "../domain/services/emoji";
 import { useFinanceStore } from "../store/financeStore";
 import { useTheme } from "../theme/tokens";
 
@@ -95,7 +95,9 @@ export function ManageCategoriesScreen({ navigation }) {
                 minHeight: 44,
               }}
             >
-              <Text style={{ fontSize: theme.typeScale.emptyTitle }}>{categoryEmoji(category.name)}</Text>
+              <Text style={{ fontSize: theme.typeScale.emptyTitle }}>
+                {resolveDisplayEmoji({ icon: category.icon, name: category.name })}
+              </Text>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
                   {category.name}

@@ -73,8 +73,10 @@ export async function runRecurringCatchUp(database, options = {}) {
     }
 
     // plan.nextRunEpochMillis is already advanced past the last posted run.
+    // Persist anchorDay too, so a clamped short month cannot erase the intended due day.
     await recurringRepo.update(rule.id, {
       nextRunEpochMillis: plan.nextRunEpochMillis,
+      anchorDay: plan.anchorDay,
     });
   }
 

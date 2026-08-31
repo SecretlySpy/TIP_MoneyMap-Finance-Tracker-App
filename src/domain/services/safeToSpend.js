@@ -45,11 +45,19 @@ export function computeSafeToSpend(input) {
   const cappedGoalReserves = Math.min(goalReservesMinor, remainingBudgetsMinor);
 
   const safeMinor = remainingBudgetsMinor - upcomingRecurringMinor - cappedGoalReserves;
-  let state = "comfortable";
-  if (safeMinor <= 0) {
+  const hasCommitments = summary.limitMinor > 0
+    || upcomingRecurringMinor > 0
+    || goalReservesMinor > 0;
+  let state;
+  if (!hasCommitments) {
+    // Nothing to measure against yet: the card should invite setup, not warn.
+    state = "unset";
+  } else if (safeMinor <= 0) {
     state = "over";
   } else if (remainingBudgetsMinor > 0 && safeMinor < remainingBudgetsMinor * 0.2) {
     state = "tight";
+  } else {
+    state = "comfortable";
   }
 
   return {

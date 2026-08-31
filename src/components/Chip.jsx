@@ -4,7 +4,8 @@ import { AppText as Text } from "./AppText";
 // Chips expose their selected state to screen readers and preserve 30+ px touch height.
 export function Chip({ children, onPress, selected = false, style }) {
     const theme = useTheme();
-    return (<Pressable accessibilityRole="button" accessibilityState={{ selected }} disabled={onPress === undefined} onPress={onPress} style={[
+    // Visual height stays on the design grid; hitSlop lifts the touch target to >=44dp.
+    return (<Pressable accessibilityRole="button" accessibilityState={{ selected }} disabled={onPress === undefined} hitSlop={{ bottom: theme.spacing.sm, left: theme.spacing.xs, right: theme.spacing.xs, top: theme.spacing.sm }} onPress={onPress} style={[
             {
                 alignItems: "center",
                 backgroundColor: selected ? theme.colors.tint : theme.colors.surface,

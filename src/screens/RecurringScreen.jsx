@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { DashedButton } from "../components/Buttons";
+import { OptionChipRow } from "../components/OptionChipRow";
 import { EmojiPickerRow } from "../components/EmojiPickerRow";
 import { EmptyState } from "../components/EmptyState";
 import { ScreenContainer } from "../components/ScreenContainer";
@@ -39,6 +40,9 @@ export function RecurringScreen({ navigation }) {
   const [draftEmoji, setDraftEmoji] = useState(BUDGET_BILL_EMOJI_PRESETS[7]);
   const [draftAmount, setDraftAmount] = useState(0);
   const [activeBillId, setActiveBillId] = useState(null);
+  const [draftFrequency, setDraftFrequency] = useState("MONTHLY");
+  const [draftCategory, setDraftCategory] = useState(null);
+  const [draftLeadDays, setDraftLeadDays] = useState(RECURRING_REMINDER_LEAD_DAYS);
 
   const { categoriesById } = useMemo(
     () => mapsFromState({ accounts: [], categories }),
@@ -50,11 +54,19 @@ export function RecurringScreen({ navigation }) {
   );
   const reminder = useMemo(() => nextReminderPreview(bills), [bills]);
 
+  const expenseCategoryOptions = useMemo(
+    () => categoriesForType(categories, "EXPENSE").map((c) => ({ value: c.name, label: c.name })),
+    [categories],
+  );
+
   const beginAdd = () => {
     setDraftName("");
     setDraftEmoji(BUDGET_BILL_EMOJI_PRESETS[7]);
     setDraftAmount(0);
     setActiveBillId(null);
+    setDraftFrequency("MONTHLY");
+    setDraftCategory(expenseCategoryOptions[0]?.value ?? null);
+    setDraftLeadDays(RECURRING_REMINDER_LEAD_DAYS);
     setStep("name");
   };
 
@@ -73,11 +85,12 @@ export function RecurringScreen({ navigation }) {
       const name = draftName.trim() || preferred.name;
       await addRecurringBill({
         amountMinor: draftAmount,
-        categoryName: preferred.name,
+        categoryName: draftCategory ?? preferred.name,
         name,
         icon: draftEmoji,
         dueEpochMillis,
-        leadDays: RECURRING_REMINDER_LEAD_DAYS,
+        frequency: draftFrequency,
+        leadDays: draftLeadDays,
       });
       setStep(null);
       setDraftName("");
@@ -129,10 +142,10 @@ export function RecurringScreen({ navigation }) {
     setBusy(true);
     try {
       const dueEpochMillis = parseLocalDateToNoonEpoch(value);
+      // Keep the user's reminder preference; only the schedule anchor changes.
       await updateRecurringRule(activeBillId, {
         nextRunEpochMillis: dueEpochMillis,
-        reminderLeadDays: RECURRING_REMINDER_LEAD_DAYS,
-        reminderEnabled: true,
+        anchorDay: new Date(dueEpochMillis).getDate(),
       });
       setStep(null);
       setActiveBillId(null);
@@ -165,7 +178,14 @@ export function RecurringScreen({ navigation }) {
               text: "More…",
               onPress: () => {
                 Alert.alert(bill.name, "Edit details", [
-                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: bill.isActive ? "Pause" : "Resume",
+                    onPress: () => {
+                      void updateRecurringRule(id, { isActive: !bill.isActive }).catch((error) => {
+                        Alert.alert("Update failed", error instanceof Error ? error.message : "Could not update.");
+                      });
+                    },
+                  },
                   {
                     text: "Amount",
                     onPress: () => {
@@ -316,7 +336,7 @@ export function RecurringScreen({ navigation }) {
                     {bill.name}
                   </Text>
                   <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-                    Monthly · Due {bill.due}
+                    {bill.frequencyLabel} · Due {bill.due}
                   </Text>
                 </View>
                 <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.listName }}>
@@ -334,9 +354,13 @@ export function RecurringScreen({ navigation }) {
                   paddingVertical: theme.spacing.sm,
                 }}
               >
-                <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>🔔</Text>
+                <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+                  {bill.reminderEnabled ? "🔔" : "🔕"}
+                </Text>
                 <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
-                  Remind {bill.leadDays} days before
+                  {bill.reminderEnabled
+                    ? (bill.leadDays === 0 ? "Remind on the due date" : `Remind ${bill.leadDays} day${bill.leadDays === 1 ? "" : "s"} before`)
+                    : "Reminders off"}
                 </Text>
               </View>
             </SectionCard>
@@ -377,6 +401,39 @@ export function RecurringScreen({ navigation }) {
             Icon for “{draftName}”
           </Text>
           <EmojiPickerRow onChange={setDraftEmoji} value={draftEmoji} />
+          <OptionChipRow
+            accessibilityLabel="Repeat frequency"
+            label="Repeats"
+            onChange={setDraftFrequency}
+            options={[
+              { value: "DAILY", label: "Daily" },
+              { value: "WEEKLY", label: "Weekly" },
+              { value: "MONTHLY", label: "Monthly" },
+            ]}
+            value={draftFrequency}
+          />
+          {expenseCategoryOptions.length > 0 ? (
+            <OptionChipRow
+              accessibilityLabel="Bill category"
+              label="Category"
+              onChange={setDraftCategory}
+              options={expenseCategoryOptions}
+              value={draftCategory ?? expenseCategoryOptions[0].value}
+            />
+          ) : null}
+          <OptionChipRow
+            accessibilityLabel="Reminder lead time"
+            label="Remind me"
+            onChange={(value) => setDraftLeadDays(Number(value))}
+            options={[
+              { value: "0", label: "On the day" },
+              { value: "1", label: "1 day" },
+              { value: "3", label: "3 days" },
+              { value: "7", label: "7 days" },
+              { value: "14", label: "14 days" },
+            ]}
+            value={String(draftLeadDays)}
+          />
           <DashedButton onPress={() => setStep("amount")}>Next: amount</DashedButton>
           <Pressable onPress={() => setStep(null)} style={{ minHeight: 44, justifyContent: "center" }}>
             <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, textAlign: "center" }}>

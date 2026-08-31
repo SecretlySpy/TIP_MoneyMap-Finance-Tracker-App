@@ -135,7 +135,7 @@ export function computeDueReminders(rules, categoriesById, now = new Date()) {
   return bills
     .map((bill) => {
       const rule = rules.find((item) => String(item.id) === bill.id);
-      if (rule === undefined || !rule.reminderEnabled) {
+      if (rule === undefined || !rule.reminderEnabled || !rule.isActive) {
         return null;
       }
       const dueStart = new Date(rule.nextRunEpochMillis);

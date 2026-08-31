@@ -7,7 +7,7 @@ import { SectionCard } from "./SectionCard";
 /**
  * @param {{
  *   safeMinor: number,
- *   state: 'comfortable'|'tight'|'over',
+ *   state: 'comfortable'|'tight'|'over'|'unset',
  *   currencySymbol: string,
  *   remainingBudgetsMinor: number,
  *   upcomingRecurringMinor: number,
@@ -28,13 +28,17 @@ export function SafeToSpendCard({
       ? theme.colors.expense
       : state === "tight"
         ? theme.colors.warning
-        : theme.colors.income;
+        : state === "unset"
+          ? theme.colors.sub
+          : theme.colors.income;
   const headline =
     state === "over"
       ? "Over committed"
       : state === "tight"
         ? "Spend carefully"
-        : "Safe to spend";
+        : state === "unset"
+          ? "Set a budget to see this"
+          : "Safe to spend";
 
   return (
     <SectionCard
@@ -55,10 +59,14 @@ export function SafeToSpendCard({
           fontSize: theme.typeScale.heroAmount,
         }}
       >
-        {formatMinor(Math.max(0, safeMinor), { currencySymbol, showCents: false })}
+        {state === "unset"
+          ? "—"
+          : formatMinor(Math.max(0, safeMinor), { currencySymbol, showCents: false })}
       </Text>
       <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-        After budgets, bills & goals · {headline}
+        {state === "unset"
+          ? "Add a monthly budget and this shows what is left to spend."
+          : `After budgets, bills & goals · ${headline}`}
       </Text>
       <View style={{ gap: theme.spacing.xxs, marginTop: theme.spacing.xs }}>
         <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>

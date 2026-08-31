@@ -7,7 +7,8 @@ import { GoalCard } from "../components/GoalCard";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
-import { sortGoalsForDisplay } from "../domain/services/goals";
+import { formatLocalDateISO, parseLocalDateToNoonEpoch } from "../domain/services/emoji";
+import { applyGoalContribution, sortGoalsForDisplay } from "../domain/services/goals";
 import { parseDecimalToMinor } from "../domain/services/money";
 import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -22,6 +23,7 @@ export function GoalsScreen({ navigation }) {
   const renameGoal = useFinanceStore((state) => state.renameGoal);
   const updateGoal = useFinanceStore((state) => state.updateGoal);
   const deleteGoal = useFinanceStore((state) => state.deleteGoal);
+  const archiveGoal = useFinanceStore((state) => state.archiveGoal);
 
   const [showCreate, setShowCreate] = useState(false);
   const [createStep, setCreateStep] = useState("name");
@@ -29,6 +31,7 @@ export function GoalsScreen({ navigation }) {
   const [contributeId, setContributeId] = useState(null);
   const [renameId, setRenameId] = useState(null);
   const [targetId, setTargetId] = useState(null);
+  const [deadlineId, setDeadlineId] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const displayGoals = useMemo(() => sortGoalsForDisplay(goals ?? []), [goals]);
@@ -66,14 +69,41 @@ export function GoalsScreen({ navigation }) {
     }
   };
 
+  const handleDeadline = async (value) => {
+    if (deadlineId === null || busy) return;
+    setBusy(true);
+    try {
+      const trimmed = value.trim();
+      // An empty value clears the deadline rather than failing validation.
+      const deadlineEpochMillis = trimmed.length === 0 ? null : parseLocalDateToNoonEpoch(trimmed);
+      await updateGoal(deadlineId, { deadlineEpochMillis });
+      setDeadlineId(null);
+    } catch (error) {
+      Alert.alert("Could not set deadline", error instanceof Error ? error.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleContribute = async (value) => {
     if (contributeId === null || busy) return;
     setBusy(true);
     try {
       const amountMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
       if (amountMinor <= 0) throw new Error("Enter a positive amount.");
+      const goal = (goals ?? []).find((g) => g.id === contributeId);
+      // Pure preview of the outcome so the user gets completion feedback, not silence.
+      const outcome = goal ? applyGoalContribution(goal, amountMinor) : null;
       await contributeToGoal(contributeId, amountMinor);
       setContributeId(null);
+      if (outcome?.complete) {
+        Alert.alert(
+          "Goal reached 🎉",
+          outcome.overflowMinor > 0
+            ? `${goal.name} is fully funded, with ${(outcome.overflowMinor / 100).toFixed(2)} to spare.`
+            : `${goal.name} is fully funded.`,
+        );
+      }
     } catch (error) {
       Alert.alert("Contribute failed", error instanceof Error ? error.message : "Unknown error");
     } finally {
@@ -132,8 +162,8 @@ export function GoalsScreen({ navigation }) {
                     onPress: () => setTargetId(goal.id),
                   },
                   {
-                    text: "Contribute",
-                    onPress: () => setContributeId(goal.id),
+                    text: "Deadline",
+                    onPress: () => setDeadlineId(goal.id),
                   },
                 ]);
               },
@@ -142,9 +172,15 @@ export function GoalsScreen({ navigation }) {
         },
       },
       {
-        text: "Delete",
-        style: "destructive",
+        text: goal.isComplete ? "Archive" : "Delete",
+        style: goal.isComplete ? "default" : "destructive",
         onPress: () => {
+          if (goal.isComplete) {
+            void archiveGoal(goal.id).catch((error) => {
+              Alert.alert("Archive failed", error instanceof Error ? error.message : "Unknown error");
+            });
+            return;
+          }
           Alert.alert("Delete goal?", "This cannot be undone.", [
             { text: "Cancel", style: "cancel" },
             {
@@ -164,6 +200,7 @@ export function GoalsScreen({ navigation }) {
 
   const targetGoal = (goals ?? []).find((g) => g.id === targetId);
   const renameGoalRow = (goals ?? []).find((g) => g.id === renameId);
+  const deadlineGoal = (goals ?? []).find((g) => g.id === deadlineId);
 
   return (
     <ScreenContainer contentContainerStyle={{ gap: theme.spacing.xl }} testID="goals-screen">
@@ -282,6 +319,21 @@ export function GoalsScreen({ navigation }) {
         placeholder="5000.00"
         title="Edit target"
         visible={targetId !== null}
+      />
+      <TextPromptModal
+        confirmLabel="Save"
+        initialValue={
+          deadlineGoal?.deadlineEpochMillis
+            ? formatLocalDateISO(deadlineGoal.deadlineEpochMillis)
+            : ""
+        }
+        maxLength={10}
+        message="Target date (YYYY-MM-DD). Leave blank to remove the deadline."
+        onCancel={() => setDeadlineId(null)}
+        onConfirm={(value) => void handleDeadline(value)}
+        placeholder="2026-12-31"
+        title="Goal deadline"
+        visible={deadlineId !== null}
       />
     </ScreenContainer>
   );

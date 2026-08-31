@@ -6,7 +6,8 @@ import { EmptyState } from "../components/EmptyState";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { TransactionRow } from "../components/TransactionRow";
-import { formatMonthChip, groupHistory, shiftMonthYear, } from "../domain/services/financeView";
+import { MonthChip } from "../components/MonthChip";
+import { groupHistory } from "../domain/services/financeView";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -52,7 +53,6 @@ export function HistoryScreen({ navigation }) {
     const categories = useFinanceStore((state) => state.categories);
     const transactions = useFinanceStore((state) => state.transactions);
     const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
-    const setSelectedMonthYear = useFinanceStore((state) => state.setSelectedMonthYear);
     const deleteTransactionById = useFinanceStore((state) => state.deleteTransactionById);
     const [categoryFilter, setCategoryFilter] = useState(null);
     const [accountFilter, setAccountFilter] = useState(null);
@@ -127,9 +127,7 @@ export function HistoryScreen({ navigation }) {
         </Pressable>
       </View>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm }}>
-        <Chip onPress={() => setSelectedMonthYear(shiftMonthYear(selectedMonthYear, -1))} style={{ height: theme.sizes.filterChip }}>
-          {formatMonthChip(selectedMonthYear)} ▾
-        </Chip>
+        <MonthChip />
         <Chip onPress={cycleCategory} style={{ height: theme.sizes.filterChip }}>
           {categoryFilter === null ? "All categories ▾" : `${categoryFilter} ▾`}
         </Chip>

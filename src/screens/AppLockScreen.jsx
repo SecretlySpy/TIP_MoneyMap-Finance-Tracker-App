@@ -5,6 +5,21 @@ import { ScreenContainer } from "../components/ScreenContainer";
 import { canUseBiometrics, isValidPin } from "../services/appLock";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
+/**
+ * Human-readable cooldown, e.g. "30 seconds" / "5 minutes".
+ * @param {number} seconds
+ */
+function formatCooldown(seconds) {
+    if (seconds >= 3600) {
+        const hours = Math.ceil(seconds / 3600);
+        return `${hours} hour${hours === 1 ? "" : "s"}`;
+    }
+    if (seconds >= 60) {
+        const minutes = Math.ceil(seconds / 60);
+        return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+    }
+    return `${seconds} second${seconds === 1 ? "" : "s"}`;
+}
 const lockKeypad = [
     ["1", "2", "3"],
     ["4", "5", "6"],
@@ -27,6 +42,7 @@ export function AppLockScreen({ navigation }) {
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
     const [biometricsAvailable, setBiometricsAvailable] = useState(false);
+    const [lockedForSeconds, setLockedForSeconds] = useState(0);
     const autoBiometricAttempted = useRef(false);
     const busyRef = useRef(false);
     const setBusySafe = (value) => {
@@ -52,6 +68,23 @@ export function AppLockScreen({ navigation }) {
             cancelled = true;
         };
     }, [hasPin]);
+    useEffect(() => {
+        if (lockedForSeconds <= 0) {
+            return undefined;
+        }
+        const timer = setInterval(() => {
+            setLockedForSeconds((current) => {
+                const next = current - 1;
+                if (next <= 0) {
+                    setError(null);
+                    return 0;
+                }
+                setError(`Too many attempts. Try again in ${formatCooldown(next)}.`);
+                return next;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [lockedForSeconds > 0]);
     const title = mode === "create" ? "Create a 4-digit PIN" : mode === "confirm" ? "Confirm your PIN" : "Enter your PIN to unlock";
     const canLeaveWithoutUnlock = !isLocked || !appLockEnabled || !hasPin;
     const finishUnlock = () => {
@@ -122,12 +155,18 @@ export function AppLockScreen({ navigation }) {
                 finishUnlock();
                 return;
             }
-            const ok = await unlockWithPin(nextPin);
+            const result = await unlockWithPin(nextPin);
+            const ok = typeof result === "object" && result !== null ? result.ok : result === true;
             if (!ok) {
-                setError("Incorrect PIN.");
+                const cooldown = typeof result === "object" && result !== null ? result.lockedForSeconds : 0;
+                setLockedForSeconds(cooldown ?? 0);
+                setError(cooldown > 0
+                    ? `Too many attempts. Try again in ${formatCooldown(cooldown)}.`
+                    : "Incorrect PIN.");
                 setPin("");
                 return;
             }
+            setLockedForSeconds(0);
             finishUnlock();
         }
         catch (caught) {
@@ -139,7 +178,7 @@ export function AppLockScreen({ navigation }) {
         }
     };
     const handleKey = (key) => {
-        if (busyRef.current) {
+        if (busyRef.current || lockedForSeconds > 0) {
             return;
         }
         if (key === "⌫") {

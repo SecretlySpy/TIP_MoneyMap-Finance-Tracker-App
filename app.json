@@ -28,6 +28,7 @@
       "expo-dev-client",
       "./plugins/withAndroidCmakeObjectPathLimit",
       "./plugins/withAndroidOpenSslJniPackaging",
+      "./plugins/withAndroidSecureScreen",
       [
         "expo-secure-store",
         {
