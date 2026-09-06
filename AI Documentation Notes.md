@@ -2139,3 +2139,52 @@ Nothing below could be executed here.
 2. **Tier C scope** — backdating and transaction editing are the two that most affect daily use.
 3. **Forgot-PIN recovery** — currently there is none; losing the PIN loses the app.
 4. **`FLAG_SECURE`** — confirm you want user screenshots blocked; flip `SECURE_SCREEN_ENABLED` if not.
+
+---
+
+# Module / File: docs/screenshots/2026-09-06/tools/capture.mjs
+
+## Purpose
+Capture complete native Android pages for the dated visual inventory, including all
+14 registered screens and additional populated, entry, import and embedded-form states.
+
+## Public Interfaces
+### CLI: `node docs/screenshots/2026-09-06/tools/capture.mjs [slug ...]`
+- **Purpose**: Capture the selected inventory entries, or all entries when no slug is supplied.
+- **Inputs**: Optional filename slugs; `MONEYMAP_CAPTURE_SERIAL`, `MONEYMAP_CAPTURE_PORT`,
+  `MONEYMAP_CAPTURE_APP_ID`; a fresh screenshot-capable local development client at 420 dpi.
+- **Outputs**: Native PNG files, UI hierarchy XML and `manifest.json` measurements.
+- **Errors**: Fails on unavailable debugger, unexpected data/density, incomplete scrolling,
+  changing content dimensions, missing screen, or mismatched native screenshot overlap.
+- **Dependencies**: Node 22, ADB, Metro/Hermes, React devtools fiber measurements, repository Sharp.
+- **Behavior**: Navigate; settle; measure content; confirm scroll end; expand display height
+  at constant width/density; capture all content. Android caps this emulator at 7200 px,
+  so longer pages use measured overlapping frames and a verified pixel join.
+- **Side Effects**: Writes dated artifacts, changes the local emulator display temporarily,
+  and supplies temporary in-memory finance/picker fixtures. Cleanup restores the display,
+  data and picker. No import/restore is submitted and no PIN is set.
+- **Security & Privacy Notes**: Uses a fresh local profile and synthetic finance data; Gemini
+  stays disabled. The older local APK permits capture; the source FLAG_SECURE plugin is unchanged.
+- **Performance / DSA Notes**: Fiber traversal is O(n) in mounted nodes; image decoding/joining
+  is O(p) in captured pixels. Inventory and maximum requested height are bounded.
+- **Accessibility / UX Notes**: Portrait width remains approximately 411 dp. Full-height PNGs
+  retain system bars once; three import-preview positions cover every horizontal column.
+- **Observability Notes**: Per-capture dimensions and coverage are recorded in the manifest;
+  UI XML, file hashes and verification reports remain alongside the gallery.
+- **Verification Status**: Executed: 31 captures, all 14 registered screens, all native scroll
+  ends reached, zero uncaptured vertical overflow, continuous coverage of all 720 dp of import
+  preview columns. Preserved replay script smoke-tested on `31-import-preview-middle`.
+
+## Data Flow
+Current app source → Metro → local native client → native view measurements / ADB framebuffer
+→ full-page PNG + manifest → `tools/verify.mjs` → `verification.json` → `tools/build-gallery.mjs`.
+
+## Known Risks / Follow-ups
+- The local APK package is `com.example.financetracker`; current release config uses
+  `com.moneymap.financetracker`. This capture is not release packaging or FLAG_SECURE QA.
+- Locally installed `expo-location` is a stub; Student Eats captured the campus fallback
+  with OpenStreetMap results fetched during the session and then cached.
+- React devtools internals and live places results can change; inspect the dated README before replay.
+- Gallery verified in Chrome at 1440 and 390 px: 31 images loaded, preserved aspect ratios,
+  no horizontal page overflow, functional search. Application unit tests were not rerun for this artifact task.
+- Handover and complete scope: `docs/screenshots/2026-09-06/HANDOVER.md`.

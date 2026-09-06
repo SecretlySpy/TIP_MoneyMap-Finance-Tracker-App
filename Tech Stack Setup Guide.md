@@ -226,3 +226,21 @@ For a native debug APK, run `npx expo prebuild --platform android --clean`, ente
 | Development client opens its welcome sheet | First launch has not acknowledged the developer menu | Select **Continue**, then close the menu once; later task launches go directly to MoneyMap. |
 | EAS rejects the project ID | Placeholder ID remains | Run `eas init` and commit the generated non-secret project ID. |
 | Package download returns 403 | Registry/network policy blocks npm | Use an approved registry or network; do not manually vendor unverified packages. |
+
+## Full-page mobile screenshots (2026-09-06)
+
+Open the [screenshot gallery](docs/screenshots/2026-09-06/index.html) or download the
+[31-image ZIP](docs/screenshots/moneymap-full-page-2026-09-06.zip). It covers all 14 registered
+screens, including empty/populated views, both transaction modes, import steps and embedded forms.
+The images are native Android captures at 1080 px width, with heights up to 7379 px.
+
+A full-page capture includes content below the phone's initial visible area. The capture
+workflow measures the native scrolling container and expands the emulator height while
+keeping the same mobile width. Pages beyond Android's height limit use overlapping native
+frames joined at verified scroll offsets. A normal `adb screencap` alone captures only
+the current visible area.
+
+See the [capture README](docs/screenshots/2026-09-06/README.md) for prerequisites,
+reproduction commands, sample-data scope and measurement evidence. The gallery was checked
+at desktop and mobile widths. These development-build images do not validate native release
+packaging; the current release configuration's screenshot protection remains unchanged.

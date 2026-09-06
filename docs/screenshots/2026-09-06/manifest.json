@@ -1,0 +1,2555 @@
+{
+  "platform": "Android 16 / API 36",
+  "appId": "com.example.financetracker",
+  "renderer": "native React Native development build with current Metro source",
+  "density": 420,
+  "widthDp": 411.42857142857144,
+  "baseViewport": {
+    "width": 1080,
+    "height": 2400
+  },
+  "method": "Measure native content and scroll end, expand height at unchanged width/density; pages exceeding the emulator limit use measured overlapping native frames with verified pixel alignment.",
+  "captures": [
+    {
+      "slug": "01-dashboard-empty",
+      "title": "Dashboard — empty",
+      "tab": "Home",
+      "screen": "Dashboard",
+      "id": "dashboard-screen",
+      "file": "01-dashboard-empty.png",
+      "width": 1080,
+      "height": 6033,
+      "original": [
+        {
+          "content": {
+            "h": 2142.47607421875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 2142.47607421875,
+            "px": 0,
+            "py": -1332.1904296875,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 2142.47607421875,
+            "px": 0,
+            "py": 51.8095703125,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 2142.47607421875,
+            "px": 0,
+            "py": 51.8095703125,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:36:35.650Z",
+      "hierarchyFile": "evidence/01-dashboard-empty.xml"
+    },
+    {
+      "slug": "02-entry-expense",
+      "title": "Add transaction — expense",
+      "tab": "Home",
+      "screen": "Entry",
+      "id": "entry-screen",
+      "file": "02-entry-expense.png",
+      "width": 1080,
+      "height": 3019,
+      "original": [
+        {
+          "content": {
+            "h": 1073.90478515625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 838.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 1073.90478515625,
+            "px": 0,
+            "py": -183.61904907226562,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 838.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 1073.90478515625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 1074.28564453125,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:36:41.725Z",
+      "hierarchyFile": "evidence/02-entry-expense.xml"
+    },
+    {
+      "slug": "03-history-empty",
+      "title": "History — empty",
+      "tab": "History",
+      "screen": "HistoryList",
+      "id": "history-screen",
+      "file": "03-history-empty.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:36:47.776Z",
+      "hierarchyFile": "evidence/03-history-empty.xml"
+    },
+    {
+      "slug": "04-budgets-empty",
+      "title": "Budgets — empty",
+      "tab": "Budgets",
+      "screen": "BudgetsOverview",
+      "id": "budgets-screen",
+      "file": "04-budgets-empty.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 442.28570556640625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 442.28570556640625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 442.28570556640625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:36:53.745Z",
+      "hierarchyFile": "evidence/04-budgets-empty.xml"
+    },
+    {
+      "slug": "05-recurring-empty",
+      "title": "Recurring and reminders — empty",
+      "tab": "Budgets",
+      "screen": "Recurring",
+      "id": "recurring-screen",
+      "file": "05-recurring-empty.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 509.3333740234375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 509.3333740234375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 509.3333740234375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:36:59.624Z",
+      "hierarchyFile": "evidence/05-recurring-empty.xml"
+    },
+    {
+      "slug": "06-settings",
+      "title": "Settings",
+      "tab": "Settings",
+      "screen": "SettingsOverview",
+      "id": "settings-screen",
+      "file": "06-settings.png",
+      "width": 1080,
+      "height": 3486,
+      "original": [
+        {
+          "content": {
+            "h": 1171.8095703125,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 1171.8095703125,
+            "px": 0,
+            "py": -361.5238342285156,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 1171.8095703125,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 1172.1904296875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:37:05.739Z",
+      "hierarchyFile": "evidence/06-settings.xml"
+    },
+    {
+      "slug": "07-goals-empty",
+      "title": "Savings goals — empty",
+      "tab": "Settings",
+      "screen": "Goals",
+      "id": "goals-screen",
+      "file": "07-goals-empty.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 410.28570556640625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 410.28570556640625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 410.28570556640625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:37:11.743Z",
+      "hierarchyFile": "evidence/07-goals-empty.xml"
+    },
+    {
+      "slug": "08-manage-categories",
+      "title": "Manage categories",
+      "tab": "Settings",
+      "screen": "ManageCategories",
+      "id": "manage-categories-screen",
+      "file": "08-manage-categories.png",
+      "width": 1080,
+      "height": 3557,
+      "original": [
+        {
+          "content": {
+            "h": 1199.238037109375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 1199.238037109375,
+            "px": 0,
+            "py": -388.9523620605469,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 1199.238037109375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 1199.238037109375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:37:17.902Z",
+      "hierarchyFile": "evidence/08-manage-categories.xml"
+    },
+    {
+      "slug": "09-manage-accounts",
+      "title": "Manage accounts",
+      "tab": "Settings",
+      "screen": "ManageAccounts",
+      "id": "manage-accounts-screen",
+      "file": "09-manage-accounts.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 499.80950927734375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 499.80950927734375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 499.80950927734375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:37:23.952Z",
+      "hierarchyFile": "evidence/09-manage-accounts.xml"
+    },
+    {
+      "slug": "10-import-file",
+      "title": "Import CSV or Excel — choose file",
+      "tab": "Settings",
+      "screen": "Import",
+      "id": "import-screen",
+      "file": "10-import-file.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 187.80953979492188,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 187.80953979492188,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 187.80953979492188,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:37:29.831Z",
+      "hierarchyFile": "evidence/10-import-file.xml"
+    },
+    {
+      "slug": "11-restore-backup",
+      "title": "Restore from backup",
+      "tab": "Settings",
+      "screen": "PasteImport",
+      "params": {
+        "mode": "backup"
+      },
+      "id": "paste-import-screen",
+      "file": "11-restore-backup.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 425.90478515625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 425.90478515625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 425.90478515625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:37:35.826Z",
+      "hierarchyFile": "evidence/11-restore-backup.xml"
+    },
+    {
+      "slug": "12-import-pasted-csv",
+      "title": "Import pasted CSV",
+      "tab": "Settings",
+      "screen": "PasteImport",
+      "params": {
+        "mode": "csv"
+      },
+      "id": "paste-import-screen",
+      "file": "12-import-pasted-csv.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 425.90478515625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 425.90478515625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 425.90478515625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:37:41.761Z",
+      "hierarchyFile": "evidence/12-import-pasted-csv.xml"
+    },
+    {
+      "slug": "13-app-lock",
+      "title": "App lock — create PIN",
+      "tab": null,
+      "screen": "AppLock",
+      "id": "app-lock-screen",
+      "file": "13-app-lock.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [],
+      "atEnd": [],
+      "expanded": [],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:37:47.440Z",
+      "hierarchyFile": "evidence/13-app-lock.xml"
+    },
+    {
+      "slug": "14-smart-tips-empty",
+      "title": "Smart Tips — offline, empty",
+      "tab": "Home",
+      "screen": "SmartTips",
+      "id": "smart-tips-screen",
+      "file": "14-smart-tips-empty.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 531.8095092773438,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 531.8095092773438,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 531.8095092773438,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:37:53.513Z",
+      "hierarchyFile": "evidence/14-smart-tips-empty.xml"
+    },
+    {
+      "slug": "15-student-eats",
+      "title": "Student Eats Near Me",
+      "tab": "Home",
+      "screen": "StudentEats",
+      "id": "student-eats-screen",
+      "file": "15-student-eats.png",
+      "width": 1080,
+      "height": 7379,
+      "original": [
+        {
+          "content": {
+            "h": 2655.238037109375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 2655.238037109375,
+            "px": 0,
+            "py": -1844.952392578125,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 2655.238037109375,
+            "px": 0,
+            "py": 51.8095703125,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 2587.047607421875,
+            "px": 0,
+            "py": 51.8095703125,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": {
+        "reason": "Android caps wm size to 7200 pixels",
+        "frames": [
+          {
+            "offsetPx": 0
+          },
+          {
+            "offsetPx": 179,
+            "overlapMeanAbsoluteDifference": 0.0000025,
+            "metrics": {
+              "content": {
+                "h": 2655.238037109375,
+                "px": 0,
+                "py": -16.380859375,
+                "w": 411.4285583496094,
+                "x": 0,
+                "y": 0
+              },
+              "horizontal": false,
+              "viewport": {
+                "h": 2587.047607421875,
+                "px": 0,
+                "py": 51.8095703125,
+                "w": 411.4285583496094,
+                "x": 0,
+                "y": 51.80952453613281
+              }
+            }
+          }
+        ],
+        "coveredContentHeightPx": 6970,
+        "expectedContentHeightPx": 6970
+      },
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:41:37.257Z",
+      "hierarchyFile": "evidence/15-student-eats.xml"
+    },
+    {
+      "slug": "16-entry-income",
+      "title": "Add transaction — income",
+      "tab": "Home",
+      "screen": "Entry",
+      "id": "entry-screen",
+      "file": "16-entry-income.png",
+      "width": 1080,
+      "height": 2715,
+      "original": [
+        {
+          "content": {
+            "h": 958.0952758789062,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 838.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 958.0953369140625,
+            "px": 0,
+            "py": -67.80953979492188,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 838.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 958.0952758789062,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 958.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:41:44.811Z",
+      "hierarchyFile": "evidence/16-entry-income.xml"
+    },
+    {
+      "slug": "17-dashboard-populated",
+      "title": "Dashboard — sample data",
+      "tab": "Home",
+      "screen": "Dashboard",
+      "id": "dashboard-screen",
+      "sample": true,
+      "file": "17-dashboard-populated.png",
+      "width": 1080,
+      "height": 4877,
+      "original": [
+        {
+          "content": {
+            "h": 1702.09521484375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 1702.09521484375,
+            "px": 0,
+            "py": -891.8095703125,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 1702.09521484375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 1702.09521484375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:42:26.958Z",
+      "hierarchyFile": "evidence/17-dashboard-populated.xml"
+    },
+    {
+      "slug": "18-history-populated",
+      "title": "History — sample data",
+      "tab": "History",
+      "screen": "HistoryList",
+      "id": "history-screen",
+      "sample": true,
+      "file": "18-history-populated.png",
+      "width": 1080,
+      "height": 3381,
+      "original": [
+        {
+          "content": {
+            "h": 1131.8095703125,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 1131.8095703125,
+            "px": 0,
+            "py": -321.5238342285156,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 1132.1904296875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 1132.1904296875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:42:34.087Z",
+      "hierarchyFile": "evidence/18-history-populated.xml"
+    },
+    {
+      "slug": "19-budgets-populated",
+      "title": "Budgets — sample data",
+      "tab": "Budgets",
+      "screen": "BudgetsOverview",
+      "id": "budgets-screen",
+      "sample": true,
+      "file": "19-budgets-populated.png",
+      "width": 1080,
+      "height": 2690,
+      "original": [
+        {
+          "content": {
+            "h": 868.9523315429688,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 868.952392578125,
+            "px": 0,
+            "py": -58.666717529296875,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 868.952392578125,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 868.952392578125,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:42:41.133Z",
+      "hierarchyFile": "evidence/19-budgets-populated.xml"
+    },
+    {
+      "slug": "20-recurring-populated",
+      "title": "Recurring and reminders — sample data",
+      "tab": "Budgets",
+      "screen": "Recurring",
+      "id": "recurring-screen",
+      "sample": true,
+      "file": "20-recurring-populated.png",
+      "width": 1080,
+      "height": 2595,
+      "original": [
+        {
+          "content": {
+            "h": 832.7619018554688,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 832.7619018554688,
+            "px": 0,
+            "py": -22.4761962890625,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 832.7619018554688,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 832.7619018554688,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:42:48.103Z",
+      "hierarchyFile": "evidence/20-recurring-populated.xml"
+    },
+    {
+      "slug": "21-goals-populated",
+      "title": "Savings goals — sample data",
+      "tab": "Settings",
+      "screen": "Goals",
+      "id": "goals-screen",
+      "sample": true,
+      "file": "21-goals-populated.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 752.7619018554688,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 752.7619018554688,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 752.7619018554688,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:42:54.973Z",
+      "hierarchyFile": "evidence/21-goals-populated.xml"
+    },
+    {
+      "slug": "22-smart-tips-populated",
+      "title": "Smart Tips — offline, sample data",
+      "tab": "Home",
+      "screen": "SmartTips",
+      "id": "smart-tips-screen",
+      "sample": true,
+      "file": "22-smart-tips-populated.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 703.6190795898438,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 703.6190795898438,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 703.6190795898438,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:43:01.839Z",
+      "hierarchyFile": "evidence/22-smart-tips-populated.xml"
+    },
+    {
+      "slug": "23-accounts-archived",
+      "title": "Accounts — active and archived sample data",
+      "tab": "Settings",
+      "screen": "ManageAccounts",
+      "id": "manage-accounts-screen",
+      "sample": true,
+      "file": "23-accounts-archived.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 610.2857055664062,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 610.2857055664062,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 610.2857055664062,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:43:08.585Z",
+      "hierarchyFile": "evidence/23-accounts-archived.xml"
+    },
+    {
+      "slug": "24-import-preview-left",
+      "title": "Import — preview first columns",
+      "tab": "Settings",
+      "screen": "Import",
+      "id": "import-screen",
+      "importSample": true,
+      "file": "24-import-preview-left.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 384.76190185546875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        },
+        {
+          "content": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 720,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": true,
+          "viewport": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 335.23809814453125,
+            "x": 17.904762268066406,
+            "y": 17.904762268066406
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 384.76190185546875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        },
+        {
+          "content": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 720,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": true,
+          "viewport": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 335.23809814453125,
+            "x": 17.904762268066406,
+            "y": 17.904762268066406
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 384.76190185546875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        },
+        {
+          "content": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 720,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": true,
+          "viewport": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 335.23809814453125,
+            "x": 17.904762268066406,
+            "y": 17.904762268066406
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:43:46.293Z",
+      "hierarchyFile": "evidence/24-import-preview-left.xml"
+    },
+    {
+      "slug": "25-import-preview-right",
+      "title": "Import — preview remaining columns",
+      "tab": "Settings",
+      "screen": "Import",
+      "id": "import-screen",
+      "importSample": true,
+      "horizontalEnd": true,
+      "file": "25-import-preview-right.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 384.76190185546875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        },
+        {
+          "content": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 720,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": true,
+          "viewport": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 335.23809814453125,
+            "x": 17.904762268066406,
+            "y": 17.904762268066406
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 384.76190185546875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        },
+        {
+          "content": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 720,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": true,
+          "viewport": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 335.23809814453125,
+            "x": 17.904762268066406,
+            "y": 17.904762268066406
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 384.76190185546875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        },
+        {
+          "content": {
+            "h": 163.4285888671875,
+            "px": -346.6666259765625,
+            "py": 170.28570556640625,
+            "w": 720,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": true,
+          "viewport": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 335.23809814453125,
+            "x": 17.904762268066406,
+            "y": 17.904762268066406
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:43:53.773Z",
+      "hierarchyFile": "evidence/25-import-preview-right.xml"
+    },
+    {
+      "slug": "26-import-map-columns",
+      "title": "Import — map columns",
+      "tab": "Settings",
+      "screen": "Import",
+      "id": "import-screen",
+      "importSample": true,
+      "file": "26-import-map-columns.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 475.80950927734375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 475.80950927734375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 475.80950927734375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:44:01.849Z",
+      "hierarchyFile": "evidence/26-import-map-columns.xml"
+    },
+    {
+      "slug": "27-import-validate",
+      "title": "Import — validation",
+      "tab": "Settings",
+      "screen": "Import",
+      "id": "import-screen",
+      "importSample": true,
+      "file": "27-import-validate.png",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 266.28570556640625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 266.28570556640625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 266.28570556640625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:44:10.441Z",
+      "hierarchyFile": "evidence/27-import-validate.xml"
+    },
+    {
+      "slug": "28-budget-category-form",
+      "title": "Budgets — category icon form",
+      "tab": "Budgets",
+      "screen": "BudgetsOverview",
+      "id": "budgets-screen",
+      "sample": true,
+      "file": "28-budget-category-form.png",
+      "width": 1080,
+      "height": 3638,
+      "original": [
+        {
+          "content": {
+            "h": 1229.71435546875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 1229.71435546875,
+            "px": 0,
+            "py": -419.4285583496094,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 1229.71435546875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 1230.09521484375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:44:18.653Z",
+      "hierarchyFile": "evidence/28-budget-category-form.xml"
+    },
+    {
+      "slug": "29-recurring-bill-form",
+      "title": "Recurring — frequency, category, reminder form",
+      "tab": "Budgets",
+      "screen": "Recurring",
+      "id": "recurring-screen",
+      "sample": true,
+      "file": "29-recurring-bill-form.png",
+      "width": 1080,
+      "height": 4607,
+      "original": [
+        {
+          "content": {
+            "h": 1598.857177734375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 1598.857177734375,
+            "px": 0,
+            "py": -788.571533203125,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 1598.857177734375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 1599.238037109375,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:44:27.025Z",
+      "hierarchyFile": "evidence/29-recurring-bill-form.xml"
+    },
+    {
+      "slug": "30-account-type-form",
+      "title": "Accounts — create account type",
+      "tab": "Settings",
+      "screen": "ManageAccounts",
+      "id": "manage-accounts-screen",
+      "file": "30-account-type-form.png",
+      "width": 1080,
+      "height": 2610,
+      "original": [
+        {
+          "content": {
+            "h": 838.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 838.4761962890625,
+            "px": 0,
+            "py": -28.19049072265625,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 838.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 838.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:44:35.211Z",
+      "sample": true,
+      "hierarchyFile": "evidence/30-account-type-form.xml"
+    },
+    {
+      "slug": "31-import-preview-middle",
+      "title": "Import — preview middle columns",
+      "tab": "Settings",
+      "screen": "Import",
+      "id": "import-screen",
+      "importSample": true,
+      "horizontalFraction": 0.5,
+      "file": "31-import-preview-middle.png",
+      "hierarchyFile": "evidence/31-import-preview-middle.xml",
+      "width": 1080,
+      "height": 2400,
+      "original": [
+        {
+          "content": {
+            "h": 384.76190185546875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        },
+        {
+          "content": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 720,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": true,
+          "viewport": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 335.23809814453125,
+            "x": 17.904762268066406,
+            "y": 17.904762268066406
+          }
+        }
+      ],
+      "atEnd": [
+        {
+          "content": {
+            "h": 384.76190185546875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        },
+        {
+          "content": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 720,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": true,
+          "viewport": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 335.23809814453125,
+            "x": 17.904762268066406,
+            "y": 17.904762268066406
+          }
+        }
+      ],
+      "expanded": [
+        {
+          "content": {
+            "h": 384.76190185546875,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": false,
+          "viewport": {
+            "h": 758.4761962890625,
+            "px": 0,
+            "py": 51.80950927734375,
+            "w": 411.4285583496094,
+            "x": 0,
+            "y": 51.80952453613281
+          }
+        },
+        {
+          "content": {
+            "h": 163.4285888671875,
+            "px": -154.2857208251953,
+            "py": 170.28570556640625,
+            "w": 720,
+            "x": 0,
+            "y": 0
+          },
+          "horizontal": true,
+          "viewport": {
+            "h": 163.4285888671875,
+            "px": 38.09523010253906,
+            "py": 170.28570556640625,
+            "w": 335.23809814453125,
+            "x": 17.904762268066406,
+            "y": 17.904762268066406
+          }
+        }
+      ],
+      "stitched": null,
+      "verticalOverflowDp": 0,
+      "capturedAt": "2026-09-06T12:47:29.030Z"
+    }
+  ],
+  "sourceCommit": "33b4c83",
+  "appearance": "light (system default)"
+}

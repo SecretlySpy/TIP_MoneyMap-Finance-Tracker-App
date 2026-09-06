@@ -1,0 +1,235 @@
+{
+  "status": "QA_PASSED",
+  "scope": "Native screenshot coverage and image integrity only",
+  "verifiedAt": "2026-09-06T12:48:28.353Z",
+  "registeredScreens": 14,
+  "captures": 31,
+  "sourceCommit": "33b4c83",
+  "verticalContentComplete": true,
+  "horizontalPreviewCoverage": [
+    {
+      "file": "24-import-preview-left.png",
+      "start": 0,
+      "end": 335.23809814453125,
+      "width": 720
+    },
+    {
+      "file": "31-import-preview-middle.png",
+      "start": 192.38095092773438,
+      "end": 527.6190490722656,
+      "width": 720
+    },
+    {
+      "file": "25-import-preview-right.png",
+      "start": 384.76185607910156,
+      "end": 719.9999542236328,
+      "width": 720
+    }
+  ],
+  "sourceHashes": {
+    "src/screens/DashboardScreen.jsx": "2ab12ff1c5c624d6ea024855e655cc431a4566dbf052642defda95f125f6b044",
+    "src/screens/EntryScreen.jsx": "c5814857f49312173473a2b0197cc0dd3cb2b5eb531de391467157656990c590",
+    "src/screens/SmartTipsScreen.jsx": "6d9da261efed29b5a656d46a416aa51d5cb302bd069ae9be0a43fc94a43758d8",
+    "src/screens/StudentEatsScreen.jsx": "bc5ce24eb40bff59fb439fa41b2efe6c6b87acba9e57292a9d40f0cac455a9a4",
+    "src/screens/HistoryScreen.jsx": "36be1c46c9561bb52d852d50a326a2f9ee5ce9b027cf376e86d9c780b5d88557",
+    "src/screens/BudgetsScreen.jsx": "755a4631bd449704dde36e12ee0d44b21cce8c69ba6156713eb9dce0ba3e4cf2",
+    "src/screens/RecurringScreen.jsx": "5cccb1c2fab168b2b622b2dd6f69940fe7cfa1c9dc127382e3bad3c6b9646f6d",
+    "src/screens/SettingsScreen.jsx": "ee552182f29a5af48aad12d60f5ba98045c88cfedcd659f634b52e0ec440c299",
+    "src/screens/GoalsScreen.jsx": "ca0ac6dc49fc84a496245f09fb5a27844b3a836ef9bffc51c5025dda2c6a526b",
+    "src/screens/ManageCategoriesScreen.jsx": "3ba78660608e596a6ac26aff7d9944bfa35dfc5b963c8caaa6adfc1a9cba4ac3",
+    "src/screens/ManageAccountsScreen.jsx": "0fb8152ed1e09f00c18feb1538e4c9aaf3080db6ce734a3bf7a7d0ed7e483505",
+    "src/screens/PasteImportScreen.jsx": "12fce86834d8ed550b5843ba748a9d4a71d484adeec4364b2df0888ba279f105",
+    "src/screens/ImportScreen.jsx": "72f1f34257b8ccbb3489d8a2ef2e4d7654dd8accd6e8eb1233200e8164c9ca1d",
+    "src/screens/AppLockScreen.jsx": "1f06a8f9648d344773ef570b9f7f7f08b7032c984006eedcccfa7ca0ccdc1a8c",
+    "src/navigation/RootNavigator.jsx": "7038443e391bbc8cc5020526cf4755d7b36e4c2af9acf96f8fcfba34dbbba037",
+    "src/components/ScreenContainer.jsx": "90b52444ae18773d45baa0896783eea021dbb865967281894ece1583eba43c3f"
+  },
+  "files": [
+    {
+      "file": "01-dashboard-empty.png",
+      "width": 1080,
+      "height": 6033,
+      "sha256": "2aa280cbddea3f03d9c2650bb11d2242386be210eb9ba7c4ccf6871142f3015c"
+    },
+    {
+      "file": "02-entry-expense.png",
+      "width": 1080,
+      "height": 3019,
+      "sha256": "c1c6d35d3f448e0e1c9c2d65ffa22e89aad4a816a67b1543e4797f61870ec41f"
+    },
+    {
+      "file": "03-history-empty.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "4d2bf69f77c7118ef0d6812e6a1267a771399c4bdb415a2d4904edaaf8b3b68e"
+    },
+    {
+      "file": "04-budgets-empty.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "ad06ed07fe0fa1f05c4eed44bdba435e7108bce086304304a4089289c8471438"
+    },
+    {
+      "file": "05-recurring-empty.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "521594ecf570bc4b6e9e8afa0dbd1826e8da097055b65db4155ad572f63fae50"
+    },
+    {
+      "file": "06-settings.png",
+      "width": 1080,
+      "height": 3486,
+      "sha256": "35cd5e74fab21956ee160b8358b77ebbf70be22c31e2c885b498e015b1886fb2"
+    },
+    {
+      "file": "07-goals-empty.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "f59cad79b720aac4b648aa9deea19b2acda5a3e7b04bd87c58a6582844d4d093"
+    },
+    {
+      "file": "08-manage-categories.png",
+      "width": 1080,
+      "height": 3557,
+      "sha256": "dd50dd9a1889f0e257de31b80a396094c618a9a03b7a494ec3c88e4f2cc5f260"
+    },
+    {
+      "file": "09-manage-accounts.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "c1e46b43dc3a5460952dfec2f9b18d8cbda0bde0f52a13970e27b7b824b99702"
+    },
+    {
+      "file": "10-import-file.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "d780be22f243e34d25ca3d7079fd6493a296bc17edb472ceec33a5a9bd8d4624"
+    },
+    {
+      "file": "11-restore-backup.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "f614d30aae8ce1e95fac189324416181fcc81b89387ed239c774e642903c8c99"
+    },
+    {
+      "file": "12-import-pasted-csv.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "62b9978539a23c5e8e625542fedde5c8c2823c4bd89909f3ed01de427d4921b5"
+    },
+    {
+      "file": "13-app-lock.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "1080751e6983760e84d0fc75e01f835e7aad49f884b6aaaafed3fea99aa8334b"
+    },
+    {
+      "file": "14-smart-tips-empty.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "df014f8d628e71f2cab333b47041eb5a28f6ee3b9854891a2649b26ea46edfaf"
+    },
+    {
+      "file": "15-student-eats.png",
+      "width": 1080,
+      "height": 7379,
+      "sha256": "84b217e8434fc9bd0bcaa86c0192fbbc5d484a6420a25df3ca6f38ff72d6a36e"
+    },
+    {
+      "file": "16-entry-income.png",
+      "width": 1080,
+      "height": 2715,
+      "sha256": "f2a5f85cf8ccd7884e38e00edb3e548afbc4865db781f50b64b5c150d2546849"
+    },
+    {
+      "file": "17-dashboard-populated.png",
+      "width": 1080,
+      "height": 4877,
+      "sha256": "6622faa9dc5cdcede0bc791181c55764652714b78a849c7ae3c0b0527e098240"
+    },
+    {
+      "file": "18-history-populated.png",
+      "width": 1080,
+      "height": 3381,
+      "sha256": "5996fb56cd38fea957eb6b1b578312b703e5dbd851f9d9b63d9071876f6c0a0b"
+    },
+    {
+      "file": "19-budgets-populated.png",
+      "width": 1080,
+      "height": 2690,
+      "sha256": "5143555a7ea979e4b822d6601fd8a3c4f0d21f71f780a1b7f1d4290636e96676"
+    },
+    {
+      "file": "20-recurring-populated.png",
+      "width": 1080,
+      "height": 2595,
+      "sha256": "8d1bbd9790b2af3a11d799c6b39cc0f2e50e6d2d53371f14be2457de4b5180e1"
+    },
+    {
+      "file": "21-goals-populated.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "82c0440d871a038c9bce2e0dba35a11fba54f0970de3cab9c03315471e71b622"
+    },
+    {
+      "file": "22-smart-tips-populated.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "d1209a75dc698f2cc7a1a9ac65a1674635c7781f196313c8ca0b41c00b50e0be"
+    },
+    {
+      "file": "23-accounts-archived.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "0a15afffaa3408df9df30f641091845edccb4c30a537debaba190f40f1c1e609"
+    },
+    {
+      "file": "24-import-preview-left.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "d7b98ba8101ee3c31744e359dbac53f926d2b4932ba538e9427407aa8ff12dd1"
+    },
+    {
+      "file": "25-import-preview-right.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "6f1c0faa2f7e754d2cc98269ca1ef55ac1d0a239eb1b9758a8352cc4dd5d7e7f"
+    },
+    {
+      "file": "26-import-map-columns.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "cb6b7178e6caa0d37172072d9979335bca05e02fb80561d132cbfc7faa6c7625"
+    },
+    {
+      "file": "27-import-validate.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "fc98868c604dfee80e4f962bfe6e7429635a2de369371478595363991f7cbee0"
+    },
+    {
+      "file": "28-budget-category-form.png",
+      "width": 1080,
+      "height": 3638,
+      "sha256": "c93163cd0271cda4b6fbc8acf0bd20803b4ed864e0747007c7555a9da7a42ab5"
+    },
+    {
+      "file": "29-recurring-bill-form.png",
+      "width": 1080,
+      "height": 4607,
+      "sha256": "3058eb0d71deed48ec82e20b6ff6942549536d4976b0deb878aa45971e627651"
+    },
+    {
+      "file": "30-account-type-form.png",
+      "width": 1080,
+      "height": 2610,
+      "sha256": "b8948b8bea30236de5acebb6b27f21e5ee5508002ba82375ecfeda16cd935638"
+    },
+    {
+      "file": "31-import-preview-middle.png",
+      "width": 1080,
+      "height": 2400,
+      "sha256": "bae5d431a9f0b223509f826ed0fd3fad755a2ac512b27a24a15dd52135508603"
+    }
+  ]
+}

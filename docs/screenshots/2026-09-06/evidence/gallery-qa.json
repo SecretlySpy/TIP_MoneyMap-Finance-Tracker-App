@@ -1,0 +1,26 @@
+[
+  {
+    "width": 1440,
+    "scrollWidth": 1425,
+    "images": 31,
+    "loaded": 31,
+    "uncropped": true,
+    "cards": 31,
+    "filter": {
+      "visible": 1,
+      "message": "Showing 1 of 31 screenshots"
+    }
+  },
+  {
+    "width": 390,
+    "scrollWidth": 375,
+    "images": 31,
+    "loaded": 31,
+    "uncropped": true,
+    "cards": 31,
+    "filter": {
+      "visible": 1,
+      "message": "Showing 1 of 31 screenshots"
+    }
+  }
+]
