@@ -1,4 +1,70 @@
-import { buildBudgetCards, budgetSummary, transactionInMonth } from "./financeView";
+import { buildBudgetCards, budgetSummary } from "./financeView";
+import { advanceNextRunEpochMillis } from "./recurringCatchUp";
+
+const MAX_PROJECTED_RECURRING_RUNS = 366;
+
+function monthBounds(monthYear) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(monthYear ?? ""));
+  if (match === null) {
+    throw new Error("monthYear must use YYYY-MM format.");
+  }
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  if (monthIndex < 0 || monthIndex > 11) {
+    throw new Error("monthYear must use a real calendar month.");
+  }
+  return {
+    start: new Date(year, monthIndex, 1, 0, 0, 0, 0).getTime(),
+    end: new Date(year, monthIndex + 1, 1, 0, 0, 0, 0).getTime() - 1,
+    year,
+    monthIndex,
+  };
+}
+
+function monthlyGoalContribution(goal, bounds) {
+  if (goal.isArchived || goal.deadlineEpochMillis === null) {
+    return 0;
+  }
+  const remaining = Math.max(0, goal.targetMinor - goal.currentMinor);
+  if (remaining === 0 || goal.createdEpochMillis > bounds.end) {
+    return 0;
+  }
+  const deadline = new Date(goal.deadlineEpochMillis);
+  const monthsThroughDeadline =
+    (deadline.getFullYear() - bounds.year) * 12
+    + deadline.getMonth()
+    - bounds.monthIndex
+    + 1;
+  return Math.ceil(remaining / Math.max(1, monthsThroughDeadline));
+}
+
+function projectedRecurring(rule, transactions, bounds) {
+  const empty = { count: 0, minor: 0 };
+  if (!rule.isActive || rule.type !== "EXPENSE" || rule.nextRunEpochMillis > bounds.end) {
+    return empty;
+  }
+  const postedRuns = new Set(
+    transactions
+      .filter((transaction) => transaction.recurringRuleId === rule.id)
+      .map((transaction) => transaction.dateEpochMillis),
+  );
+  let nextRun = rule.nextRunEpochMillis;
+  let minor = 0;
+  let count = 0;
+  let guard = 0;
+  const frequency = ["DAILY", "WEEKLY", "MONTHLY"].includes(rule.frequency)
+    ? rule.frequency
+    : "MONTHLY";
+  while (nextRun <= bounds.end && guard < MAX_PROJECTED_RECURRING_RUNS) {
+    if (nextRun >= bounds.start && !postedRuns.has(nextRun)) {
+      minor += Math.max(0, rule.amountMinor);
+      count += 1;
+    }
+    nextRun = advanceNextRunEpochMillis(nextRun, frequency, rule.anchorDay);
+    guard += 1;
+  }
+  return { count, minor };
+}
 
 /**
  * Pure Safe-to-Spend: remaining budgets − upcoming recurring − goal reserves.
@@ -15,7 +81,7 @@ import { buildBudgetCards, budgetSummary, transactionInMonth } from "./financeVi
  * }} input
  */
 export function computeSafeToSpend(input) {
-  const now = input.nowEpochMillis ?? Date.now();
+  const bounds = monthBounds(input.monthYear);
   const cards = buildBudgetCards(
     input.budgets ?? [],
     input.transactions ?? [],
@@ -23,28 +89,23 @@ export function computeSafeToSpend(input) {
     input.monthYear,
   );
   const summary = budgetSummary(cards);
-  const remainingBudgetsMinor = Math.max(0, summary.limitMinor - summary.spentMinor);
+  const rawBudgetHeadroomMinor = summary.limitMinor - summary.spentMinor;
+  const remainingBudgetsMinor = Math.max(0, rawBudgetHeadroomMinor);
 
-  const upcomingRecurringMinor = (input.recurringRules ?? [])
-    .filter((rule) => rule.isActive && rule.type === "EXPENSE")
-    .filter((rule) => transactionInMonth(
-      { dateEpochMillis: rule.nextRunEpochMillis, type: "EXPENSE", amountMinor: 1 },
-      input.monthYear,
-    ) || rule.nextRunEpochMillis <= now + 14 * 24 * 60 * 60 * 1000)
-    .reduce((sum, rule) => sum + Math.max(0, rule.amountMinor), 0);
+  const projected = (input.recurringRules ?? []).map((rule) =>
+    projectedRecurring(rule, input.transactions ?? [], bounds)
+  );
+  const upcomingRecurringMinor = projected.reduce((sum, item) => sum + item.minor, 0);
+  const upcomingRecurringCount = projected.reduce((sum, item) => sum + item.count, 0);
 
-  // Reserves: remaining toward incomplete, non-archived goals.
-  const goalReservesMinor = (input.goals ?? [])
-    .filter((goal) => !goal.isArchived)
-    .reduce((sum, goal) => {
-      const remaining = Math.max(0, goal.targetMinor - goal.currentMinor);
-      return sum + remaining;
-    }, 0);
+  // Only deadline-based monthly contributions are commitments for this month.
+  const goalContributions = (input.goals ?? []).map((goal) => monthlyGoalContribution(goal, bounds));
+  const goalReservesMinor = goalContributions.reduce((sum, minor) => sum + minor, 0);
+  const goalReserveCount = goalContributions.filter((minor) => minor > 0).length;
 
-  // Cap goal drag so open-ended large goals don't zero the card permanently.
-  const cappedGoalReserves = Math.min(goalReservesMinor, remainingBudgetsMinor);
-
-  const safeMinor = remainingBudgetsMinor - upcomingRecurringMinor - cappedGoalReserves;
+  const rawSafeMinor = rawBudgetHeadroomMinor - upcomingRecurringMinor - goalReservesMinor;
+  const safeMinor = Math.max(0, rawSafeMinor);
+  const overCommittedMinor = Math.max(0, -rawSafeMinor);
   const hasCommitments = summary.limitMinor > 0
     || upcomingRecurringMinor > 0
     || goalReservesMinor > 0;
@@ -52,7 +113,7 @@ export function computeSafeToSpend(input) {
   if (!hasCommitments) {
     // Nothing to measure against yet: the card should invite setup, not warn.
     state = "unset";
-  } else if (safeMinor <= 0) {
+  } else if (rawSafeMinor <= 0) {
     state = "over";
   } else if (remainingBudgetsMinor > 0 && safeMinor < remainingBudgetsMinor * 0.2) {
     state = "tight";
@@ -63,8 +124,11 @@ export function computeSafeToSpend(input) {
   return {
     remainingBudgetsMinor,
     upcomingRecurringMinor,
-    goalReservesMinor: cappedGoalReserves,
+    upcomingRecurringCount,
+    goalReservesMinor,
+    goalReserveCount,
     safeMinor,
+    overCommittedMinor,
     state,
   };
 }

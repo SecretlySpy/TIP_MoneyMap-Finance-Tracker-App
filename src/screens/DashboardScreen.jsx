@@ -204,6 +204,7 @@ export function DashboardScreen({ navigation }) {
       <SafeToSpendCard
         currencySymbol={currencySymbol}
         goalReservesMinor={safeToSpend.goalReservesMinor}
+        overCommittedMinor={safeToSpend.overCommittedMinor}
         remainingBudgetsMinor={safeToSpend.remainingBudgetsMinor}
         safeMinor={safeToSpend.safeMinor}
         state={safeToSpend.state}
@@ -232,48 +233,71 @@ export function DashboardScreen({ navigation }) {
         </Pressable>
       ) : null}
 
+      <View style={{ gap: theme.spacing.sm }}>
+        <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
+          Quick actions
+        </Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm }}>
+          {[
+            {
+              label: "🧾 History",
+              onPress: () => tabNavigation?.navigate("History", { screen: "HistoryList" }),
+            },
+            {
+              label: "📊 Budgets",
+              onPress: () => tabNavigation?.navigate("Budgets", { screen: "BudgetsOverview" }),
+            },
+            {
+              label: "🔁 Recurring",
+              onPress: () => tabNavigation?.navigate("Budgets", { screen: "Recurring" }),
+            },
+          ].map((action) => (
+            <Pressable
+              key={action.label}
+              accessibilityLabel={action.label.replace(/^\S+\s/, "")}
+              accessibilityRole="button"
+              onPress={action.onPress}
+              style={{
+                alignItems: "center",
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+                borderRadius: theme.radii.chip,
+                borderWidth: 1,
+                flexGrow: 1,
+                justifyContent: "center",
+                minHeight: theme.sizes.secondaryButton,
+                minWidth: "30%",
+                paddingHorizontal: theme.spacing.md,
+                paddingVertical: theme.spacing.sm,
+              }}
+            >
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                {action.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm }}>
-        {smartTipsEnabled ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.navigate("SmartTips")}
-            style={{
-              backgroundColor: theme.colors.tint,
-              borderRadius: theme.radii.row,
-              flexGrow: 1,
-              minWidth: "46%",
-              padding: theme.spacing.lg,
-            }}
-          >
-            <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
-              ✨ Smart Tips
-            </Text>
-            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny, marginTop: theme.spacing.xxs }}>
-              From your spending
-            </Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => tabNavigation?.navigate("Settings", { screen: "SettingsOverview" })}
-            style={{
-              backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.outline,
-              borderRadius: theme.radii.row,
-              borderWidth: theme.spacing.hairline,
-              flexGrow: 1,
-              minWidth: "46%",
-              padding: theme.spacing.lg,
-            }}
-          >
-            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
-              ✨ Try Smart Tips
-            </Text>
-            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny, marginTop: theme.spacing.xxs }}>
-              Offline tips · optional AI · enable in Settings
-            </Text>
-          </Pressable>
-        )}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => navigation.navigate("SmartTips")}
+          style={{
+            backgroundColor: theme.colors.tint,
+            borderRadius: theme.radii.row,
+            flexGrow: 1,
+            minWidth: "46%",
+            padding: theme.spacing.lg,
+          }}
+        >
+          <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
+            ✨ Smart Tips
+          </Text>
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny, marginTop: theme.spacing.xxs }}>
+            Offline tips{smartTipsEnabled ? " · online personalization on" : " · optional online personalization"}
+          </Text>
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           onPress={() => navigation.navigate("StudentEats")}
@@ -335,9 +359,21 @@ export function DashboardScreen({ navigation }) {
       </SectionCard>
 
       <SectionCard shadowed style={{ gap: theme.spacing.lg }}>
-        <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.cardHeader }}>
-          Spending by Category
-        </Text>
+        <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.cardHeader }}>
+            Spending by Category
+          </Text>
+          <Pressable
+            accessibilityLabel="See budgets"
+            accessibilityRole="button"
+            hitSlop={theme.spacing.sm}
+            onPress={() => tabNavigation?.navigate("Budgets", { screen: "BudgetsOverview" })}
+          >
+            <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
+              See budgets
+            </Text>
+          </Pressable>
+        </View>
         {spending.totalMinor <= 0 ? (
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
             No expenses this month yet — your donut fills as you log spends.

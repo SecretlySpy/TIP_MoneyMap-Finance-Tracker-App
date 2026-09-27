@@ -1,16 +1,16 @@
 import { useMemo, useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Alert, Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
+import { BottomSheet } from "../components/BottomSheet";
 import { BudgetCard } from "../components/BudgetCard";
-import { DashedButton } from "../components/Buttons";
-import { EmojiPickerRow } from "../components/EmojiPickerRow";
+import { DashedButton, PrimaryButton } from "../components/Buttons";
+import { EmojiGrid } from "../components/EmojiGrid";
 import { EmptyState } from "../components/EmptyState";
 import { MonthChip } from "../components/MonthChip";
 import { ScreenContainer } from "../components/ScreenContainer";
-import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
 import { BUDGET_BILL_EMOJI_PRESETS } from "../domain/services/emoji";
-import { budgetSummary, buildBudgetCards } from "../domain/services/financeView";
+import { budgetSummary, buildBudgetCards, formatMonthChip } from "../domain/services/financeView";
 import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -29,11 +29,13 @@ export function BudgetsScreen({ navigation }) {
   const deleteBudgetByCategoryName = useFinanceStore((state) => state.deleteBudgetByCategoryName);
 
   const [busy, setBusy] = useState(false);
-  const [step, setStep] = useState(null); // name | emoji | limit | rename
+  const [sheetStep, setSheetStep] = useState(null); // name | limit
   const [pendingCategoryName, setPendingCategoryName] = useState("");
   const [pendingEmoji, setPendingEmoji] = useState(BUDGET_BILL_EMOJI_PRESETS[0]);
+  const [pendingLimitInput, setPendingLimitInput] = useState("1500.00");
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [editingLimitName, setEditingLimitName] = useState(null);
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
 
   const { categoriesById } = useMemo(
     () => mapsFromState({ accounts: [], categories }),
@@ -48,12 +50,19 @@ export function BudgetsScreen({ navigation }) {
   const beginAddBudget = () => {
     setPendingCategoryName("");
     setPendingEmoji(BUDGET_BILL_EMOJI_PRESETS[0]);
+    setPendingLimitInput("1500.00");
     setEditingLimitName(null);
-    setStep("name");
+    setSheetStep("name");
   };
 
-  const handleNameConfirm = (value) => {
-    const name = value.trim();
+  const closeSheet = () => {
+    setSheetStep(null);
+    setPendingCategoryName("");
+    setEditingLimitName(null);
+  };
+
+  const handleNameStepNext = () => {
+    const name = pendingCategoryName.trim();
     if (name.length === 0) {
       Alert.alert("Name required", "Enter a category name for this budget (e.g. Food, School).");
       return;
@@ -69,8 +78,7 @@ export function BudgetsScreen({ navigation }) {
         return;
       }
     }
-    setPendingCategoryName(name);
-    setStep("emoji");
+    setSheetStep("limit");
   };
 
   const handleLimitConfirm = async (value) => {
@@ -103,7 +111,7 @@ export function BudgetsScreen({ navigation }) {
           monthYear: selectedMonthYear,
         });
       }
-      setStep(null);
+      setSheetStep(null);
       setPendingCategoryName("");
       setEditingLimitName(null);
     } catch (error) {
@@ -118,7 +126,7 @@ export function BudgetsScreen({ navigation }) {
     setBusy(true);
     try {
       await renameCategory(editingCategoryId, value);
-      setStep(null);
+      setRenameModalVisible(false);
       setEditingCategoryId(null);
     } catch (error) {
       Alert.alert("Rename failed", error instanceof Error ? error.message : "Could not rename.");
@@ -144,7 +152,8 @@ export function BudgetsScreen({ navigation }) {
               onPress: () => {
                 setEditingLimitName(budget.name);
                 setPendingCategoryName(budget.name);
-                setStep("limit");
+                setPendingLimitInput(((budget.limitMinor) / 100).toFixed(2));
+                setSheetStep("limit");
               },
             },
             {
@@ -155,7 +164,7 @@ export function BudgetsScreen({ navigation }) {
                   return;
                 }
                 setEditingCategoryId(category.id);
-                setStep("rename");
+                setRenameModalVisible(true);
               },
             },
           ]);
@@ -251,63 +260,85 @@ export function BudgetsScreen({ navigation }) {
         </>
       ) : null}
 
-      <TextPromptModal
-        confirmLabel="Next"
-        message="Existing expense category or a new custom name."
-        onCancel={() => {
-          setStep(null);
-          setPendingCategoryName("");
-        }}
-        onConfirm={handleNameConfirm}
-        placeholder="Food, School, Load…"
-        title="Budget category name"
-        visible={step === "name"}
-      />
+      {/* 08 Add Budget - Step 1: Category & Icon */}
+      <BottomSheet
+        onClose={closeSheet}
+        testID="add-budget-step1-sheet"
+        title="New budget"
+        visible={sheetStep === "name"}
+      >
+        <TextInput
+          autoFocus
+          onChangeText={setPendingCategoryName}
+          placeholder="Sample supplies"
+          placeholderTextColor={theme.colors.sub}
+          style={{
+            backgroundColor: theme.colors.bg,
+            borderRadius: theme.radii.row,
+            color: theme.colors.text,
+            fontFamily: theme.fonts.medium,
+            fontSize: theme.typeScale.body,
+            height: 48,
+            paddingHorizontal: theme.spacing.lg,
+          }}
+          value={pendingCategoryName}
+        />
+        <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
+          Icon
+        </Text>
+        <EmojiGrid onChange={setPendingEmoji} value={pendingEmoji} />
+        <PrimaryButton onPress={handleNameStepNext}>
+          Next: set limit
+        </PrimaryButton>
+        <Pressable
+          accessibilityRole="button"
+          onPress={closeSheet}
+          style={{ alignItems: "center", justifyContent: "center", minHeight: 44 }}
+        >
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium }}>Cancel</Text>
+        </Pressable>
+      </BottomSheet>
 
-      {step === "emoji" ? (
-        <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.lg }}>
-          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
-            Icon for “{pendingCategoryName}”
-          </Text>
-          <EmojiPickerRow onChange={setPendingEmoji} value={pendingEmoji} />
-          <DashedButton
-            onPress={() => setStep("limit")}
-          >
-            Next: set limit
-          </DashedButton>
-          <Pressable
-            onPress={() => {
-              setStep(null);
-              setPendingCategoryName("");
-            }}
-            style={{ minHeight: 44, justifyContent: "center" }}
-          >
-            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, textAlign: "center" }}>
-              Cancel
-            </Text>
-          </Pressable>
-        </SectionCard>
-      ) : null}
+      {/* 08b Add Budget - Step 2: Set Limit */}
+      <BottomSheet
+        onClose={closeSheet}
+        testID="add-budget-step2-sheet"
+        title="Set monthly limit"
+        visible={sheetStep === "limit"}
+      >
+        <TextInput
+          autoFocus
+          keyboardType="decimal-pad"
+          onChangeText={setPendingLimitInput}
+          placeholder="1500.00"
+          placeholderTextColor={theme.colors.sub}
+          style={{
+            backgroundColor: theme.colors.bg,
+            borderRadius: theme.radii.row,
+            color: theme.colors.text,
+            fontFamily: theme.fonts.bold,
+            fontSize: theme.typeScale.cardHeader,
+            height: 48,
+            paddingHorizontal: theme.spacing.lg,
+          }}
+          value={pendingLimitInput}
+        />
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
+          {`${pendingCategoryName || editingLimitName || "Budget"} · ${formatMonthChip(selectedMonthYear)}`}
+        </Text>
+        <EmojiGrid onChange={setPendingEmoji} value={pendingEmoji} />
+        <PrimaryButton disabled={busy} onPress={() => void handleLimitConfirm(pendingLimitInput)}>
+          {busy ? "Saving…" : "Save budget"}
+        </PrimaryButton>
+        <Pressable
+          accessibilityRole="button"
+          onPress={closeSheet}
+          style={{ alignItems: "center", justifyContent: "center", minHeight: 44 }}
+        >
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium }}>Cancel</Text>
+        </Pressable>
+      </BottomSheet>
 
-      <TextPromptModal
-        confirmLabel="Save"
-        initialValue={limitInitial}
-        keyboardType="decimal-pad"
-        message={
-          editingLimitName
-            ? `Monthly limit for ${editingLimitName}`
-            : `Monthly limit for ${pendingCategoryName || "this category"}`
-        }
-        onCancel={() => {
-          setStep(null);
-          setPendingCategoryName("");
-          setEditingLimitName(null);
-        }}
-        onConfirm={(value) => void handleLimitConfirm(value)}
-        placeholder="5000.00"
-        title={editingLimitName ? "Edit budget limit" : "Budget limit"}
-        visible={step === "limit"}
-      />
       <TextPromptModal
         confirmLabel="Rename"
         initialValue={
@@ -315,13 +346,13 @@ export function BudgetsScreen({ navigation }) {
         }
         message="Renames the category everywhere (budgets, history, entry)."
         onCancel={() => {
-          setStep(null);
+          setRenameModalVisible(false);
           setEditingCategoryId(null);
         }}
         onConfirm={(value) => void handleRenameConfirm(value)}
         placeholder="Category name"
         title="Rename category"
-        visible={step === "rename"}
+        visible={renameModalVisible}
       />
     </ScreenContainer>
   );

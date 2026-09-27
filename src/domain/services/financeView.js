@@ -111,7 +111,7 @@ export function buildUiTransaction(transaction, categoriesById, accountsById) {
         id: String(transaction.id),
         amountMinor: transaction.amountMinor,
         emoji: categoryEmoji(categoryName),
-        meta: `${categoryName} · ${account ? accountLabel(account.type) : "Account"}`,
+        meta: `${categoryName} · ${account?.name ?? "Account"}`,
         title,
         type: transaction.type,
     };

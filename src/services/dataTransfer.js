@@ -1,4 +1,5 @@
 import { Share } from "react-native";
+import { importAccountKey, normalizeImportAccountLabel, parseImportAccountType } from "../domain/services/importParser";
 import { parseDecimalToMinor } from "../domain/services/money";
 export const BACKUP_FORMAT = "moneymap-backup";
 export const BACKUP_VERSION = 1;
@@ -81,7 +82,7 @@ export function buildTransactionsCsv(transactions, categoriesById, accountsById)
         .map((transaction) => {
         const category = categoriesById.get(transaction.categoryId)?.name ?? "Other";
         const account = accountsById.get(transaction.accountId);
-        const accountLabel = account?.type ?? "CASH";
+        const accountLabel = account?.name ?? "Cash";
         const note = transaction.note ?? "";
         return [
             formatCsvDate(transaction.dateEpochMillis),
@@ -128,25 +129,6 @@ function splitCsvLine(line) {
     }
     cells.push(current);
     return cells;
-}
-function parseAccountType(value) {
-    const normalized = value.trim().toUpperCase().replace(/[\s-]/g, "");
-    if (normalized === "CASH" || normalized === "💵CASH") {
-        return "CASH";
-    }
-    if (normalized === "CARD" || normalized === "CREDIT" || normalized === "DEBIT") {
-        return "CARD";
-    }
-    if (normalized === "EWALLET" || normalized === "E_WALLET" || normalized === "WALLET") {
-        return "EWALLET";
-    }
-    if (value.toLowerCase().includes("wallet")) {
-        return "EWALLET";
-    }
-    if (value.toLowerCase().includes("card")) {
-        return "CARD";
-    }
-    return "CASH";
 }
 function parseCsvDate(value) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
@@ -200,13 +182,19 @@ export function parseTransactionsCsv(raw) {
             throw new Error(`Row ${rowIndex + 1} amount must be positive.`);
         }
         const categoryName = (cells[categoryIndex] ?? "Other").trim() || "Other";
+        const accountLabel = normalizeImportAccountLabel(cells[accountIndex]);
+        if (accountLabel.length === 0) {
+            throw new Error(`Row ${rowIndex + 1} is missing an account.`);
+        }
         const noteRaw = (cells[noteIndex] ?? "").trim();
         return {
             dateEpochMillis: parseCsvDate(cells[dateIndex] ?? ""),
             type,
             amountMinor,
             categoryName,
-            accountType: parseAccountType(cells[accountIndex] ?? "CASH"),
+            accountLabel,
+            accountKey: importAccountKey(accountLabel),
+            accountType: parseImportAccountType(accountLabel),
             note: noteRaw.length > 0 ? noteRaw : null,
         };
     });

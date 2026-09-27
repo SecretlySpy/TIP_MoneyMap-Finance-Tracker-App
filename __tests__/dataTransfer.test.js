@@ -39,10 +39,26 @@ describe("dataTransfer", () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]?.amountMinor).toBe(15_000);
         expect(rows[0]?.categoryName).toBe("Food");
+        expect(rows[0]?.accountLabel).toBe("Cash");
         expect(rows[0]?.accountType).toBe("CASH");
         expect(rows[0]?.note).toBe("Lunch, campus");
     });
     it("rejects unknown backup formats", () => {
         expect(() => parseBackup(JSON.stringify({ format: "other", version: 1 }))).toThrow(/not a MoneyMap backup/);
+    });
+    it("exports a named account without collapsing it to its generic type", () => {
+        const namedAccounts = [
+            ...accounts,
+            { id: 2, name: "GCash", type: "EWALLET", startingBalanceMinor: 0, isArchived: false },
+        ];
+        const csv = buildTransactionsCsv(
+            [{ ...transactions[0], accountId: 2 }],
+            new Map(categories.map((category) => [category.id, category])),
+            new Map(namedAccounts.map((account) => [account.id, account])),
+        );
+        const [row] = parseTransactionsCsv(csv);
+        expect(csv).toContain(",GCash,");
+        expect(row.accountLabel).toBe("GCash");
+        expect(row.accountType).toBeNull();
     });
 });

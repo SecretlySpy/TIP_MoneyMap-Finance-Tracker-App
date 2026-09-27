@@ -7,7 +7,7 @@ const categoriesById = new Map([
 describe("computeSafeToSpend", () => {
   const monthYear = "2026-08";
 
-  it("subtracts upcoming bills and goal reserves from remaining budgets", () => {
+  it("subtracts unposted bills and this month's deadline-based goal contribution", () => {
     const result = computeSafeToSpend({
       monthYear,
       categoriesById,
@@ -37,6 +37,7 @@ describe("computeSafeToSpend", () => {
           isActive: true,
           reminderEnabled: false,
           reminderLeadDays: 3,
+          frequency: "MONTHLY",
         },
       ],
       goals: [
@@ -45,7 +46,7 @@ describe("computeSafeToSpend", () => {
           name: "Laptop",
           targetMinor: 200_000,
           currentMinor: 50_000,
-          deadlineEpochMillis: null,
+          deadlineEpochMillis: new Date(2026, 9, 1).getTime(),
           isArchived: false,
           createdEpochMillis: 1,
         },
@@ -53,11 +54,12 @@ describe("computeSafeToSpend", () => {
       nowEpochMillis: new Date(2026, 7, 10).getTime(),
     });
 
-    // remaining budgets 400_000 - bills 50_000 - goals 150_000 = 200_000
+    // Laptop needs 150_000 over Aug/Sep/Oct: this month's contribution is 50_000.
     expect(result.remainingBudgetsMinor).toBe(400_000);
     expect(result.upcomingRecurringMinor).toBe(50_000);
-    expect(result.goalReservesMinor).toBe(150_000);
-    expect(result.safeMinor).toBe(200_000);
+    expect(result.goalReservesMinor).toBe(50_000);
+    expect(result.safeMinor).toBe(300_000);
+    expect(result.overCommittedMinor).toBe(0);
     expect(result.state).toBe("comfortable");
   });
 
@@ -80,6 +82,7 @@ describe("computeSafeToSpend", () => {
           isActive: true,
           reminderEnabled: false,
           reminderLeadDays: 1,
+          frequency: "MONTHLY",
         },
       ],
       goals: [
@@ -88,15 +91,90 @@ describe("computeSafeToSpend", () => {
           name: "Emergency",
           targetMinor: 50_000,
           currentMinor: 0,
-          deadlineEpochMillis: null,
+          deadlineEpochMillis: new Date(2026, 7, 31).getTime(),
           isArchived: false,
           createdEpochMillis: 1,
         },
       ],
       nowEpochMillis: new Date(2026, 7, 1).getTime(),
     });
-    // remaining 100k, bills 80k, goals capped to 100k → safe = 100k - 80k - 100k = -80k
-    expect(result.safeMinor).toBeLessThanOrEqual(0);
+    expect(result.safeMinor).toBe(0);
+    expect(result.overCommittedMinor).toBe(30_000);
     expect(result.state).toBe("over");
+  });
+
+  it("does not reserve an open-ended goal without a monthly deadline commitment", () => {
+    const result = computeSafeToSpend({
+      monthYear,
+      categoriesById,
+      budgets: [{ id: 1, categoryId: 1, monthYear, limitMinor: 100_000 }],
+      transactions: [],
+      recurringRules: [],
+      goals: [{
+        id: 1,
+        name: "Emergency fund",
+        targetMinor: 1_000_000,
+        currentMinor: 0,
+        deadlineEpochMillis: null,
+        isArchived: false,
+        createdEpochMillis: 1,
+      }],
+    });
+
+    expect(result.goalReservesMinor).toBe(0);
+    expect(result.safeMinor).toBe(100_000);
+  });
+
+  it("does not count an already-posted recurring occurrence twice", () => {
+    const runEpochMillis = new Date(2026, 7, 20).getTime();
+    const result = computeSafeToSpend({
+      monthYear,
+      categoriesById,
+      budgets: [{ id: 1, categoryId: 1, monthYear, limitMinor: 100_000 }],
+      transactions: [{
+        id: 1,
+        amountMinor: 20_000,
+        type: "EXPENSE",
+        categoryId: 1,
+        accountId: 1,
+        dateEpochMillis: runEpochMillis,
+        note: "Internet",
+        recurringRuleId: 9,
+      }],
+      recurringRules: [{
+        id: 9,
+        amountMinor: 20_000,
+        type: "EXPENSE",
+        nextRunEpochMillis: runEpochMillis,
+        frequency: "MONTHLY",
+        isActive: true,
+      }],
+      goals: [],
+    });
+
+    expect(result.remainingBudgetsMinor).toBe(80_000);
+    expect(result.upcomingRecurringMinor).toBe(0);
+    expect(result.safeMinor).toBe(80_000);
+  });
+
+  it("counts each unposted weekly bill occurrence due in the selected month", () => {
+    const result = computeSafeToSpend({
+      monthYear,
+      categoriesById,
+      budgets: [{ id: 1, categoryId: 1, monthYear, limitMinor: 100_000 }],
+      transactions: [],
+      recurringRules: [{
+        id: 4,
+        amountMinor: 5_000,
+        type: "EXPENSE",
+        nextRunEpochMillis: new Date(2026, 7, 3).getTime(),
+        frequency: "WEEKLY",
+        isActive: true,
+      }],
+      goals: [],
+    });
+
+    expect(result.upcomingRecurringMinor).toBe(25_000);
+    expect(result.safeMinor).toBe(75_000);
   });
 });

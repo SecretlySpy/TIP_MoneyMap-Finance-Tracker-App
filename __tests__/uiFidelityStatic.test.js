@@ -4,11 +4,13 @@ import { join } from "node:path";
 const root = join(__dirname, "..");
 const uiFiles = [
   "src/components/AppText.jsx",
+  "src/components/BottomSheet.jsx",
   "src/components/BudgetCard.jsx",
   "src/components/Buttons.jsx",
   "src/components/Chip.jsx",
   "src/components/DatabaseGate.jsx",
   "src/components/EmptyState.jsx",
+  "src/components/EmojiGrid.jsx",
   "src/components/EmojiPickerRow.jsx",
   "src/components/GoalCard.jsx",
   "src/components/OptionChipRow.jsx",
@@ -35,6 +37,7 @@ const uiFiles = [
   "src/screens/RecurringScreen.jsx",
   "src/screens/SettingsScreen.jsx",
   "src/screens/SmartTipsScreen.jsx",
+  "src/screens/SplashScreen.jsx",
   "src/screens/StudentEatsScreen.jsx",
 ];
 
@@ -92,5 +95,31 @@ describe("static UI fidelity boundaries", () => {
     for (const relativePath of appFiles) {
       expect(() => readFileSync(join(root, relativePath), "utf8")).not.toThrow();
     }
+  });
+
+  it("keeps offline Smart Tips reachable when online personalization is off", () => {
+    const tips = readFileSync(join(root, "src/screens/SmartTipsScreen.jsx"), "utf8");
+    const dashboard = readFileSync(join(root, "src/screens/DashboardScreen.jsx"), "utf8");
+    expect(tips).not.toMatch(/if \(!smartTipsEnabled\)\s*\{\s*navigation\.goBack/);
+    expect(dashboard).toContain('navigation.navigate("SmartTips")');
+  });
+
+  it("keeps every dashboard destination reachable with labeled actions", () => {
+    const dashboard = readFileSync(join(root, "src/screens/DashboardScreen.jsx"), "utf8");
+    expect(dashboard).toContain('label: "🧾 History"');
+    expect(dashboard).toContain('label: "📊 Budgets"');
+    expect(dashboard).toContain('label: "🔁 Recurring"');
+    expect(dashboard).toContain('accessibilityLabel="See budgets"');
+    expect(dashboard).toContain('navigation.navigate("StudentEats")');
+    expect(dashboard).toContain('{ screen: "Goals" }');
+  });
+
+  it("uses named account ids for Entry and removes unsupported GPS claims", () => {
+    const entry = readFileSync(join(root, "src/screens/EntryScreen.jsx"), "utf8");
+    const location = readFileSync(join(root, "src/services/locationService.js"), "utf8");
+    const appConfig = readFileSync(join(root, "app.json"), "utf8");
+    expect(entry).toContain("accountId: selectedAccountId");
+    expect(location).not.toContain('import("expo-location")');
+    expect(appConfig).not.toMatch(/ACCESS_(COARSE|FINE)_LOCATION/);
   });
 });

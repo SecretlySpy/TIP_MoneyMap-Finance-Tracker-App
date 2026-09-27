@@ -3,7 +3,10 @@ import { initializeDatabase } from "../db/client";
 import { AccountRepository, BudgetRepository, CategoryRepository, GoalRepository, RecurringRepository, TransactionRepository, } from "../db/repositories";
 import { RECURRING_REMINDER_LEAD_DAYS } from "../domain/services/emoji";
 import { canDeleteAccount, canDeleteCategory, canRenameCategory, } from "../domain/services/entityGuards";
-import { accountChipLabel, toMonthYear, } from "../domain/services/financeView";
+import { toMonthYear, } from "../domain/services/financeView";
+import { buildAutomaticAccountResolutions, listImportAccountSources, unresolvedImportAccountSources, } from "../domain/services/importAccounts";
+import { importAccountKey } from "../domain/services/importParser";
+import { ACCOUNT_TYPES } from "../domain/types";
 import { runRecurringCatchUp } from "../services/recurringCatchUp";
 import { registerFinanceSnapshotProvider, syncRemindersFromStores } from "./uiStore";
 const DEFAULT_ACCOUNTS = [
@@ -14,10 +17,13 @@ const DEFAULT_ACCOUNTS = [
 const ENTRY_CATEGORY_SEED = [
     { name: "Food", icon: "restaurant", colorHex: "#EA580C", type: "EXPENSE" },
     { name: "Transport", icon: "bus", colorHex: "#2563EB", type: "EXPENSE" },
+    { name: "School", icon: "book", colorHex: "#7C3AED", type: "EXPENSE" },
+    { name: "Load/Data", icon: "phone-portrait", colorHex: "#0F766E", type: "EXPENSE" },
     { name: "Bills", icon: "receipt", colorHex: "#CA8A04", type: "EXPENSE" },
     { name: "Shopping", icon: "shopping-bag", colorHex: "#DB2777", type: "EXPENSE" },
     { name: "Health", icon: "medkit", colorHex: "#DC2626", type: "EXPENSE" },
     { name: "Fun", icon: "game-controller", colorHex: "#9333EA", type: "EXPENSE" },
+    { name: "Entertainment", icon: "game-controller", colorHex: "#9333EA", type: "EXPENSE" },
     { name: "Other", icon: "ellipsis-horizontal", colorHex: "#64748B", type: "EXPENSE" },
     { name: "Allowance", icon: "wallet", colorHex: "#16A34A", type: "INCOME" },
     { name: "Part-time", icon: "briefcase", colorHex: "#0F766E", type: "INCOME" },
@@ -92,6 +98,13 @@ function findAccount(accounts, type) {
     }
     return match;
 }
+function findActiveAccountById(accounts, id) {
+    const match = accounts.find((account) => account.id === id && !account.isArchived);
+    if (!match) {
+        throw new Error("The selected account is unavailable or archived.");
+    }
+    return match;
+}
 export const useFinanceStore = create((set, get) => ({
     accounts: [],
     budgets: [],
@@ -159,7 +172,9 @@ export const useFinanceStore = create((set, get) => ({
         }
         const { accounts, categories } = get();
         const category = findCategory(categories, input.categoryName, input.type);
-        const account = findAccount(accounts, input.accountType);
+        const account = input.accountId === undefined
+            ? findAccount(accounts, input.accountType)
+            : findActiveAccountById(accounts, input.accountId);
         const payload = {
             amountMinor: input.amountMinor,
             type: input.type,
@@ -462,10 +477,10 @@ export const useFinanceStore = create((set, get) => ({
     },
     /**
      * Bulk-insert already-validated import rows inside one transaction.
-     * Auto-creates missing categories and account types. Returns a summary object
+     * Auto-creates missing categories after every source account is explicitly resolved.
      * (or a number for older callers that only read the created count).
-     * @param {Array<{ dateEpochMillis: number, type: string, amountMinor: number, categoryName: string, accountType: string, note: string|null }>} rows
-     * @param {{ skipped?: Array<{ rowNumber: number, reason: string }> }} [meta]
+     * @param {Array<{ dateEpochMillis: number, type: string, amountMinor: number, categoryName: string, accountLabel: string, accountKey?: string, accountType: string|null, note: string|null }>} rows
+     * @param {{ skipped?: Array<{ rowNumber: number, reason: string }>, accountResolutions?: Record<string, { kind: 'existing', accountId: number }|{ kind: 'create', name: string, type: string }> }} [meta]
      */
     importCsvRows: async (rows, meta = {}) => {
         await get().ensureHydrated();
@@ -478,19 +493,32 @@ export const useFinanceStore = create((set, get) => ({
             return { created: 0, skipped: skipped.length, skippedRows: skipped };
         }
 
-        const accountDefaults = {
-            CASH: "Cash",
-            CARD: "Card",
-            EWALLET: "E-wallet",
-        };
+        const accountResolutions = meta.accountResolutions
+            ?? buildAutomaticAccountResolutions(rows, get().accounts);
+        const unresolved = unresolvedImportAccountSources(rows, accountResolutions);
+        if (unresolved.length > 0) {
+            throw new Error(`Resolve imported account "${unresolved[0].label}" before confirming the import.`);
+        }
+        const activeAccounts = get().accounts.filter((account) => !account.isArchived);
+        for (const source of listImportAccountSources(rows)) {
+            const resolution = accountResolutions[source.key];
+            if (resolution.kind === "existing") {
+                if (!activeAccounts.some((account) => account.id === resolution.accountId)) {
+                    throw new Error(`The selected account for "${source.label}" is unavailable or archived.`);
+                }
+                continue;
+            }
+            const name = String(resolution.name ?? "").trim();
+            if (name.length === 0 || !ACCOUNT_TYPES.includes(resolution.type)) {
+                throw new Error(`Choose a valid account name and type for "${source.label}".`);
+            }
+        }
 
         await database.transaction(async (tx) => {
             const categoryCache = new Map(
                 get().categories.map((category) => [`${category.type}:${category.name.toLowerCase()}`, category]),
             );
-            const accountCache = new Map(
-                get().accounts.filter((account) => !account.isArchived).map((account) => [account.type, account]),
-            );
+            const accountCache = new Map();
 
             const insertReturningId = async (statement, parameters) => {
                 const result = await tx.execute(statement, parameters);
@@ -531,21 +559,29 @@ export const useFinanceStore = create((set, get) => ({
                     categoryCache.set(categoryKey, category);
                 }
 
-                let account = accountCache.get(row.accountType);
+                const accountKey = row.accountKey || importAccountKey(row.accountLabel);
+                const resolution = accountResolutions[accountKey];
+                let account = accountCache.get(accountKey);
                 if (account === undefined) {
-                    const accountId = await insertReturningId(
-                        `INSERT INTO accounts (name, type, starting_balance_minor, is_archived)
-             VALUES (?, ?, ?, 0)`,
-                        [accountDefaults[row.accountType] ?? row.accountType, row.accountType, 0],
-                    );
-                    account = {
-                        id: accountId,
-                        name: accountDefaults[row.accountType] ?? row.accountType,
-                        type: row.accountType,
-                        startingBalanceMinor: 0,
-                        isArchived: false,
-                    };
-                    accountCache.set(row.accountType, account);
+                    if (resolution.kind === "existing") {
+                        account = activeAccounts.find((candidate) => candidate.id === resolution.accountId);
+                    }
+                    else {
+                        const accountName = resolution.name.trim();
+                        const accountId = await insertReturningId(
+                            `INSERT INTO accounts (name, type, starting_balance_minor, is_archived)
+               VALUES (?, ?, ?, 0)`,
+                            [accountName, resolution.type, 0],
+                        );
+                        account = {
+                            id: accountId,
+                            name: accountName,
+                            type: resolution.type,
+                            startingBalanceMinor: 0,
+                            isArchived: false,
+                        };
+                    }
+                    accountCache.set(accountKey, account);
                 }
 
                 await tx.execute(
@@ -755,13 +791,15 @@ export const useFinanceStore = create((set, get) => ({
     },
 }));
 export function listAccountChips(accounts) {
-    return DEFAULT_ACCOUNTS.map((defaults) => {
-        const match = accounts.find((account) => account.type === defaults.type && !account.isArchived);
-        return {
-            type: defaults.type,
-            label: match ? accountChipLabel(match.type) : accountChipLabel(defaults.type),
-        };
-    });
+    const emojiByType = { CASH: "💵", CARD: "💳", EWALLET: "📱" };
+    return accounts
+        .filter((account) => !account.isArchived)
+        .sort((left, right) => left.id - right.id)
+        .map((account) => ({
+            id: account.id,
+            type: account.type,
+            label: `${emojiByType[account.type] ?? "🏦"} ${account.name}`,
+        }));
 }
 export function mapsFromState(state) {
     return {

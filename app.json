@@ -19,9 +19,7 @@
         "INTERNET",
         "POST_NOTIFICATIONS",
         "USE_BIOMETRIC",
-        "USE_FINGERPRINT",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "USE_FINGERPRINT"
       ]
     },
     "plugins": [

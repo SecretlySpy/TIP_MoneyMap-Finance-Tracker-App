@@ -33,12 +33,6 @@ export function SmartTipsScreen({ navigation }) {
   const [aiTips, setAiTips] = useState(null);
   const [aiStatus, setAiStatus] = useState("idle"); // idle | loading | ready | offline
 
-  useEffect(() => {
-    if (!smartTipsEnabled) {
-      navigation.goBack();
-    }
-  }, [navigation, smartTipsEnabled]);
-
   const { categoriesById } = useMemo(
     () => mapsFromState({ accounts: [], categories }),
     [categories],
@@ -122,10 +116,6 @@ export function SmartTipsScreen({ navigation }) {
     }
     return offlineSnapshot.tips;
   }, [aiTips, offlineSnapshot.tips]);
-
-  if (!smartTipsEnabled) {
-    return null;
-  }
 
   return (
     <ScreenContainer contentContainerStyle={{ gap: theme.spacing.xl }} testID="smart-tips-screen">

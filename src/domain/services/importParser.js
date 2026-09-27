@@ -5,7 +5,7 @@ import { parseDecimalToMinor } from "./money";
 /**
  * @typedef {'Date'|'Amount'|'Category'|'Account'|'Note'|'Type'} ImportField
  * @typedef {Record<ImportField, number>} ImportColumnMappings
- * @typedef {{ dateEpochMillis: number, type: 'EXPENSE'|'INCOME', amountMinor: number, categoryName: string, accountType: 'CASH'|'CARD'|'EWALLET', note: string|null }} ImportTransactionRow
+ * @typedef {{ dateEpochMillis: number, type: 'EXPENSE'|'INCOME', amountMinor: number, categoryName: string, accountLabel: string, accountKey: string, accountType: 'CASH'|'CARD'|'EWALLET'|null, note: string|null }} ImportTransactionRow
  * @typedef {{ rowNumber: number, reason: string }} ImportSkip
  * @typedef {{ rows: ImportTransactionRow[], skipped: ImportSkip[], headers: string[], dataRowCount: number }} ImportParseResult
  */
@@ -114,25 +114,32 @@ export function parseImportDate(value) {
 
 /**
  * @param {string} value
- * @returns {'CASH'|'CARD'|'EWALLET'}
+ * @returns {'CASH'|'CARD'|'EWALLET'|null}
  */
 export function parseImportAccountType(value) {
-  const normalized = String(value ?? "").trim().toUpperCase().replace(/[\s-]/g, "");
-  if (normalized === "CASH" || normalized.includes("CASH")) {
+  const normalized = String(value ?? "").trim().toUpperCase().replace(/[^A-Z]/g, "");
+  if (normalized === "CASH" || normalized === "CASHACCOUNT") {
     return "CASH";
   }
-  if (normalized === "CARD" || normalized === "CREDIT" || normalized === "DEBIT" || normalized.includes("CARD")) {
+  if (["CARD", "CREDIT", "DEBIT", "CREDITCARD", "DEBITCARD", "CARDACCOUNT"].includes(normalized)) {
     return "CARD";
   }
   if (
     normalized === "EWALLET"
-    || normalized === "E_WALLET"
     || normalized === "WALLET"
-    || normalized.includes("WALLET")
+    || normalized === "DIGITALWALLET"
   ) {
     return "EWALLET";
   }
-  return "CASH";
+  return null;
+}
+
+export function normalizeImportAccountLabel(value) {
+  return String(value ?? "").trim().replace(/\s+/g, " ");
+}
+
+export function importAccountKey(value) {
+  return normalizeImportAccountLabel(value).toLocaleLowerCase();
 }
 
 /**
@@ -228,9 +235,14 @@ export function parseImportGrid(grid, mappings) {
           : "Other"
       ).trim() || "Other";
 
-      const accountType = parseImportAccountType(
-        resolvedMappings.Account >= 0 ? String(cells[resolvedMappings.Account] ?? "CASH") : "CASH",
-      );
+      if (resolvedMappings.Account < 0) {
+        throw new Error("Account column is unmapped.");
+      }
+      const accountLabel = normalizeImportAccountLabel(cells[resolvedMappings.Account]);
+      if (accountLabel.length === 0) {
+        throw new Error("Account is empty.");
+      }
+      const accountType = parseImportAccountType(accountLabel);
 
       const noteRaw = resolvedMappings.Note >= 0
         ? String(cells[resolvedMappings.Note] ?? "").trim()
@@ -241,6 +253,8 @@ export function parseImportGrid(grid, mappings) {
         type,
         amountMinor,
         categoryName,
+        accountLabel,
+        accountKey: importAccountKey(accountLabel),
         accountType,
         note: noteRaw.length > 0 ? noteRaw : null,
       });

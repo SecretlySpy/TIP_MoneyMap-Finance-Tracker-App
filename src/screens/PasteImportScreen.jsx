@@ -8,6 +8,7 @@ import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 export function PasteImportScreen({ navigation, route }) {
+    const tabNavigation = navigation.getParent();
     const mode = route.params.mode;
     const theme = useTheme(useUiStore((state) => state.themePreference));
     const importCsvRows = useFinanceStore((state) => state.importCsvRows);
@@ -69,7 +70,7 @@ export function PasteImportScreen({ navigation, route }) {
                 ? summary.created
                 : Number(summary);
             Alert.alert("Import complete", `Imported ${created} transaction${created === 1 ? "" : "s"}.`);
-            navigation.goBack();
+            tabNavigation?.navigate("History", { screen: "HistoryList" });
         }
         catch (error) {
             Alert.alert("Import failed", error instanceof Error ? error.message : "Unknown error");

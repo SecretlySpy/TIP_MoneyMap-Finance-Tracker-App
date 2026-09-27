@@ -12,10 +12,7 @@ import { formatMinor } from "../domain/services/money";
 import { deriveSmartTips } from "../domain/services/tips";
 import { fetchEatsAiTips } from "../remote/eatsTipsClient";
 import { fetchNearbyEats } from "../remote/placesClient";
-import {
-  requestEatsLocationPermission,
-  resolveEatsOrigin,
-} from "../services/locationService";
+import { resolveEatsOrigin } from "../services/locationService";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -173,7 +170,6 @@ export function StudentEatsScreen({ navigation }) {
     setAiTips(null);
     setAiStatus("idle");
 
-    await requestEatsLocationPermission();
     const nextOrigin = await resolveEatsOrigin();
     setOrigin(nextOrigin);
 
@@ -235,9 +231,7 @@ export function StudentEatsScreen({ navigation }) {
             Student Eats Near Me
           </Text>
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-            {origin.isFallback
-              ? `Using ${TIP_QC_CAMPUS.label} (location ${origin.permission})`
-              : "Ranked by walk distance, price, and student fit"}
+            {`Using ${TIP_QC_CAMPUS.label} · live places need internet`}
           </Text>
         </View>
         <Pressable
@@ -342,7 +336,7 @@ export function StudentEatsScreen({ navigation }) {
           emoji="🍜"
           message={
             errorMessage
-              ?? "No places loaded. Check your connection or allow location. Campus fallback still works when offline data is cached."
+              ?? "No places loaded. Connect to the internet and try again; a recent in-session result may still be available from cache."
           }
           onAction={() => void load()}
           title="No eats found"
@@ -386,7 +380,7 @@ export function StudentEatsScreen({ navigation }) {
         }}
       >
         <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-          Location is requested only for this screen and never saved. AI tips (if Smart Tips is on) receive place names, distance bands, and price levels — never your coordinates.
+          MoneyMap does not request or save your location. Places are searched online around TIP QC. Optional AI receives place names, distance bands, and price levels — never coordinates.
         </Text>
       </View>
     </ScreenContainer>

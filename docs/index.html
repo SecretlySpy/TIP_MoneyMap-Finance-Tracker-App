@@ -13,34 +13,55 @@
       font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       line-height: 1.7;
       text-rendering: optimizeLegibility;
+      font-variant-east-asian: full-width;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
-    body { margin: 0; padding: 0; min-height: 100vh; background: #f4f4f2; color: #111; }
-    .page { max-width: 920px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
-    a { color: #0F6E5C; text-decoration: none; }
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: #f4f4f2;
+      color: #111;
+    }
+    .page {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+    a { color: #0b6af2; text-decoration: none; }
     a:hover, a:focus-visible { text-decoration: underline; }
-    h1, h2, h3 { margin-top: 2.25rem; margin-bottom: 1rem; line-height: 1.15; }
+    h1, h2, h3, h4, h5, h6 { margin-top: 2.25rem; margin-bottom: 1rem; line-height: 1.15; }
     h1 { font-size: clamp(2rem, 3vw, 3rem); }
     h2 { font-size: clamp(1.5rem, 2.6vw, 2.2rem); }
     p { margin-bottom: 1.25rem; }
     ul, ol { margin: 0 0 1.25rem 1.5rem; }
     li { margin-bottom: 0.75rem; }
-    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #e8e7e5; padding: 0.2rem 0.35rem; border-radius: 4px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
-    th, td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid #ddd; }
-    th { background: #eef3f1; }
-    .hero { padding: 3rem 0 1.5rem; border-bottom: 1px solid rgba(17, 17, 17, 0.08); }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #e8e7e5; padding: 0.2rem 0.35rem; border-radius: 4px; }
+    pre {
+      overflow: auto;
+      padding: 1rem;
+      background: #1d1f21;
+      color: #f8f8f2;
+      border-radius: 0.75rem;
+      margin: 1rem 0;
+    }
+    pre code { color: inherit; background: transparent; padding: 0; }
+    blockquote {
+      margin: 1.5rem 0;
+      padding-left: 1rem;
+      border-left: 4px solid #0b6af2;
+      color: #333;
+    }
+    .hero {
+      padding: 3rem 0 1.5rem;
+      border-bottom: 1px solid rgba(17, 17, 17, 0.08);
+    }
     .hero p { max-width: 68ch; margin-top: 1rem; font-size: 1.05rem; color: #3e444a; }
     .hero .meta { margin-top: 0.75rem; font-size: 0.95rem; color: #5c6369; }
-    .banner {
-      background: #D7F2EA;
-      border: 1px solid #0F6E5C;
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-      margin: 1.5rem 0;
+    @media (max-width: 640px) {
+      .page { padding: 1.5rem 1rem 2.5rem; }
     }
-    @media (max-width: 640px) { .page { padding: 1.5rem 1rem 2.5rem; } }
   </style>
 </head>
 <body>
@@ -48,64 +69,102 @@
     <div class="hero">
       <h1>MoneyMap Finance Tracker</h1>
       <p>An Android-first, offline-first personal finance tracker for students, built with React Native and Expo.</p>
-      <p class="meta">Static project documentation generated from README.md · v0.1.0 · Tasks 1–18 complete.</p>
+      <p class="meta">Static project documentation generated from README.md.</p>
     </div>
-
-    <div class="banner">
-      <strong>Full setup guide with OS tabs, SVG previews, and troubleshooting:</strong>
-      <a href="https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/">GitHub Pages (root index.html)</a>
-      · or open <a href="../index.html">../index.html</a> in this repo.
-    </div>
-
-    <h2>Status</h2>
-    <table>
-      <thead><tr><th>Area</th><th>State</th></tr></thead>
-      <tbody>
-        <tr><td>Tasks 1–9 core product</td><td>Done</td></tr>
-        <tr><td>Task 10 recurring catch-up</td><td>Done</td></tr>
-        <tr><td>Task 11 bill reminders</td><td>Done</td></tr>
-        <tr><td>Task 12 CSV export + backup</td><td>Done</td></tr>
-        <tr><td>Task 13 CSV + Excel import</td><td>Done</td></tr>
-        <tr><td>Task 14 app lock</td><td>Done</td></tr>
-        <tr><td>Task 15 Smart Tips offline</td><td>Done</td></tr>
-        <tr><td>Task 16 Smart Tips online Gemini</td><td>Done</td></tr>
-        <tr><td>Task 17 polish</td><td>Done</td></tr>
-        <tr><td>Task 18 release prep</td><td>Done (EAS projectId placeholder until <code>eas init</code>)</td></tr>
-      </tbody>
-    </table>
-
-    <h2>Quick start</h2>
-    <ol>
-      <li>Install <strong>Node.js 22 LTS</strong>, <strong>JDK 21</strong>, Android SDK (API 35 recommended).</li>
-      <li><code>npm ci</code></li>
-      <li>Copy <code>.env.example</code> → <code>.env</code> (optional <code>GEMINI_API_KEY</code>).</li>
-      <li><code>npm test</code> (~91 tests)</li>
-      <li>Start emulator/device, then <code>npm run android</code> (dev client required — <strong>Expo Go unsupported</strong>).</li>
-    </ol>
-
-    <h2>Architecture</h2>
-    <ul>
-      <li>Screens → Zustand stores → repositories → SQLCipher</li>
-      <li>Money is always <strong>integer minor units</strong></li>
-      <li>Theme tokens only — no hardcoded hex in screens</li>
-      <li><strong>Only</strong> <code>src/remote/smartTipsClient.js</code> may call remote <code>fetch</code></li>
-    </ul>
-
-    <h2>Smart Tips privacy</h2>
-    <ul>
-      <li>Default <strong>off</strong>. First enable shows a consent sheet.</li>
-      <li>Offline: rules from local budgets/transactions.</li>
-      <li>Online: anonymized summary only (period, totals, category ratios, currency).</li>
-      <li>Never: raw transactions, notes, account names/IDs.</li>
-    </ul>
-
-    <h2>Release docs</h2>
-    <ul>
-      <li>Package: <code>com.moneymap.financetracker</code></li>
-      <li><a href="./privacy-policy.md">Privacy policy</a></li>
-      <li><a href="./play-data-safety.md">Play Data safety</a></li>
-      <li><a href="./release-checklist.md">Release checklist</a></li>
-    </ul>
+    <p>
+An Android-first, offline-first personal finance tracker for <strong>students</strong>, built with React Native and Expo (JavaScript).
+</p>
+<p>
+<strong>Live docs (GitHub Pages):</strong> https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/
+</p>
+<p>
+The Pages site is the polished setup guide: root <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/index.html"><code>index.html</code></a> (self-contained HTML, OS tabs, SVG app previews, troubleshooting). A static README mirror is also generated at <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/index.html"><code>docs/index.html</code></a> via <code>npm run build:readme-page</code>.
+</p>
+<h2>Status</h2>
+<p>
+| Area | State |
+|---|---|
+| Tasks 1–9 core product | Done |
+| Task 10 recurring catch-up | Done |
+| Task 11 bill reminders (local notifications) | Done |
+| Task 12 CSV export + backup | Done — file-based share; backup now includes savings goals (QA 2026-08-31) |
+| Task 13 CSV + Excel import | Done |
+| Task 14 app lock (PIN + biometrics) | Done — with attempt lockout; <strong>no forgot-PIN recovery</strong> |
+| Task 15 Smart Tips offline rules | Done |
+| Task 16 Smart Tips online Gemini (opt-in) | Done |
+| Task 17 polish | Done |
+| Task 18 release prep docs | Done (EAS project ID still placeholder until <code>eas init</code>) |
+| Dark-mode theme consistency | Done (<code>useTheme</code> reads <code>themePreference</code>) |
+| Student Eats Near Me | Done (Overpass/Nominatim + ranking + optional AI) |
+| Settings pickers + Dashboard polish | Done (theme/currency chips, empties, tips teaser) |
+| Safe-to-Spend + Savings Goals | Done (pure calc + schema v2 + Goals screen); goal deadlines added |
+| Entry quick chips + MoM trend | Done |
+</p>
+<p>
+<strong>v0.1.0</strong> — Core complete + Student Eats + Goals / Safe-to-Spend.
+</p>
+<h3>Known gaps (reconciled 2026-09-27)</h3>
+<p>
+A full QA pass is recorded in <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/AI%20Documentation%20Notes.md#qa-audit--2026-08-31">AI Documentation Notes.md</a>.
+&quot;Done&quot; above means the feature ships, not that it matches every expectation of a mainstream
+expense tracker. Still missing:
+</p>
+<p>
+| Gap | Impact |
+|---|---|
+| Transactions cannot be <strong>backdated</strong> (always <code>Date.now()</code>) or <strong>edited</strong> after saving | High — the biggest deviation from standard trackers |
+| No transaction <strong>search</strong>; History supports explicit category and account filters | Medium |
+| <code>xlsx@0.18.5</code> has two unpatched high-severity advisories and parses user files | <strong>Security — action required</strong> |
+| No account transfers, budget rollover, import de-duplication, or &quot;delete all data&quot; reset | Low–medium; the import screen warns before confirmation |
+</p>
+<p>
+The Jest suite covers domain, data-transfer, store, component, and static UI contracts. Native
+device behavior still requires the Android verification path below.
+</p>
+<h2>Quick start</h2>
+<ol>
+<li>Install <strong>Node.js 22 LTS</strong>, <strong>JDK 21</strong>, Android SDK (API 35 recommended).</li>
+<li><code>npm ci</code></li>
+<li>Copy <code>.env.example</code> → <code>.env</code> (optional <code>GEMINI_API_KEY</code> for online tips).</li>
+<li><code>npm test</code> (26 suites, 154 tests at the 2026-09-27 reconciliation)</li>
+<li>Start an emulator/device, then <code>npm run android</code> (dev client required — <strong>Expo Go unsupported</strong> because of SQLCipher).</li>
+</ol>
+<p>
+Full walkthrough (Windows / macOS / Linux): <strong><a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/index.html">index.html</a></strong> or the <a href="https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/">live Pages site</a>. Also see <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/Tech%20Stack%20Setup%20Guide.md">Tech Stack Setup Guide.md</a> and <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/local-environment-audit-linux.md">docs/local-environment-audit-linux.md</a>.
+</p>
+<h2>Architecture (short)</h2>
+<ul>
+<li>Screens → Zustand stores → repositories → SQLCipher</li>
+<li>Money is always <strong>integer minor units</strong> (<code>src/domain/services/money.js</code>)</li>
+<li>Theme tokens only (<code>src/theme/tokens.js</code>) — no hardcoded hex in screens</li>
+<li>Bare <code>useTheme()</code> reads <code>themePreference</code> from <code>uiStore</code> (shared components stay dark-mode correct)</li>
+<li>Outbound HTTPS only from <code>src/remote/*</code> (<code>smartTipsClient</code>, <code>placesClient</code>, <code>eatsTipsClient</code>)</li>
+</ul>
+<h2>Smart Tips privacy</h2>
+<ul>
+<li>Default <strong>off</strong>. First enable shows a consent sheet.</li>
+<li>Offline: <code>deriveSmartTips</code> from local budgets/transactions.</li>
+<li>Online: anonymized summary only (period, totals, category ratios, currency) to Gemini.</li>
+<li>Never: raw transactions, notes, account names/IDs.</li>
+</ul>
+<h2>Student Eats Near Me</h2>
+<ul>
+<li>Dashboard → <strong>Student Eats</strong>; searches use the fixed TIP Quezon City campus origin and request no location permission.</li>
+<li>Places via Overpass (Nominatim fallback); ranked by distance + price + rating + student heuristics.</li>
+<li>Mini-map is on-device relative plot (no map SDK).</li>
+<li>Origin: TIP Quezon City campus. The app does not read or persist device coordinates.</li>
+<li>Optional AI tips reuse Smart Tips consent; payload uses distance <strong>bands</strong> only (no lat/lon).</li>
+</ul>
+<h2>Release</h2>
+<ul>
+<li>Package: <code>com.moneymap.financetracker</code></li>
+<li>Privacy: <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/privacy-policy.md">docs/privacy-policy.md</a></li>
+<li>Play Data safety: <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/play-data-safety.md">docs/play-data-safety.md</a></li>
+<li>Checklist: <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/release-checklist.md">docs/release-checklist.md</a></li>
+</ul>
+<p>
+Replace the all-zero EAS <code>projectId</code> after <code>eas init</code> before cloud builds.
+</p>
   </main>
 </body>
 </html>

@@ -12,6 +12,7 @@ import { SectionCard } from "./SectionCard";
  *   remainingBudgetsMinor: number,
  *   upcomingRecurringMinor: number,
  *   goalReservesMinor: number,
+ *   overCommittedMinor: number,
  * }} props
  */
 export function SafeToSpendCard({
@@ -21,6 +22,7 @@ export function SafeToSpendCard({
   remainingBudgetsMinor,
   upcomingRecurringMinor,
   goalReservesMinor,
+  overCommittedMinor,
 }) {
   const theme = useTheme();
   const amountColor =
@@ -76,6 +78,11 @@ export function SafeToSpendCard({
           {" · Goals "}
           {formatMinor(goalReservesMinor, { currencySymbol, showCents: false })}
         </Text>
+        {state === "over" && overCommittedMinor > 0 ? (
+          <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.tiny }}>
+            Commitments exceed this month&apos;s budget by {formatMinor(overCommittedMinor, { currencySymbol, showCents: false })}.
+          </Text>
+        ) : null}
       </View>
     </SectionCard>
   );

@@ -85,7 +85,7 @@ export function AppLockScreen({ navigation }) {
         }, 1000);
         return () => clearInterval(timer);
     }, [lockedForSeconds > 0]);
-    const title = mode === "create" ? "Create a 4-digit PIN" : mode === "confirm" ? "Confirm your PIN" : "Enter your PIN to unlock";
+    const title = mode === "create" ? "Optional app lock — create a 4-digit PIN" : mode === "confirm" ? "Confirm your PIN" : "Enter your PIN to unlock";
     const canLeaveWithoutUnlock = !isLocked || !appLockEnabled || !hasPin;
     const finishUnlock = () => {
         // Root-level lock swaps navigators when isLocked becomes false.
@@ -223,10 +223,13 @@ export function AppLockScreen({ navigation }) {
 
       <View style={{ alignItems: "center", gap: theme.spacing.xxs, marginTop: theme.spacing.xxl }}>
         <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.lockTitle }}>
-          Finance Tracker
+          MoneyMap
         </Text>
-        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body }}>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body, textAlign: "center" }}>
           {title}
+        </Text>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small, textAlign: "center" }}>
+          The PIN protects app access. Database encryption uses a separate key stored on this device.
         </Text>
         {error !== null ? (<Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
             {error}
@@ -265,9 +268,11 @@ export function AppLockScreen({ navigation }) {
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
             Use fingerprint instead
           </Text>
-        </Pressable>) : !hasPin && canLeaveWithoutUnlock ? (<Pressable accessibilityRole="button" hitSlop={theme.spacing.md} onPress={() => {
+        </Pressable>) : (mode === "create" || mode === "confirm") && canLeaveWithoutUnlock ? (<Pressable accessibilityRole="button" hitSlop={theme.spacing.md} onPress={() => {
                 void setAppLockEnabled(false);
-                navigation.goBack();
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                }
             }} style={{ marginTop: theme.spacing.xxl }}>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
             Cancel setup

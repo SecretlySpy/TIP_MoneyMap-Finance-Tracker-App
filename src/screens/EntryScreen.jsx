@@ -5,7 +5,7 @@ import { Chip } from "../components/Chip";
 import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { TextPromptModal } from "../components/TextPromptModal";
-import { accountChipLabel, categoriesForType, toMonthYear, } from "../domain/services/financeView";
+import { categoriesForType, toMonthYear, } from "../domain/services/financeView";
 import { resolveDisplayEmoji } from "../domain/services/emoji";
 import { formatMinor, parseDecimalToMinor, updateMoneyInput } from "../domain/services/money";
 import { listAccountChips, useFinanceStore } from "../store/financeStore";
@@ -23,6 +23,7 @@ function todayLabel(now = new Date()) {
 }
 // The entry screen keeps the Figma three-step flow while all money stays integer minor units.
 export function EntryScreen({ navigation }) {
+    const tabNavigation = navigation.getParent();
     const theme = useTheme(useUiStore((state) => state.themePreference));
     const currencySymbol = useUiStore((state) => state.currencySymbol);
     const accounts = useFinanceStore((state) => state.accounts);
@@ -33,7 +34,7 @@ export function EntryScreen({ navigation }) {
     const [transactionType, setTransactionType] = useState("EXPENSE");
     const [amountInput, setAmountInput] = useState("0");
     const [selectedCategory, setSelectedCategory] = useState("");
-    const [selectedAccountType, setSelectedAccountType] = useState("CASH");
+    const [selectedAccountId, setSelectedAccountId] = useState(null);
     const [saving, setSaving] = useState(false);
     const [showNewCategory, setShowNewCategory] = useState(false);
     const [note, setNote] = useState("");
@@ -59,21 +60,27 @@ export function EntryScreen({ navigation }) {
     const quickTemplates = useMemo(() => {
         if (transactionType === "INCOME") {
             return [
-                { label: "Allowance", amount: "2000", note: "Monthly allowance", category: "Allowance" },
-                { label: "Part-time", amount: "500", note: "Shift pay", category: "Part-time" },
+                { label: `Allowance ${currencySymbol}15,000`, amount: "15000", note: "Monthly allowance", category: "Allowance" },
+                { label: `Part-time ${currencySymbol}3,000`, amount: "3000", note: "Shift pay", category: "Part-time" },
             ];
         }
         // Labels follow the chosen currency symbol instead of a hardcoded peso sign.
         return [
             { name: "Lunch", amount: "80", note: "Lunch", category: "Food" },
             { name: "Jeep", amount: "15", note: "Commute", category: "Transport" },
-            { name: "Load", amount: "50", note: "Mobile load", category: "Bills" },
+            { name: "Load", amount: "50", note: "Mobile load", category: "Load/Data" },
             { name: "Coffee", amount: "120", note: "Coffee", category: "Food" },
         ].map((template) => ({
             ...template,
             label: `${template.name} ${currencySymbol}${template.amount}`,
         }));
     }, [transactionType, currencySymbol]);
+    useEffect(() => {
+        if (accountChips.some((account) => account.id === selectedAccountId)) {
+            return;
+        }
+        setSelectedAccountId(accountChips[0]?.id ?? null);
+    }, [accountChips, selectedAccountId]);
     const applyTemplate = (template) => {
         setAmountInput(template.amount);
         if (template.note) setNote(template.note);
@@ -119,8 +126,8 @@ export function EntryScreen({ navigation }) {
         }
     }, [amountInput]);
     const amountColor = transactionType === "EXPENSE" ? theme.colors.expense : theme.colors.income;
-    const selectedAccountLabel = accountChipLabel(selectedAccountType).replace(/^\S+\s/, "");
-    const canSave = amountMinor > 0 && selectedCategory !== "" && selectedCategory !== "New" && !saving;
+    const selectedAccountLabel = accountChips.find((account) => account.id === selectedAccountId)?.label.replace(/^\S+\s/, "") ?? "Choose account";
+    const canSave = amountMinor > 0 && selectedCategory !== "" && selectedCategory !== "New" && selectedAccountId !== null && !saving;
     const handleSave = async () => {
         if (!canSave) {
             return;
@@ -128,14 +135,14 @@ export function EntryScreen({ navigation }) {
         setSaving(true);
         try {
             await addTransaction({
-                accountType: selectedAccountType,
+                accountId: selectedAccountId,
                 amountMinor,
                 categoryName: selectedCategory,
                 note: note.trim() ? note.trim() : null,
                 type: transactionType,
             });
             setSelectedMonthYear(toMonthYear());
-            navigation.goBack();
+            tabNavigation?.navigate("History", { screen: "HistoryList" });
         }
         catch (error) {
             const message = error instanceof Error ? error.message : "Could not save transaction.";
@@ -295,8 +302,8 @@ export function EntryScreen({ navigation }) {
         <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
           Account
         </Text>
-        <View style={{ flexDirection: "row", gap: theme.spacing.keyGap }}>
-          {accountChips.map((account) => (<Chip key={account.type} onPress={() => setSelectedAccountType(account.type)} selected={selectedAccountType === account.type} style={{ height: theme.sizes.accountChip }}>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.keyGap }}>
+          {accountChips.map((account) => (<Chip key={account.id} onPress={() => setSelectedAccountId(account.id)} selected={selectedAccountId === account.id} style={{ height: theme.sizes.accountChip }}>
               {account.label}
             </Chip>))}
         </View>

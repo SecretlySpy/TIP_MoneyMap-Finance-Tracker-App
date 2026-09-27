@@ -19,6 +19,7 @@ import { RecurringScreen } from "../screens/RecurringScreen";
 import { GoalsScreen } from "../screens/GoalsScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { SmartTipsScreen } from "../screens/SmartTipsScreen";
+import { SplashScreen } from "../screens/SplashScreen";
 import { StudentEatsScreen } from "../screens/StudentEatsScreen";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -55,6 +56,7 @@ function SettingsNavigator() {
       <SettingsStack.Screen name="ManageAccounts" component={ManageAccountsScreen}/>
       <SettingsStack.Screen name="PasteImport" component={PasteImportScreen}/>
       <SettingsStack.Screen name="Import" component={ImportScreen}/>
+      <SettingsStack.Screen name="Splash" component={SplashScreen}/>
     </SettingsStack.Navigator>);
 }
 const tabIcons = {
@@ -102,6 +104,7 @@ function MainTabs() {
 // App Lock sits above navigation when enabled; unlocked sessions reach the tab shell.
 export function RootNavigator() {
     const isLocked = useUiStore((state) => state.isLocked);
+    const hasSeenSplash = useUiStore((state) => state.hasSeenSplash);
     const preferencesReady = useUiStore((state) => state.preferencesReady);
     const ensurePreferencesLoaded = useUiStore((state) => state.ensurePreferencesLoaded);
     const themePreference = useUiStore((state) => state.themePreference);
@@ -129,10 +132,27 @@ export function RootNavigator() {
           </View>
         );
     }
+    if (!hasSeenSplash) {
+        return (
+          <RootStack.Navigator screenOptions={{ headerShown: false }}>
+            <RootStack.Screen name="Splash" component={SplashScreen} />
+            <RootStack.Screen name="Main" component={MainTabs} />
+            <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
+          </RootStack.Navigator>
+        );
+    }
     return (<RootStack.Navigator screenOptions={{ headerShown: false }}>
-      {isLocked ? (<RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }}/>) : (<>
-          <RootStack.Screen name="Main" component={MainTabs}/>
-          <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }}/>
-        </>)}
+      {isLocked ? (
+        <>
+          <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
+          <RootStack.Screen name="Main" component={MainTabs} />
+        </>
+      ) : (
+        <>
+          <RootStack.Screen name="Main" component={MainTabs} />
+          <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
+        </>
+      )}
+      <RootStack.Screen name="Splash" component={SplashScreen} />
     </RootStack.Navigator>);
 }

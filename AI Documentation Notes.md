@@ -2183,8 +2183,67 @@ Current app source → Metro → local native client → native view measurement
 - The local APK package is `com.example.financetracker`; current release config uses
   `com.moneymap.financetracker`. This capture is not release packaging or FLAG_SECURE QA.
 - Locally installed `expo-location` is a stub; Student Eats captured the campus fallback
-  with OpenStreetMap results fetched during the session and then cached.
-- React devtools internals and live places results can change; inspect the dated README before replay.
-- Gallery verified in Chrome at 1440 and 390 px: 31 images loaded, preserved aspect ratios,
-  no horizontal page overflow, functional search. Application unit tests were not rerun for this artifact task.
-- Handover and complete scope: `docs/screenshots/2026-09-06/HANDOVER.md`.
+
+---
+
+---
+
+# Module / File: src/components/BottomSheet.jsx
+## Function: BottomSheet
+- **Purpose**: Render an accessible, native modal bottom sheet matching Figma sheets (`08b`, `09b`, `10b`, `16b`) with backdrop scrim, top grabber bar, theme surface styling, and keyboard avoidance.
+- **Inputs**:
+  - `visible` (`boolean`): Whether the modal sheet is displayed.
+  - `onClose` (`() => void`): Callback invoked when the user taps the scrim or requests dismissal.
+  - `title` (`string`): Header title of the bottom sheet.
+  - `children` (`React.ReactNode`): Sheet form content and actions.
+- **Outputs**: `React.JSX.Element` modal component.
+- **Dependencies**: React Native `Modal`, `Pressable`, `KeyboardAvoidingView`, `ScrollView`, and `useTheme`.
+- **Behavior**: Opens over current screen with semi-transparent scrim (`theme.colors.scrim`), applies rounded top corners (`theme.radii.card`), renders 44x5px grabber bar (`theme.colors.outline`), scrolls if content overflows viewport, and avoids on-screen keyboard.
+- **Side Effects**: Controls native modal presentation state.
+- **DSA Used**: O(1) layout composition.
+- **Responsive & Accessibility Notes**: Traps focus appropriately, provides accessible grabber, supports arbitrary content height with scroll fallback.
+- **Security Notes**: Pure UI component; processes no sensitive data.
+
+# Module / File: src/components/EmojiGrid.jsx
+## Function: EmojiGrid
+- **Purpose**: Render the exact 18-icon 3x6 curated emoji preset grid from Figma prototype (`🍜, 🚌, 📚, 📱, 🛍️, 🎮, 🧾, 🏠, 🌐, 💧, 💡, 🎓, 💼, 💵, 📦, ☕, 🎬, 💊`).
+- **Inputs**:
+  - `selectedEmoji` (`string`): Currently selected emoji character.
+  - `onSelect` (`(emoji: string) => void`): Selection callback when an emoji tile is pressed.
+- **Outputs**: `React.JSX.Element` representing the 3x6 grid.
+- **Dependencies**: React Native `View`, `Pressable`, `AppText`, and `useTheme`.
+- **Behavior**: Renders 18 icon tiles arranged into 3 rows of 6 items. Highlights selected emoji with `theme.colors.tint` background and `theme.colors.primary` border.
+- **Side Effects**: Invokes `onSelect` with chosen emoji string.
+- **DSA Used**: O(18) = O(1) static array rendering.
+- **Responsive & Accessibility Notes**: Minimum 44px touch targets for each emoji button, accessible role button and label.
+- **Security Notes**: Pure presentation component.
+
+# Module / File: src/screens/SplashScreen.jsx
+## Function: SplashScreen
+- **Purpose**: Provide the first-launch onboarding welcome screen matching Figma `01 Splash`, displaying the brand circle, app title, subtitle, 56px CTA, and offline security promise.
+- **Inputs**:
+  - `navigation` (`object`): React Navigation prop.
+- **Outputs**: `React.JSX.Element` full-screen container.
+- **Dependencies**: `ScreenContainer`, `PrimaryButton`, `AppText`, `useUiStore`, and `useTheme`.
+- **Behavior**: On pressing "Get started", sets `hasSeenSplash = true` (persisted via `SecureStore`), and navigates to the Main application shell.
+- **Side Effects**: Writes to SecureStore key `moneymap.splash.seen.v1` and updates `uiStore`.
+- **DSA Used**: O(1) state transitions.
+- **Responsive & Accessibility Notes**: High-contrast typography, 56px touch target height for primary button, full screen container.
+- **Security Notes**: Reassures user regarding 100% offline-first architecture, local SQLite encryption, and absence of remote server data collection.
+
+---
+
+# Technical reconciliation — 2026-09-27 (Update 092726)
+
+This section updates the prototype parity and test verification status:
+
+- Full visual and layout parity achieved for all 22 canvas frames in Figma page `MoneyMap — Update 092726` (`75:172`).
+- Replaced fragmented sequential alert modals with reusable, accessible `BottomSheet.jsx` and `EmojiGrid.jsx` across Budgets (`08 & 08b`), Recurring (`09b`), and Savings Goals (`10b`).
+- Delivered dedicated, two-stage interactive Import UX matching Figma `16 Import Data` (PreviewTable + MappingCard with cycling pills + ReadyBanner) and `16b Import Data — Resolve Accounts` (PreviewTable + Account resolution pills + atomic confirmation).
+- Implemented `SplashScreen.jsx` matching Figma `01 Splash` with persistent first-launch state and Settings replay link.
+- Reconciled `AppLockScreen.jsx` with "MoneyMap" branding, 4-digit PIN indicator dots, and "Cancel setup" affordance.
+- Added subtle hairline card row dividers across `SettingsScreen.jsx` matching Figma `13 Settings`.
+- Automated test coverage: 27 test suites passed, 165 total tests passed (including comprehensive `e2eVerification.test.js` validating all backend algorithmic pipelines, money precision, and database schemas).
+- Static UI fidelity verified: Zero hexadecimal color literals across all 37 UI components and screen files (enforcing strict `theme.colors.*` token consumption).
+- Continuity source: [`Project Guidelines/Decisions and Handover.md`](./Project%20Guidelines/Decisions%20and%20Handover.md).
+

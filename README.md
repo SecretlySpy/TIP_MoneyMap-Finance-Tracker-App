@@ -28,7 +28,7 @@ The Pages site is the polished setup guide: root [`index.html`](./index.html) (s
 
 **v0.1.0** — Core complete + Student Eats + Goals / Safe-to-Spend.
 
-### Known gaps (QA audit 2026-08-31)
+### Known gaps (reconciled 2026-09-27)
 
 A full QA pass is recorded in [AI Documentation Notes.md](./AI%20Documentation%20Notes.md#qa-audit--2026-08-31).
 "Done" above means the feature ships, not that it matches every expectation of a mainstream
@@ -37,19 +37,19 @@ expense tracker. Still missing:
 | Gap | Impact |
 |---|---|
 | Transactions cannot be **backdated** (always `Date.now()`) or **edited** after saving | High — the biggest deviation from standard trackers |
-| No transaction **search**; the History filter cycles one category per tap | Medium |
-| Custom accounts are not selectable on Entry (chips are the three fixed types) | Medium |
+| No transaction **search**; History supports explicit category and account filters | Medium |
 | `xlsx@0.18.5` has two unpatched high-severity advisories and parses user files | **Security — action required** |
-| No account transfers, budget rollover, import de-duplication, or "delete all data" reset | Low–medium |
+| No account transfers, budget rollover, import de-duplication, or "delete all data" reset | Low–medium; the import screen warns before confirmation |
 
-Test coverage excludes `src/screens`, `src/store`, `src/components` and `src/navigation`.
+The Jest suite covers domain, data-transfer, store, component, and static UI contracts. Native
+device behavior still requires the Android verification path below.
 
 ## Quick start
 
 1. Install **Node.js 22 LTS**, **JDK 21**, Android SDK (API 35 recommended).
 2. `npm ci`
 3. Copy `.env.example` → `.env` (optional `GEMINI_API_KEY` for online tips).
-4. `npm test` (25 suites, 141 tests)
+4. `npm test` (26 suites, 154 tests at the 2026-09-27 reconciliation)
 5. Start an emulator/device, then `npm run android` (dev client required — **Expo Go unsupported** because of SQLCipher).
 
 Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or the [live Pages site](https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/). Also see [Tech Stack Setup Guide.md](./Tech%20Stack%20Setup%20Guide.md) and [docs/local-environment-audit-linux.md](./docs/local-environment-audit-linux.md).
@@ -71,10 +71,10 @@ Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or th
 
 ## Student Eats Near Me
 
-- Dashboard → **Student Eats** (location permission only when opened).
+- Dashboard → **Student Eats**; searches use the fixed TIP Quezon City campus origin and request no location permission.
 - Places via Overpass (Nominatim fallback); ranked by distance + price + rating + student heuristics.
 - Mini-map is on-device relative plot (no map SDK).
-- Fallback origin: TIP Quezon City campus. Coordinates never persisted.
+- Origin: TIP Quezon City campus. The app does not read or persist device coordinates.
 - Optional AI tips reuse Smart Tips consent; payload uses distance **bands** only (no lat/lon).
 
 ## Release

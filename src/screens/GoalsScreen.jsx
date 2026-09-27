@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Alert, Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
-import { DashedButton } from "../components/Buttons";
+import { BottomSheet } from "../components/BottomSheet";
+import { DashedButton, PrimaryButton } from "../components/Buttons";
+import { EmojiGrid } from "../components/EmojiGrid";
 import { EmptyState } from "../components/EmptyState";
 import { GoalCard } from "../components/GoalCard";
 import { ScreenContainer } from "../components/ScreenContainer";
@@ -25,9 +27,13 @@ export function GoalsScreen({ navigation }) {
   const deleteGoal = useFinanceStore((state) => state.deleteGoal);
   const archiveGoal = useFinanceStore((state) => state.archiveGoal);
 
-  const [showCreate, setShowCreate] = useState(false);
-  const [createStep, setCreateStep] = useState("name");
+  // Figma 10b Add Savings Goal Bottom Sheet
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const [draftName, setDraftName] = useState("");
+  const [draftTargetText, setDraftTargetText] = useState("");
+  const [draftDeadlineText, setDraftDeadlineText] = useState("");
+  const [draftEmoji, setDraftEmoji] = useState("💻");
+
   const [contributeId, setContributeId] = useState(null);
   const [renameId, setRenameId] = useState(null);
   const [targetId, setTargetId] = useState(null);
@@ -37,31 +43,51 @@ export function GoalsScreen({ navigation }) {
   const displayGoals = useMemo(() => sortGoalsForDisplay(goals ?? []), [goals]);
 
   const beginCreate = () => {
-    setCreateStep("name");
     setDraftName("");
-    setShowCreate(true);
+    setDraftTargetText("");
+    setDraftDeadlineText("");
+    setDraftEmoji("💻");
+    setIsAddOpen(true);
   };
 
-  const handleCreateName = (name) => {
-    const trimmed = name.trim();
+  const handleSaveGoal = async () => {
+    const trimmed = draftName.trim();
     if (!trimmed) {
-      Alert.alert("Name required", "Give your goal a short name (e.g. New laptop).");
+      Alert.alert("Name required", "Give your goal a name (e.g. New laptop).");
       return;
     }
-    setDraftName(trimmed);
-    setCreateStep("target");
-  };
+    let targetMinor = 0;
+    try {
+      targetMinor = parseDecimalToMinor(draftTargetText.replace(/[₱$,\s]/g, "") || "0");
+      if (targetMinor <= 0) throw new Error("Enter a positive target amount.");
+    } catch (err) {
+      Alert.alert("Invalid target", err instanceof Error ? err.message : "Enter a valid target amount.");
+      return;
+    }
 
-  const handleCreateTarget = async (value) => {
+    let deadlineEpochMillis = null;
+    const trimmedDeadline = draftDeadlineText.trim();
+    if (trimmedDeadline.length > 0) {
+      try {
+        deadlineEpochMillis = parseLocalDateToNoonEpoch(trimmedDeadline);
+      } catch (err) {
+        Alert.alert("Invalid date", "Please use YYYY-MM-DD format for the deadline.");
+        return;
+      }
+    }
+
     if (busy) return;
     setBusy(true);
     try {
-      const targetMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
-      if (targetMinor <= 0) throw new Error("Enter a positive target amount.");
-      await addGoal({ name: draftName, targetMinor });
-      setShowCreate(false);
-      setCreateStep("name");
+      await addGoal({
+        name: trimmed,
+        targetMinor,
+        deadlineEpochMillis,
+      });
+      setIsAddOpen(false);
       setDraftName("");
+      setDraftTargetText("");
+      setDraftDeadlineText("");
     } catch (error) {
       Alert.alert("Could not create goal", error instanceof Error ? error.message : "Unknown error");
     } finally {
@@ -74,7 +100,6 @@ export function GoalsScreen({ navigation }) {
     setBusy(true);
     try {
       const trimmed = value.trim();
-      // An empty value clears the deadline rather than failing validation.
       const deadlineEpochMillis = trimmed.length === 0 ? null : parseLocalDateToNoonEpoch(trimmed);
       await updateGoal(deadlineId, { deadlineEpochMillis });
       setDeadlineId(null);
@@ -92,7 +117,6 @@ export function GoalsScreen({ navigation }) {
       const amountMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
       if (amountMinor <= 0) throw new Error("Enter a positive amount.");
       const goal = (goals ?? []).find((g) => g.id === contributeId);
-      // Pure preview of the outcome so the user gets completion feedback, not silence.
       const outcome = goal ? applyGoalContribution(goal, amountMinor) : null;
       await contributeToGoal(contributeId, amountMinor);
       setContributeId(null);
@@ -140,7 +164,6 @@ export function GoalsScreen({ navigation }) {
   };
 
   const openGoalMenu = (goal) => {
-    // Android Alert shows at most 3 buttons — keep Cancel | Edit | Delete.
     Alert.alert(goal.name, "Manage this savings goal.", [
       { text: "Cancel", style: "cancel" },
       {
@@ -262,34 +285,112 @@ export function GoalsScreen({ navigation }) {
         </>
       ) : null}
 
-      <TextPromptModal
-        confirmLabel="Next"
-        message="What are you saving for?"
-        onCancel={() => {
-          setShowCreate(false);
-          setCreateStep("name");
-          setDraftName("");
-        }}
-        onConfirm={handleCreateName}
-        placeholder="New laptop"
-        title="Goal name"
-        visible={showCreate && createStep === "name"}
-      />
-      <TextPromptModal
-        confirmLabel="Create"
-        initialValue="5000.00"
-        keyboardType="decimal-pad"
-        message={`Target amount for “${draftName}”`}
-        onCancel={() => {
-          setShowCreate(false);
-          setCreateStep("name");
-          setDraftName("");
-        }}
-        onConfirm={(value) => void handleCreateTarget(value)}
-        placeholder="5000.00"
-        title="Target amount"
-        visible={showCreate && createStep === "target"}
-      />
+      {/* Figma 10b Add Savings Goal Bottom Sheet */}
+      <BottomSheet
+        onClose={() => setIsAddOpen(false)}
+        title="Add savings goal"
+        visible={isAddOpen}
+      >
+        <View style={{ gap: theme.spacing.md }}>
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+              Goal name
+            </Text>
+            <TextInput
+              accessibilityLabel="Goal name"
+              onChangeText={setDraftName}
+              placeholder="New laptop"
+              placeholderTextColor={theme.colors.sub}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.outline,
+                borderRadius: theme.radii.card,
+                borderWidth: 1,
+                color: theme.colors.text,
+                fontFamily: theme.fonts.regular,
+                fontSize: theme.typeScale.body,
+                minHeight: 48,
+                paddingHorizontal: theme.spacing.lg,
+              }}
+              value={draftName}
+            />
+          </View>
+
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+              Target amount ({currencySymbol})
+            </Text>
+            <TextInput
+              accessibilityLabel="Target amount"
+              keyboardType="decimal-pad"
+              onChangeText={setDraftTargetText}
+              placeholder="35,000.00"
+              placeholderTextColor={theme.colors.sub}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.outline,
+                borderRadius: theme.radii.card,
+                borderWidth: 1,
+                color: theme.colors.text,
+                fontFamily: theme.fonts.regular,
+                fontSize: theme.typeScale.body,
+                minHeight: 48,
+                paddingHorizontal: theme.spacing.lg,
+              }}
+              value={draftTargetText}
+            />
+          </View>
+
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+              Target deadline (optional YYYY-MM-DD)
+            </Text>
+            <TextInput
+              accessibilityLabel="Target deadline"
+              maxLength={10}
+              onChangeText={setDraftDeadlineText}
+              placeholder="2026-11-15"
+              placeholderTextColor={theme.colors.sub}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.outline,
+                borderRadius: theme.radii.card,
+                borderWidth: 1,
+                color: theme.colors.text,
+                fontFamily: theme.fonts.regular,
+                fontSize: theme.typeScale.body,
+                minHeight: 48,
+                paddingHorizontal: theme.spacing.lg,
+              }}
+              value={draftDeadlineText}
+            />
+          </View>
+
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+              Choose icon
+            </Text>
+            <EmojiGrid onSelect={setDraftEmoji} selectedEmoji={draftEmoji} />
+          </View>
+
+          <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.md }}>
+            <PrimaryButton disabled={busy} onPress={() => void handleSaveGoal()}>
+              {busy ? "Saving…" : "Save goal"}
+            </PrimaryButton>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setIsAddOpen(false)}
+              style={{ alignItems: "center", justifyContent: "center", minHeight: 44 }}
+            >
+              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+                Cancel
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </BottomSheet>
+
+      {/* Contribution / edit dialogs */}
       <TextPromptModal
         confirmLabel="Add"
         initialValue="100.00"

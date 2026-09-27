@@ -5,6 +5,7 @@ import {
   detectImportMappings,
   parseImportFile,
   parseImportGrid,
+  parseImportAccountType,
   xlsxToGrid,
 } from "../src/domain/services/importParser";
 import { AccountRepository, CategoryRepository, TransactionRepository } from "../src/db/repositories";
@@ -42,6 +43,8 @@ describe("importParser CSV grid", () => {
       amountMinor: 15_000,
       type: "EXPENSE",
       categoryName: "Food",
+      accountLabel: "CASH",
+      accountKey: "cash",
       accountType: "CASH",
       note: "Lunch, campus",
     });
@@ -77,6 +80,7 @@ describe("importParser XLSX grid", () => {
       amountMinor: 9_950,
       type: "EXPENSE",
       categoryName: "Transport",
+      accountLabel: "Card",
       accountType: "CARD",
       note: "Jeep",
     });
@@ -84,9 +88,32 @@ describe("importParser XLSX grid", () => {
       amountMinor: 100_000,
       type: "INCOME",
       categoryName: "Part-time",
+      accountLabel: "E-wallet",
       accountType: "EWALLET",
     });
     expect(result.skipped.length).toBe(2);
+  });
+
+  it("preserves named accounts instead of silently coercing them to Cash", () => {
+    const result = parseImportGrid([
+      ["Date", "Amount", "Type", "Category", "Account"],
+      ["2026-08-01", "100", "EXPENSE", "Food", "GCash"],
+      ["2026-08-02", "200", "EXPENSE", "School", "BPI Savings"],
+    ]);
+
+    expect(result.rows.map((row) => row.accountLabel)).toEqual(["GCash", "BPI Savings"]);
+    expect(result.rows.map((row) => row.accountType)).toEqual([null, null]);
+    expect(parseImportAccountType("mystery account")).toBeNull();
+  });
+
+  it("rejects rows until the account column is mapped", () => {
+    const result = parseImportGrid(
+      [["Date", "Amount"], ["2026-08-01", "100"]],
+      { Date: 0, Amount: 1, Type: -1, Category: -1, Account: -1, Note: -1 },
+    );
+
+    expect(result.rows).toHaveLength(0);
+    expect(result.skipped[0]?.reason).toMatch(/Account column is unmapped/);
   });
 });
 

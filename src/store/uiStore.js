@@ -1,3 +1,4 @@
+import * as SecureStore from "expo-secure-store";
 import { AppState } from "react-native";
 import { create } from "zustand";
 import { clearPin, getPinLockoutStatus, hasStoredPin, setPin, tryLocalAuthentication, verifyPinWithLockout, } from "../services/appLock";
@@ -48,6 +49,7 @@ export async function syncRemindersFromStores(options = {}) {
 export const useUiStore = create((set, get) => ({
     ...DEFAULT_PREFERENCES,
     hasPin: false,
+    hasSeenSplash: false,
     isLocked: false,
     preferencesReady: false,
     notificationPermissionDenied: false,
@@ -63,9 +65,11 @@ export const useUiStore = create((set, get) => ({
         preferencesPromise = (async () => {
             const preferences = await loadPreferences();
             const pinExists = await hasStoredPin();
+            const splashSeen = await SecureStore.getItemAsync("moneymap.splash.seen.v1").catch(() => null);
             set({
                 ...preferences,
                 hasPin: pinExists,
+                hasSeenSplash: splashSeen === "true",
                 isLocked: preferences.appLockEnabled && pinExists,
                 preferencesReady: true,
             });
@@ -106,6 +110,14 @@ export const useUiStore = create((set, get) => ({
         const current = get();
         if (current.appLockEnabled && current.hasPin) {
             set({ isLocked: true });
+        }
+    },
+    setHasSeenSplash: async (seen) => {
+        set({ hasSeenSplash: seen });
+        try {
+            await SecureStore.setItemAsync("moneymap.splash.seen.v1", seen ? "true" : "false");
+        } catch {
+            // no-op
         }
     },
     setAppLockEnabled: async (enabled) => {

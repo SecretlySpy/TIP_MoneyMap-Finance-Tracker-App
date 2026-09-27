@@ -22,8 +22,8 @@
 | Background / reminders | expo-background-task / expo-notifications / expo-task-manager | Expo 54-compatible | Recurring catch-up + local bill reminders |
 | App lock | expo-local-authentication | Expo 54-compatible | Biometrics with PIN fallback |
 | Import | papaparse / xlsx / expo-document-picker / expo-file-system | Locked via package.json | CSV + Excel migration import |
-| Smart Tips (optional HTTPS) | `src/remote/smartTipsClient.js` + Gemini | Key via `app.config.js` / EAS | Only networked module; offline rules always available |
-| Tests | Jest Expo / RNTL / better-sqlite3 | `~54.0.17` / `^14.0.1` / `^12.11.1` | ~91 unit tests: SQL, money, tips, import, lock, UI |
+| Optional HTTPS | `src/remote/smartTipsClient.js`, `placesClient.js`, `eatsTipsClient.js` | Key via `app.config.js` / EAS for Gemini paths | Offline finance tips always remain available; Student Eats searches online around fixed TIP QC |
+| Tests | Jest Expo / RNTL / better-sqlite3 | `~54.0.17` / `^14.0.1` / `^12.11.1` | 165 tests at the 2026-09-27 reconciliation (27 suites): SQL, money, tips, import, lock, store, UI, and e2e integration |
 | Package manager | npm | 10 or newer (verified `10.9.8`) | Dependency installation and scripts |
 | Android tooling | Android SDK cmdline-tools / Studio, JDK | SDK platform 35, build-tools 35, NDK 27.1, Emulator, JDK 21 | API 26+ emulator/device builds; Java 25+ is unsupported by this Gradle stack |
 
@@ -90,7 +90,7 @@ sequenceDiagram
 4. Copy `.env.example` to `.env`. Optional `GEMINI_API_KEY` enables online Smart Tips after in-app consent; offline tips work without it.
 5. Run `npm ci` (preferred with lockfile) or `npm install`.
 6. Run `npm run asset:splash` only after changing the source Home SVG or launch color; identical input produces an identical PNG hash.
-7. Run `npm test` (~91 tests expected).
+7. Run `npm test` (26 suites / 154 tests expected at the 2026-09-27 reconciliation).
 8. Run `npx expo-doctor` and optionally `npx expo export --platform android --clear`.
 9. Start an emulator or connect an Android device with USB debugging, then run `npm run android` (first run performs a native dev-client build).
 
@@ -200,7 +200,7 @@ npx expo export --platform android --clear
 npm audit --omit=dev --audit-level high
 ```
 
-Expect: 44 tests green, expo-doctor 18/18, export writes `dist/`. Production dependency audit may still report **moderate** advisories in Expo transitive packages; do not run `npm audit fix --force` (breaking). Re-check after Expo SDK upgrades.
+Current reconciliation evidence (2026-09-27): 26 suites / 154 tests green; Expo export succeeded; Expo Doctor passed 17/18 checks and reported five Expo patch-level mismatches. A native Gradle build remains unverified on the reconciliation workstation because it supplied Node 24 and JDK 25 rather than the supported Node 22/JDK 21 baseline. Production dependency audit may report advisories; do not run `npm audit fix --force` (breaking). Re-check after reviewed dependency upgrades.
 
 For a native debug APK, run `npx expo prebuild --platform android --clean`, enter the generated `android` directory, and run `./gradlew :app:assembleDebug` on macOS/Linux or `.\gradlew.bat :app:assembleDebug` in PowerShell. Running the wrapper from its own directory avoids Windows wrapper working-directory surprises. During Gradle configuration, OP-SQLite should report that it is using SQLCipher and `prepareMoneyMapOpenSslJni` must run before the application JNI merge. Confirm the APK contains both `lib/<abi>/libop-sqlite.so` and `lib/<abi>/libcrypto.so`. Generated `android/` and `ios/` directories are ignored because Expo Continuous Native Generation recreates them from `app.json`.
 

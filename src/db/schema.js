@@ -32,7 +32,7 @@ const CREATE_SCHEMA_STATEMENTS = [
      next_run_epoch_millis INTEGER NOT NULL,
      is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
       reminder_enabled INTEGER NOT NULL DEFAULT 0 CHECK (reminder_enabled IN (0, 1)),
-      reminder_lead_days INTEGER NOT NULL DEFAULT 3 CHECK (reminder_lead_days >= 0),
+      reminder_lead_days INTEGER NOT NULL DEFAULT 14 CHECK (reminder_lead_days >= 0),
       icon TEXT,
       anchor_day INTEGER CHECK (anchor_day IS NULL OR (anchor_day >= 1 AND anchor_day <= 31)),
       FOREIGN KEY (category_id, type) REFERENCES categories (id, type) ON UPDATE RESTRICT ON DELETE RESTRICT,

@@ -29,4 +29,13 @@ describe("Figma reusable UI states", () => {
         await fireEvent.press(screen.getByRole("button", { name: "＋ Add your first transaction" }));
         expect(onAdd).toHaveBeenCalledTimes(1);
     });
+    it("distinguishes an empty filter result from an empty ledger", async () => {
+        const onClearFilters = jest.fn();
+        const screen = await render(
+          <HistoryBody groups={[]} isFiltered onClearFilters={onClearFilters}/>,
+        );
+        expect(screen.getByText("No matching transactions")).toBeTruthy();
+        await fireEvent.press(screen.getByRole("button", { name: "Clear filters" }));
+        expect(onClearFilters).toHaveBeenCalledTimes(1);
+    });
 });

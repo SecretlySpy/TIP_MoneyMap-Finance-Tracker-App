@@ -47,11 +47,19 @@ function SettingsRow({ emoji, label, onPress, trailing }) {
 }
 function SettingsSection({ children, title }) {
     const theme = useTheme();
+    const childArray = Array.isArray(children) ? children.filter(Boolean) : [children];
     return (<View style={{ gap: theme.spacing.sm }}>
       <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
         {title}
       </Text>
-      <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.lg }}>{children}</SectionCard>
+      <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.md }}>
+        {childArray.map((child, idx) => (
+          <View key={`settings-card-item-${idx}`} style={{ gap: theme.spacing.md }}>
+            {idx > 0 ? <View style={{ height: 1, backgroundColor: theme.colors.outline }} /> : null}
+            {child}
+          </View>
+        ))}
+      </SectionCard>
     </View>);
 }
 export function SettingsScreen({ navigation }) {
@@ -134,8 +142,11 @@ export function SettingsScreen({ navigation }) {
       </Text>
 
       <SettingsSection title="SECURITY">
-        <SettingsRow emoji="🔒" label="App lock (PIN + biometric)" onPress={() => rootNavigation?.navigate("AppLock")} trailing={<Toggle enabled={appLockEnabled && hasPin} label="App lock" onChange={(enabled) => void handleAppLockToggle(enabled)}/>}/>
-        <SettingsRow emoji="🛡️" label="Encrypted database" trailing={trailingText("On")}/>
+        <SettingsRow emoji="🔒" label={"Optional app lock\n(PIN + biometric)"} onPress={() => rootNavigation?.navigate("AppLock")} trailing={<Toggle enabled={appLockEnabled && hasPin} label="App lock" onChange={(enabled) => void handleAppLockToggle(enabled)}/>}/>
+        <SettingsRow emoji="🛡️" label={"Encrypted database\n(separate on-device key)"} trailing={trailingText("On")}/>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+          The optional PIN blocks access to MoneyMap. It does not create or decrypt the database key.
+        </Text>
       </SettingsSection>
 
       <SettingsSection title="DATA">
@@ -163,14 +174,11 @@ export function SettingsScreen({ navigation }) {
         <SettingsRow emoji="🗂️" label="Manage categories" onPress={() => navigation.navigate("ManageCategories")} trailing={trailingText("›")}/>
         <SettingsRow emoji="🏦" label="Manage accounts" onPress={() => navigation.navigate("ManageAccounts")} trailing={trailingText("›")}/>
         <SettingsRow emoji="🎯" label="Savings goals" onPress={() => navigation.navigate("Goals")} trailing={trailingText("›")}/>
+        <SettingsRow emoji="👋" label="Welcome to MoneyMap (Splash)" onPress={() => navigation.navigate("Splash")} trailing={trailingText("›")}/>
       </SettingsSection>
 
       <SettingsSection title="SMART FEATURES">
-        <SettingsRow emoji="✨" label={"Budget-based tips\n(uses internet)"} onPress={() => {
-            if (!smartTipsEnabled) {
-                Alert.alert("Smart Tips off", "Turn on the switch to open budget-based tips.");
-                return;
-            }
+        <SettingsRow emoji="✨" label={"Online tip personalization\n(optional; offline tips stay available)"} onPress={() => {
             tabNavigation?.navigate("Home", { screen: "SmartTips" });
         }} trailing={<Toggle enabled={smartTipsEnabled} label="Budget-based tips" onChange={(enabled) => {
             if (!enabled) {

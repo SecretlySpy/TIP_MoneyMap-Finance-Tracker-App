@@ -125,7 +125,7 @@ export async function fetchNearbyEats(options = {}) {
         origin,
         source: "error",
         fromCache: false,
-        errorMessage: "Could not load places. Showing offline tip: try campus canteen or carinderias nearby.",
+        errorMessage: "Could not load places. Connect to the internet and try again.",
       };
     }
   } finally {

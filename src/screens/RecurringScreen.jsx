@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Alert, Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
-import { DashedButton } from "../components/Buttons";
-import { OptionChipRow } from "../components/OptionChipRow";
-import { EmojiPickerRow } from "../components/EmojiPickerRow";
+import { BottomSheet } from "../components/BottomSheet";
+import { DashedButton, PrimaryButton } from "../components/Buttons";
+import { EmojiGrid } from "../components/EmojiGrid";
 import { EmptyState } from "../components/EmptyState";
+import { OptionChipRow } from "../components/OptionChipRow";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
@@ -34,15 +35,19 @@ export function RecurringScreen({ navigation }) {
   const deleteRecurringById = useFinanceStore((state) => state.deleteRecurringById);
 
   const [busy, setBusy] = useState(false);
-  const [step, setStep] = useState(null);
-  // name | emoji | amount | due | rename | editAmount | editDue
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [step, setStep] = useState(null); // rename | editAmount | editDue
+
+  // Form draft state for 09b Add Recurring Bill
   const [draftName, setDraftName] = useState("");
-  const [draftEmoji, setDraftEmoji] = useState(BUDGET_BILL_EMOJI_PRESETS[7]);
-  const [draftAmount, setDraftAmount] = useState(0);
-  const [activeBillId, setActiveBillId] = useState(null);
+  const [draftEmoji, setDraftEmoji] = useState("🧾");
+  const [draftAmountText, setDraftAmountText] = useState("");
+  const [draftDueText, setDraftDueText] = useState(defaultDueDateISO(RECURRING_REMINDER_LEAD_DAYS));
   const [draftFrequency, setDraftFrequency] = useState("MONTHLY");
   const [draftCategory, setDraftCategory] = useState(null);
   const [draftLeadDays, setDraftLeadDays] = useState(RECURRING_REMINDER_LEAD_DAYS);
+
+  const [activeBillId, setActiveBillId] = useState(null);
 
   const { categoriesById } = useMemo(
     () => mapsFromState({ accounts: [], categories }),
@@ -61,17 +66,34 @@ export function RecurringScreen({ navigation }) {
 
   const beginAdd = () => {
     setDraftName("");
-    setDraftEmoji(BUDGET_BILL_EMOJI_PRESETS[7]);
-    setDraftAmount(0);
+    setDraftEmoji("🧾");
+    setDraftAmountText("");
+    setDraftDueText(defaultDueDateISO(RECURRING_REMINDER_LEAD_DAYS));
     setActiveBillId(null);
     setDraftFrequency("MONTHLY");
     setDraftCategory(expenseCategoryOptions[0]?.value ?? null);
     setDraftLeadDays(RECURRING_REMINDER_LEAD_DAYS);
-    setStep("name");
+    setIsAddOpen(true);
   };
 
-  const finishCreate = async (dueIso) => {
+  const finishCreate = async () => {
     if (busy) return;
+    const trimmedName = draftName.trim();
+    if (!trimmedName) {
+      Alert.alert("Name required", "Enter a name for this recurring bill.");
+      return;
+    }
+
+    let amountMinor = 0;
+    try {
+      amountMinor = parseDecimalToMinor(draftAmountText.replace(/[₱$,\s]/g, "") || "0");
+      if (amountMinor <= 0) throw new Error("Enter a positive bill amount.");
+    } catch (err) {
+      Alert.alert("Invalid amount", err instanceof Error ? err.message : "Enter a valid amount.");
+      return;
+    }
+
+    const dueIso = draftDueText.trim() || defaultDueDateISO(draftLeadDays);
     const expenseCategories = categoriesForType(categories, "EXPENSE");
     const preferred =
       expenseCategories.find((category) => category.name === "Bills") ?? expenseCategories[0];
@@ -79,22 +101,22 @@ export function RecurringScreen({ navigation }) {
       Alert.alert("No categories", "Add an expense category before creating a recurring bill.");
       return;
     }
+
     setBusy(true);
     try {
       const dueEpochMillis = parseLocalDateToNoonEpoch(dueIso);
-      const name = draftName.trim() || preferred.name;
       await addRecurringBill({
-        amountMinor: draftAmount,
+        amountMinor,
         categoryName: draftCategory ?? preferred.name,
-        name,
+        name: trimmedName,
         icon: draftEmoji,
         dueEpochMillis,
         frequency: draftFrequency,
         leadDays: draftLeadDays,
       });
-      setStep(null);
+      setIsAddOpen(false);
       setDraftName("");
-      setDraftAmount(0);
+      setDraftAmountText("");
     } catch (error) {
       Alert.alert("Add bill failed", error instanceof Error ? error.message : "Could not add bill.");
     } finally {
@@ -142,7 +164,6 @@ export function RecurringScreen({ navigation }) {
     setBusy(true);
     try {
       const dueEpochMillis = parseLocalDateToNoonEpoch(value);
-      // Keep the user's reminder preference; only the schedule anchor changes.
       await updateRecurringRule(activeBillId, {
         nextRunEpochMillis: dueEpochMillis,
         anchorDay: new Date(dueEpochMillis).getDate(),
@@ -157,7 +178,6 @@ export function RecurringScreen({ navigation }) {
   };
 
   const openBillActions = (bill) => {
-    // Android Alert shows at most 3 buttons — keep Cancel | Edit | Delete.
     const id = Number(bill.id);
     Alert.alert(bill.name, "Manage this recurring bill.", [
       { text: "Cancel", style: "cancel" },
@@ -379,28 +399,87 @@ export function RecurringScreen({ navigation }) {
         </>
       ) : null}
 
-      <TextPromptModal
-        confirmLabel="Next"
-        message="Name shown on the bills list."
-        onCancel={() => {
-          setStep(null);
-          setDraftName("");
-        }}
-        onConfirm={(value) => {
-          setDraftName(value.trim() || "Monthly bill");
-          setStep("emoji");
-        }}
-        placeholder="Internet"
-        title="Bill name"
-        visible={step === "name"}
-      />
+      {/* Figma 09b Add Recurring Bill Bottom Sheet */}
+      <BottomSheet
+        onClose={() => setIsAddOpen(false)}
+        title="Add recurring bill"
+        visible={isAddOpen}
+      >
+        <View style={{ gap: theme.spacing.md }}>
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+              Bill name
+            </Text>
+            <TextInput
+              accessibilityLabel="Bill name"
+              onChangeText={setDraftName}
+              placeholder="Internet plan"
+              placeholderTextColor={theme.colors.sub}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.outline,
+                borderRadius: theme.radii.card,
+                borderWidth: 1,
+                color: theme.colors.text,
+                fontFamily: theme.fonts.regular,
+                fontSize: theme.typeScale.body,
+                minHeight: 48,
+                paddingHorizontal: theme.spacing.lg,
+              }}
+              value={draftName}
+            />
+          </View>
 
-      {step === "emoji" ? (
-        <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.lg }}>
-          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
-            Icon for “{draftName}”
-          </Text>
-          <EmojiPickerRow onChange={setDraftEmoji} value={draftEmoji} />
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+              Amount ({currencySymbol})
+            </Text>
+            <TextInput
+              accessibilityLabel="Bill amount"
+              keyboardType="decimal-pad"
+              onChangeText={setDraftAmountText}
+              placeholder="999.00"
+              placeholderTextColor={theme.colors.sub}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.outline,
+                borderRadius: theme.radii.card,
+                borderWidth: 1,
+                color: theme.colors.text,
+                fontFamily: theme.fonts.regular,
+                fontSize: theme.typeScale.body,
+                minHeight: 48,
+                paddingHorizontal: theme.spacing.lg,
+              }}
+              value={draftAmountText}
+            />
+          </View>
+
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+              Due date (YYYY-MM-DD)
+            </Text>
+            <TextInput
+              accessibilityLabel="Due date"
+              maxLength={10}
+              onChangeText={setDraftDueText}
+              placeholder={defaultDueDateISO(draftLeadDays)}
+              placeholderTextColor={theme.colors.sub}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.outline,
+                borderRadius: theme.radii.card,
+                borderWidth: 1,
+                color: theme.colors.text,
+                fontFamily: theme.fonts.regular,
+                fontSize: theme.typeScale.body,
+                minHeight: 48,
+                paddingHorizontal: theme.spacing.lg,
+              }}
+              value={draftDueText}
+            />
+          </View>
+
           <OptionChipRow
             accessibilityLabel="Repeat frequency"
             label="Repeats"
@@ -412,6 +491,7 @@ export function RecurringScreen({ navigation }) {
             ]}
             value={draftFrequency}
           />
+
           {expenseCategoryOptions.length > 0 ? (
             <OptionChipRow
               accessibilityLabel="Bill category"
@@ -421,6 +501,7 @@ export function RecurringScreen({ navigation }) {
               value={draftCategory ?? expenseCategoryOptions[0].value}
             />
           ) : null}
+
           <OptionChipRow
             accessibilityLabel="Reminder lead time"
             label="Remind me"
@@ -434,45 +515,32 @@ export function RecurringScreen({ navigation }) {
             ]}
             value={String(draftLeadDays)}
           />
-          <DashedButton onPress={() => setStep("amount")}>Next: amount</DashedButton>
-          <Pressable onPress={() => setStep(null)} style={{ minHeight: 44, justifyContent: "center" }}>
-            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, textAlign: "center" }}>
-              Cancel
-            </Text>
-          </Pressable>
-        </SectionCard>
-      ) : null}
 
-      <TextPromptModal
-        confirmLabel="Next"
-        initialValue="1000.00"
-        keyboardType="decimal-pad"
-        message={`Amount for ${draftName || "this bill"}`}
-        onCancel={() => setStep(null)}
-        onConfirm={(value) => {
-          try {
-            const amountMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
-            if (amountMinor <= 0) throw new Error("Enter a positive bill amount.");
-            setDraftAmount(amountMinor);
-            setStep("due");
-          } catch (error) {
-            Alert.alert("Invalid amount", error instanceof Error ? error.message : "Try again.");
-          }
-        }}
-        placeholder="1000.00"
-        title="Bill amount"
-        visible={step === "amount"}
-      />
-      <TextPromptModal
-        confirmLabel="Save bill"
-        initialValue={defaultDueDateISO(RECURRING_REMINDER_LEAD_DAYS)}
-        message={`Due date (YYYY-MM-DD). Reminder fires ${RECURRING_REMINDER_LEAD_DAYS} days before.`}
-        onCancel={() => setStep(null)}
-        onConfirm={(value) => void finishCreate(value)}
-        placeholder="2026-09-01"
-        title="Due date"
-        visible={step === "due"}
-      />
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+              Choose icon
+            </Text>
+            <EmojiGrid onSelect={setDraftEmoji} selectedEmoji={draftEmoji} />
+          </View>
+
+          <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.md }}>
+            <PrimaryButton disabled={busy} onPress={() => void finishCreate()}>
+              {busy ? "Saving…" : "Save bill"}
+            </PrimaryButton>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setIsAddOpen(false)}
+              style={{ alignItems: "center", justifyContent: "center", minHeight: 44 }}
+            >
+              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+                Cancel
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </BottomSheet>
+
+      {/* Edit modals for existing bills */}
       <TextPromptModal
         confirmLabel="Rename"
         initialValue={draftName}
@@ -505,7 +573,7 @@ export function RecurringScreen({ navigation }) {
             ? formatLocalDateISO(activeRule.nextRunEpochMillis)
             : defaultDueDateISO(RECURRING_REMINDER_LEAD_DAYS)
         }
-        message={`Due date (YYYY-MM-DD). Reminder stays ${RECURRING_REMINDER_LEAD_DAYS} days before.`}
+        message={`Due date (YYYY-MM-DD). Reminder stays ${activeRule?.reminderLeadDays ?? RECURRING_REMINDER_LEAD_DAYS} day${(activeRule?.reminderLeadDays ?? RECURRING_REMINDER_LEAD_DAYS) === 1 ? "" : "s"} before.`}
         onCancel={() => {
           setStep(null);
           setActiveBillId(null);

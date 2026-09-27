@@ -12,5 +12,11 @@
     "**/.expo/**": true,
     "**/android/.gradle/**": true,
     "**/android/app/build/**": true
-  }
+  },
+  "kimi.yoloMode": true,
+  "kimi.showThinkingExpanded": true,
+  "chat.checkpoints.showFileChanges": true,
+  "discord.detailsDebugging": "Debugging {file_name}",
+  "discord.detailsEditing": "Editing {file_name}",
+  "discord.detailsIdling": "Idling in {workspace}"
 }

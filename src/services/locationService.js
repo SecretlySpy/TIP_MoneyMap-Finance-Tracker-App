@@ -1,8 +1,6 @@
 /**
- * Location for Student Eats only.
- * - Permission requested when the feature is entered (caller responsibility).
- * - Coordinates are returned ephemerally — never written to SecureStore or DB.
- * - Falls back to TIP QC campus when denied / unavailable.
+ * Student Eats uses the deterministic TIP QC campus origin.
+ * GPS is unavailable until a supported location dependency is approved.
  */
 
 import { TIP_QC_CAMPUS } from "../domain/services/eatsRanking";
@@ -11,49 +9,8 @@ import { TIP_QC_CAMPUS } from "../domain/services/eatsRanking";
  * @typedef {{ latitude: number, longitude: number, label: string, isFallback: boolean, permission: string }} EatsOrigin
  */
 
-let locationModulePromise = null;
-
-async function loadLocationModule() {
-  if (locationModulePromise !== null) {
-    return locationModulePromise;
-  }
-  locationModulePromise = import("expo-location")
-    .then((mod) => {
-      const api = mod?.default ?? mod;
-      // Real package exposes requestForegroundPermissionsAsync; stub does too.
-      // Prefer real GPS only when getCurrentPositionAsync is not the stub thrower —
-      // both work; resolveEatsOrigin handles getCurrentPosition failures via TIP QC.
-      if (typeof api?.getForegroundPermissionsAsync !== "function") {
-        return null;
-      }
-      return api;
-    })
-    .catch(() => null);
-  return locationModulePromise;
-}
-
-/**
- * Request foreground permission (call when user opens Student Eats).
- * @returns {Promise<{ granted: boolean, status: string }>}
- */
 export async function requestEatsLocationPermission() {
-  const Location = await loadLocationModule();
-  if (Location === null) {
-    return { granted: false, status: "unavailable" };
-  }
-  try {
-    const existing = await Location.getForegroundPermissionsAsync();
-    if (existing.granted) {
-      return { granted: true, status: existing.status ?? "granted" };
-    }
-    const asked = await Location.requestForegroundPermissionsAsync();
-    return {
-      granted: asked.granted === true,
-      status: asked.status ?? (asked.granted ? "granted" : "denied"),
-    };
-  } catch {
-    return { granted: false, status: "error" };
-  }
+  return { granted: false, status: "not-requested" };
 }
 
 /**
@@ -62,10 +19,9 @@ export async function requestEatsLocationPermission() {
  * @returns {Promise<EatsOrigin>}
  */
 export async function resolveEatsOrigin(options = {}) {
-  const Location = options.LocationImpl
-    ?? await loadLocationModule();
+  const Location = options.LocationImpl ?? null;
   if (Location === null) {
-    return { ...TIP_QC_CAMPUS, isFallback: true, permission: "unavailable" };
+    return { ...TIP_QC_CAMPUS, isFallback: true, permission: "not-requested" };
   }
   try {
     const permission = await Location.getForegroundPermissionsAsync();
