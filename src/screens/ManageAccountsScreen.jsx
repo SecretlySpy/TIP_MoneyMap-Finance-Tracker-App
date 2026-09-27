@@ -132,7 +132,7 @@ export function ManageAccountsScreen({ navigation }) {
 
       {active.length === 0 ? (
         <EmptyState
-          actionLabel="＋ Add account"
+          actionLabel="+ Add account"
           emoji="🏦"
           message="Add Cash, Card, or E-wallet accounts with your own labels."
           onAction={() => setCreateStep("name")}
@@ -207,7 +207,7 @@ export function ManageAccountsScreen({ navigation }) {
 
       {active.length > 0 ? (
         <DashedButton disabled={busy} onPress={() => setCreateStep("name")}>
-          ＋ Add account
+          + Add account
         </DashedButton>
       ) : null}
 

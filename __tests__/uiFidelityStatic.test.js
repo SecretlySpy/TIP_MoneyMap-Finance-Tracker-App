@@ -109,7 +109,7 @@ describe("static UI fidelity boundaries", () => {
     expect(dashboard).toContain('label: "🧾 History"');
     expect(dashboard).toContain('label: "📊 Budgets"');
     expect(dashboard).toContain('label: "🔁 Recurring"');
-    expect(dashboard).toContain('accessibilityLabel="See budgets"');
+    expect(dashboard).toContain('accessibilityLabel="See all budgets"');
     expect(dashboard).toContain('navigation.navigate("StudentEats")');
     expect(dashboard).toContain('{ screen: "Goals" }');
   });

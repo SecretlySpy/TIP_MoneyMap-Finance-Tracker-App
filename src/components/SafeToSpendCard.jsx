@@ -1,18 +1,24 @@
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { formatMinor } from "../domain/services/money";
 import { useTheme } from "../theme/tokens";
 import { AppText as Text } from "./AppText";
 import { SectionCard } from "./SectionCard";
 
 /**
+ * Figma 03 Dashboard "Safe to Spend" card: label + headroom/bill/goal formula
+ * on one row, the safe amount below, and an optional due-bill reminder pill.
  * @param {{
  *   safeMinor: number,
  *   state: 'comfortable'|'tight'|'over'|'unset',
  *   currencySymbol: string,
  *   remainingBudgetsMinor: number,
  *   upcomingRecurringMinor: number,
+ *   upcomingRecurringCount?: number,
  *   goalReservesMinor: number,
+ *   goalReserveCount?: number,
  *   overCommittedMinor: number,
+ *   reminderText?: string|null,
+ *   onReminderPress?: () => void,
  * }} props
  */
 export function SafeToSpendCard({
@@ -21,8 +27,12 @@ export function SafeToSpendCard({
   currencySymbol,
   remainingBudgetsMinor,
   upcomingRecurringMinor,
+  upcomingRecurringCount = 0,
   goalReservesMinor,
+  goalReserveCount = 0,
   overCommittedMinor,
+  reminderText = null,
+  onReminderPress,
 }) {
   const theme = useTheme();
   const amountColor =
@@ -33,14 +43,14 @@ export function SafeToSpendCard({
         : state === "unset"
           ? theme.colors.sub
           : theme.colors.income;
-  const headline =
-    state === "over"
-      ? "Over committed"
-      : state === "tight"
-        ? "Spend carefully"
-        : state === "unset"
-          ? "Set a budget to see this"
-          : "Safe to spend";
+  const money = (minor) => formatMinor(minor, { currencySymbol, showCents: false });
+  const formulaParts = [`${money(remainingBudgetsMinor)} headroom`];
+  if (upcomingRecurringMinor > 0) {
+    formulaParts.push(`${money(upcomingRecurringMinor)} bill${upcomingRecurringCount === 1 ? "" : "s"}`);
+  }
+  if (goalReservesMinor > 0) {
+    formulaParts.push(`${money(goalReservesMinor)} goal${goalReserveCount === 1 ? "" : "s"}`);
+  }
 
   return (
     <SectionCard
@@ -51,9 +61,25 @@ export function SafeToSpendCard({
         borderColor: theme.colors.outline,
       }}
     >
-      <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
-        SAFE TO SPEND
-      </Text>
+      <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.md }}>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+          SAFE TO SPEND
+        </Text>
+        {state !== "unset" ? (
+          <Text
+            numberOfLines={1}
+            style={{
+              color: theme.colors.sub,
+              flexShrink: 1,
+              fontFamily: theme.fonts.medium,
+              fontSize: theme.typeScale.small,
+              textAlign: "right",
+            }}
+          >
+            {formulaParts.join(" − ")}
+          </Text>
+        ) : null}
+      </View>
       <Text
         style={{
           color: amountColor,
@@ -61,29 +87,45 @@ export function SafeToSpendCard({
           fontSize: theme.typeScale.heroAmount,
         }}
       >
-        {state === "unset"
-          ? "—"
-          : formatMinor(Math.max(0, safeMinor), { currencySymbol, showCents: false })}
+        {state === "unset" ? "—" : money(Math.max(0, safeMinor))}
       </Text>
-      <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-        {state === "unset"
-          ? "Add a monthly budget and this shows what is left to spend."
-          : `After budgets, bills & goals · ${headline}`}
-      </Text>
-      <View style={{ gap: theme.spacing.xxs, marginTop: theme.spacing.xs }}>
-        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
-          Budgets left {formatMinor(remainingBudgetsMinor, { currencySymbol, showCents: false })}
-          {" · Bills "}
-          {formatMinor(upcomingRecurringMinor, { currencySymbol, showCents: false })}
-          {" · Goals "}
-          {formatMinor(goalReservesMinor, { currencySymbol, showCents: false })}
+      {state === "unset" ? (
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+          Add a monthly budget and this shows what is left to spend.
         </Text>
-        {state === "over" && overCommittedMinor > 0 ? (
-          <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.tiny }}>
-            Commitments exceed this month&apos;s budget by {formatMinor(overCommittedMinor, { currencySymbol, showCents: false })}.
+      ) : null}
+      {state === "tight" ? (
+        <Text style={{ color: theme.colors.warning, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.tiny }}>
+          Spend carefully — little headroom left this month.
+        </Text>
+      ) : null}
+      {state === "over" && overCommittedMinor > 0 ? (
+        <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.tiny }}>
+          Commitments exceed this month&apos;s budget by {money(overCommittedMinor)}.
+        </Text>
+      ) : null}
+      {reminderText ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onReminderPress}
+          style={{
+            alignItems: "center",
+            backgroundColor: theme.colors.amberBg,
+            borderRadius: theme.radii.row,
+            flexDirection: "row",
+            gap: theme.spacing.sm,
+            marginTop: theme.spacing.xs,
+            minHeight: theme.sizes.secondaryButton,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.sm,
+          }}
+        >
+          <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>🔔</Text>
+          <Text style={{ color: theme.colors.amberText, flex: 1, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+            {reminderText}
           </Text>
-        ) : null}
-      </View>
+        </Pressable>
+      ) : null}
     </SectionCard>
   );
 }

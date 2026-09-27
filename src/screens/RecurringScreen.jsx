@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Alert, Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { BottomSheet } from "../components/BottomSheet";
-import { DashedButton, PrimaryButton } from "../components/Buttons";
+import { DashedButton } from "../components/Buttons";
 import { EmojiGrid } from "../components/EmojiGrid";
 import { EmptyState } from "../components/EmptyState";
 import { OptionChipRow } from "../components/OptionChipRow";
@@ -319,7 +319,7 @@ export function RecurringScreen({ navigation }) {
 
       {bills.length === 0 ? (
         <EmptyState
-          actionLabel="＋ Add recurring bill"
+          actionLabel="+ Add recurring bill"
           emoji="🔔"
           message="Name, icon, amount, and due date. You’ll be reminded 14 days before. Long-press a card to edit or delete."
           onAction={beginAdd}
@@ -391,10 +391,10 @@ export function RecurringScreen({ navigation }) {
       {bills.length > 0 ? (
         <>
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
-            Tip: press and hold a bill card for Edit or Delete.
+            Tip: press and hold a bill card to edit or delete.
           </Text>
           <DashedButton disabled={busy} onPress={beginAdd}>
-            {busy ? "Saving…" : "＋ Add recurring bill"}
+            {busy ? "Saving…" : "+ Add recurring bill"}
           </DashedButton>
         </>
       ) : null}
@@ -524,9 +524,9 @@ export function RecurringScreen({ navigation }) {
           </View>
 
           <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.md }}>
-            <PrimaryButton disabled={busy} onPress={() => void finishCreate()}>
+            <DashedButton disabled={busy} onPress={() => void finishCreate()}>
               {busy ? "Saving…" : "Save bill"}
-            </PrimaryButton>
+            </DashedButton>
             <Pressable
               accessibilityRole="button"
               onPress={() => setIsAddOpen(false)}

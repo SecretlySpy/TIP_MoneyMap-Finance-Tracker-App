@@ -3,7 +3,7 @@ import { Alert, Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { BottomSheet } from "../components/BottomSheet";
 import { BudgetCard } from "../components/BudgetCard";
-import { DashedButton, PrimaryButton } from "../components/Buttons";
+import { DashedButton } from "../components/Buttons";
 import { EmojiGrid } from "../components/EmojiGrid";
 import { EmptyState } from "../components/EmptyState";
 import { MonthChip } from "../components/MonthChip";
@@ -221,14 +221,14 @@ export function BudgetsScreen({ navigation }) {
         </Text>
         <Pressable accessibilityRole="button" onPress={() => navigation.navigate("Recurring")}>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
-            Bills
+            Bills ›
           </Text>
         </Pressable>
       </View>
 
       {cards.length === 0 ? (
         <EmptyState
-          actionLabel="＋ Add budget"
+          actionLabel="+ Add budget"
           emoji="📊"
           message="Name a category, pick an icon, and set a monthly limit. Long-press a card to edit or delete."
           onAction={beginAddBudget}
@@ -252,10 +252,10 @@ export function BudgetsScreen({ navigation }) {
       {cards.length > 0 ? (
         <>
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
-            Tip: press and hold a budget card for Edit or Delete.
+            Tip: press and hold a budget card to edit or delete.
           </Text>
           <DashedButton disabled={busy} onPress={beginAddBudget}>
-            {busy ? "Saving…" : "＋ Add budget"}
+            {busy ? "Saving…" : "+ Add budget"}
           </DashedButton>
         </>
       ) : null}
@@ -287,9 +287,9 @@ export function BudgetsScreen({ navigation }) {
           Icon
         </Text>
         <EmojiGrid onChange={setPendingEmoji} value={pendingEmoji} />
-        <PrimaryButton onPress={handleNameStepNext}>
+        <DashedButton onPress={handleNameStepNext}>
           Next: set limit
-        </PrimaryButton>
+        </DashedButton>
         <Pressable
           accessibilityRole="button"
           onPress={closeSheet}
@@ -327,9 +327,9 @@ export function BudgetsScreen({ navigation }) {
           {`${pendingCategoryName || editingLimitName || "Budget"} · ${formatMonthChip(selectedMonthYear)}`}
         </Text>
         <EmojiGrid onChange={setPendingEmoji} value={pendingEmoji} />
-        <PrimaryButton disabled={busy} onPress={() => void handleLimitConfirm(pendingLimitInput)}>
+        <DashedButton disabled={busy} onPress={() => void handleLimitConfirm(pendingLimitInput)}>
           {busy ? "Saving…" : "Save budget"}
-        </PrimaryButton>
+        </DashedButton>
         <Pressable
           accessibilityRole="button"
           onPress={closeSheet}

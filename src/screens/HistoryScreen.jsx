@@ -17,7 +17,7 @@ export function HistoryBody({ groups, isFiltered = false, onAdd, onClearFilters,
     if (groups.length === 0) {
         return (
           <EmptyState
-            actionLabel={isFiltered ? "Clear filters" : "＋ Add your first transaction"}
+            actionLabel={isFiltered ? "Clear filters" : "+ Add your first transaction"}
             emoji="🧾"
             message={isFiltered
               ? "No transactions match the selected category and account."

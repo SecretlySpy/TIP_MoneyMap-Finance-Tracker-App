@@ -121,7 +121,7 @@ function EatsMiniMap({ origin, places, theme }) {
           position: "absolute",
         }}
       >
-        {origin.isFallback ? "TIP QC campus" : "You"} · rings ≈ distance
+        {origin.isFallback ? "TIP QC campus" : "You"} · rings = distance
       </Text>
     </View>
   );
@@ -228,10 +228,10 @@ export function StudentEatsScreen({ navigation }) {
         </Pressable>
         <View style={{ flex: 1, gap: theme.spacing.xxs }}>
           <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.subScreenTitle }}>
-            Student Eats Near Me
+            Student Eats near TIP QC
           </Text>
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-            {`Using ${TIP_QC_CAMPUS.label} · live places need internet`}
+            Fixed TIP Quezon City search origin
           </Text>
         </View>
         <Pressable
@@ -276,7 +276,7 @@ export function StudentEatsScreen({ navigation }) {
         <>
           <EatsMiniMap origin={origin} places={places} theme={theme} />
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
-            Top picks {source ? `· ${source}` : ""}
+            Top picks · {source === "cache" ? "cached results" : "online results"}
           </Text>
           {places.map((place, index) => (
             <SectionCard
@@ -380,7 +380,11 @@ export function StudentEatsScreen({ navigation }) {
         }}
       >
         <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-          MoneyMap does not request or save your location. Places are searched online around TIP QC. Optional AI receives place names, distance bands, and price levels — never coordinates.
+          Uses TIP Quezon City as the fixed search origin. Places need a network connection; no location
+          permission is requested or saved.
+          {smartTipsEnabled && smartTipsConsentAccepted
+            ? " Optional AI receives place names, distance bands, and price levels — never coordinates."
+            : ""}
         </Text>
       </View>
     </ScreenContainer>

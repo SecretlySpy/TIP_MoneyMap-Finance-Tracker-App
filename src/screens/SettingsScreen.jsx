@@ -22,7 +22,7 @@ const THEME_OPTIONS = [
     { value: "dark", label: "Dark" },
 ];
 
-function SettingsRow({ emoji, label, onPress, trailing }) {
+function SettingsRow({ emoji, label, onPress, subtitle, trailing }) {
     const theme = useTheme();
     return (<Pressable accessibilityRole={onPress === undefined ? "text" : "button"} disabled={onPress === undefined} onPress={onPress} style={{
             alignItems: "center",
@@ -33,15 +33,21 @@ function SettingsRow({ emoji, label, onPress, trailing }) {
       <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body, width: theme.typeScale.emptyTitle }}>
         {emoji}
       </Text>
-      <Text style={{
+      <View style={{ flex: 1, gap: theme.spacing.xxs }}>
+        <Text style={{
             color: theme.colors.text,
-            flex: 1,
             fontFamily: theme.fonts.medium,
             fontSize: theme.typeScale.body,
             lineHeight: theme.typeScale.cardHeader,
         }}>
-        {label}
-      </Text>
+          {label}
+        </Text>
+        {subtitle ? (
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
       {trailing}
     </Pressable>);
 }
@@ -92,6 +98,22 @@ export function SettingsScreen({ navigation }) {
     const trailingText = (value) => (<Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
       {value}
     </Text>);
+    const valuePill = (value) => (<View style={{
+            backgroundColor: theme.colors.tint,
+            borderRadius: theme.radii.chip,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.compact,
+        }}>
+      <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+        {value}
+      </Text>
+    </View>);
+    const cycleThemePreference = () => {
+        const order = THEME_OPTIONS.map((option) => option.value);
+        const next = order[(order.indexOf(themePreference) + 1) % order.length];
+        void setThemePreference(next);
+    };
+    const themeLabel = THEME_OPTIONS.find((option) => option.value === themePreference)?.label ?? "System";
     const handleAppLockToggle = async (enabled) => {
         if (enabled) {
             await setAppLockEnabled(true);
@@ -142,18 +164,15 @@ export function SettingsScreen({ navigation }) {
       </Text>
 
       <SettingsSection title="SECURITY">
-        <SettingsRow emoji="🔒" label={"Optional app lock\n(PIN + biometric)"} onPress={() => rootNavigation?.navigate("AppLock")} trailing={<Toggle enabled={appLockEnabled && hasPin} label="App lock" onChange={(enabled) => void handleAppLockToggle(enabled)}/>}/>
-        <SettingsRow emoji="🛡️" label={"Encrypted database\n(separate on-device key)"} trailing={trailingText("On")}/>
-        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-          The optional PIN blocks access to MoneyMap. It does not create or decrypt the database key.
-        </Text>
+        <SettingsRow emoji="🔒" label="Optional app lock (PIN + biometric)" onPress={() => rootNavigation?.navigate("AppLock")} trailing={<Toggle enabled={appLockEnabled && hasPin} label="App lock" onChange={(enabled) => void handleAppLockToggle(enabled)}/>}/>
+        <SettingsRow emoji="🛡️" label="Encrypted database · separate key" trailing={trailingText("On")}/>
       </SettingsSection>
 
       <SettingsSection title="DATA">
         <SettingsRow emoji="📤" label="Export as CSV" onPress={() => void handleExportCsv()} trailing={trailingText("›")}/>
         <SettingsRow emoji="💾" label="Backup data" onPress={() => void handleBackup()} trailing={trailingText("›")}/>
         <SettingsRow emoji="♻️" label="Restore from backup" onPress={() => navigation.navigate("PasteImport", { mode: "backup" })} trailing={trailingText("›")}/>
-        <SettingsRow emoji="📥" label={"Import data\n(CSV / Excel)"} onPress={() => navigation.navigate("Import")} trailing={trailingText("›")}/>
+        <SettingsRow emoji="📥" label="Import data (CSV / Excel)" onPress={() => navigation.navigate("Import")} trailing={trailingText("›")}/>
       </SettingsSection>
 
       <SettingsSection title="PREFERENCES">
@@ -164,23 +183,15 @@ export function SettingsScreen({ navigation }) {
           options={CURRENCY_OPTIONS}
           value={currencySymbol}
         />
-        <OptionChipRow
-          accessibilityLabel="Theme"
-          label="🎨 Theme"
-          onChange={(value) => void setThemePreference(value)}
-          options={THEME_OPTIONS}
-          value={themePreference}
-        />
+        <SettingsRow emoji="🎨" label="Theme" onPress={cycleThemePreference} subtitle="Light / Dark / System" trailing={valuePill(themeLabel)}/>
         <SettingsRow emoji="🗂️" label="Manage categories" onPress={() => navigation.navigate("ManageCategories")} trailing={trailingText("›")}/>
         <SettingsRow emoji="🏦" label="Manage accounts" onPress={() => navigation.navigate("ManageAccounts")} trailing={trailingText("›")}/>
-        <SettingsRow emoji="🎯" label="Savings goals" onPress={() => navigation.navigate("Goals")} trailing={trailingText("›")}/>
-        <SettingsRow emoji="👋" label="Welcome to MoneyMap (Splash)" onPress={() => navigation.navigate("Splash")} trailing={trailingText("›")}/>
       </SettingsSection>
 
       <SettingsSection title="SMART FEATURES">
-        <SettingsRow emoji="✨" label={"Online tip personalization\n(optional; offline tips stay available)"} onPress={() => {
+        <SettingsRow emoji="✨" label="Offline tips + online personalization" onPress={() => {
             tabNavigation?.navigate("Home", { screen: "SmartTips" });
-        }} trailing={<Toggle enabled={smartTipsEnabled} label="Budget-based tips" onChange={(enabled) => {
+        }} subtitle="Offline always available · online opt-in" trailing={<Toggle enabled={smartTipsEnabled} label="Budget-based tips" onChange={(enabled) => {
             if (!enabled) {
                 void setSmartTipsEnabled(false);
                 return;
@@ -198,22 +209,12 @@ export function SettingsScreen({ navigation }) {
                 ],
             );
         }}/>}/>
-        <SettingsRow emoji="🔔" label={"Recurring bill\nreminders"} onPress={() => tabNavigation?.navigate("Budgets", { screen: "Recurring" })} trailing={<Toggle enabled={remindersEnabled} label="Recurring bill reminders" onChange={(enabled) => void setRemindersEnabled(enabled)}/>}/>
+        <SettingsRow emoji="🔔" label="Recurring bill reminders" onPress={() => tabNavigation?.navigate("Budgets", { screen: "Recurring" })} trailing={<Toggle enabled={remindersEnabled} label="Recurring bill reminders" onChange={(enabled) => void setRemindersEnabled(enabled)}/>}/>
         {remindersEnabled && (notificationPermissionDenied || notificationHint) ? (
           <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small, marginTop: theme.spacing.sm }}>
             {notificationHint ?? "Notification permission is off. Bill alerts stay in-app only until you allow notifications."}
           </Text>
         ) : null}
       </SettingsSection>
-
-      <View accessible accessibilityRole="summary" style={{
-            backgroundColor: theme.colors.tint,
-            borderRadius: theme.radii.row,
-            padding: theme.spacing.lg,
-        }}>
-        <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
-          🔀 Offline-first · AI tips use internet (opt-in)
-        </Text>
-      </View>
     </ScreenContainer>);
 }

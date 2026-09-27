@@ -175,7 +175,7 @@ export function SmartTipsScreen({ navigation }) {
         </Text>
         <Text style={{ color: theme.colors.heroMeta, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
           {offlineSnapshot.limitMinor > 0
-            ? `of ${formatMinor(limitMinor, { currencySymbol, showCents: false })} budget · ~${formatMinor(dailyMinor, { currencySymbol, showCents: false })}/day for ${offlineSnapshot.daysLeftInMonth} day${offlineSnapshot.daysLeftInMonth === 1 ? "" : "s"} left`
+            ? `after bills & goal · ~${formatMinor(dailyMinor, { currencySymbol, showCents: false })}/day for ${offlineSnapshot.daysLeftInMonth} day${offlineSnapshot.daysLeftInMonth === 1 ? "" : "s"} left`
             : "Add category budgets to unlock a monthly allowance plan"}
         </Text>
         <View
@@ -223,7 +223,7 @@ export function SmartTipsScreen({ navigation }) {
               ? "Checking for personalized tips…"
               : aiStatus === "ready"
                 ? "Personalized suggestions when online · rules-based tips always available offline."
-                : "Tips from your own spending stay on-device. Online personalization is optional."}
+                : "Tips are computed from your own spending and stay on-device. Online personalization is optional."}
           </Text>
         </View>
         {aiStatus === "loading" ? (
@@ -304,7 +304,7 @@ export function SmartTipsScreen({ navigation }) {
       >
         <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>🔀</Text>
         <Text style={{ color: theme.colors.sub, flex: 1, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-          Online: AI-personalized from an anonymized budget summary · Offline: from your own spending. Raw transactions never leave this device.
+          Online: AI-personalized from an anonymized budget summary. Offline: from your own spending. Raw transactions never leave this device.
         </Text>
       </View>
     </ScreenContainer>

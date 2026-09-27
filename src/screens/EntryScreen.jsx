@@ -285,23 +285,19 @@ export function EntryScreen({ navigation }) {
       <View style={{ gap: theme.spacing.keyGap }}>
         <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
           <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
-            Note
+            Account
           </Text>
           <Pressable accessibilityRole="button" onPress={() => setShowNotePrompt(true)}>
             <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
-              {note.trim() ? "Edit" : "Add"}
+              {note.trim() ? "Edit note" : "+ Add note"}
             </Text>
           </Pressable>
         </View>
-        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
-          {note.trim() ? note.trim() : "Optional note (shown in History)"}
-        </Text>
-      </View>
-
-      <View style={{ gap: theme.spacing.keyGap }}>
-        <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
-          Account
-        </Text>
+        {note.trim() ? (
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
+            {note.trim()}
+          </Text>
+        ) : null}
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.keyGap }}>
           {accountChips.map((account) => (<Chip key={account.id} onPress={() => setSelectedAccountId(account.id)} selected={selectedAccountId === account.id} style={{ height: theme.sizes.accountChip }}>
               {account.label}

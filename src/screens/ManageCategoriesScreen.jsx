@@ -146,10 +146,10 @@ export function ManageCategoriesScreen({ navigation }) {
       {renderGroup("EXPENSE", expense)}
       {renderGroup("INCOME", income)}
       <DashedButton disabled={busy} onPress={() => setPromptType("EXPENSE")}>
-        ＋ Add expense category
+        + Add expense category
       </DashedButton>
       <DashedButton disabled={busy} onPress={() => setPromptType("INCOME")}>
-        ＋ Add income category
+        + Add income category
       </DashedButton>
       <TextPromptModal
         confirmLabel="Add"

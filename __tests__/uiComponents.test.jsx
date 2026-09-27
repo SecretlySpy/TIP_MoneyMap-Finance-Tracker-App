@@ -26,7 +26,7 @@ describe("Figma reusable UI states", () => {
         const onAdd = jest.fn();
         const screen = await render(<HistoryBody groups={[]} onAdd={onAdd}/>);
         expect(screen.getByText("No transactions yet")).toBeTruthy();
-        await fireEvent.press(screen.getByRole("button", { name: "＋ Add your first transaction" }));
+        await fireEvent.press(screen.getByRole("button", { name: "+ Add your first transaction" }));
         expect(onAdd).toHaveBeenCalledTimes(1);
     });
     it("distinguishes an empty filter result from an empty ledger", async () => {
