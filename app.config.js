@@ -4,8 +4,6 @@ module.exports = ({ config }) => {
     ...config,
     extra: {
       ...(config.extra ?? {}),
-      // EAS secrets / local .env — never commit a real key.
-      geminiApiKey: process.env.GEMINI_API_KEY ?? "",
     },
   };
 };

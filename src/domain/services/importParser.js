@@ -10,6 +10,13 @@ import { parseDecimalToMinor } from "./money";
  * @typedef {{ rows: ImportTransactionRow[], skipped: ImportSkip[], headers: string[], dataRowCount: number }} ImportParseResult
  */
 
+export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
+export const MAX_IMPORT_ROWS = 10_000;
+export const MAX_IMPORT_COLUMNS = 100;
+export const MAX_CELL_LENGTH = 1_000;
+export const MIN_IMPORT_YEAR = 1970;
+export const MAX_IMPORT_YEAR = 2100;
+
 /** @type {ImportField[]} */
 export const IMPORT_FIELDS = ["Date", "Amount", "Type", "Category", "Account", "Note"];
 
@@ -79,12 +86,19 @@ export function parseImportDate(value) {
       const excelEpoch = Date.UTC(1899, 11, 30);
       const millis = excelEpoch + Math.round(serial * 86400000);
       const date = new Date(millis);
+      const year = date.getUTCFullYear();
+      if (year < MIN_IMPORT_YEAR || year > MAX_IMPORT_YEAR) {
+        throw new Error(`Date year ${year} is outside supported range (1970-2100).`);
+      }
       return new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0, 0).getTime();
     }
   }
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
   if (iso !== null) {
     const year = Number(iso[1]);
+    if (year < MIN_IMPORT_YEAR || year > MAX_IMPORT_YEAR) {
+      throw new Error(`Date year ${year} is outside supported range (1970-2100).`);
+    }
     const month = Number(iso[2]);
     const day = Number(iso[3]);
     const date = new Date(year, month - 1, day, 12, 0, 0, 0);
@@ -98,6 +112,9 @@ export function parseImportDate(value) {
     const month = Number(slash[1]);
     const day = Number(slash[2]);
     const year = Number(slash[3]);
+    if (year < MIN_IMPORT_YEAR || year > MAX_IMPORT_YEAR) {
+      throw new Error(`Date year ${year} is outside supported range (1970-2100).`);
+    }
     const date = new Date(year, month - 1, day, 12, 0, 0, 0);
     if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
       throw new Error(`Invalid date "${trimmed}".`);
@@ -107,6 +124,10 @@ export function parseImportDate(value) {
   const parsed = Date.parse(trimmed);
   if (!Number.isNaN(parsed)) {
     const date = new Date(parsed);
+    const year = date.getFullYear();
+    if (year < MIN_IMPORT_YEAR || year > MAX_IMPORT_YEAR) {
+      throw new Error(`Date year ${year} is outside supported range (1970-2100).`);
+    }
     return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0).getTime();
   }
   throw new Error(`Invalid date "${trimmed}". Use YYYY-MM-DD.`);
@@ -139,7 +160,11 @@ export function normalizeImportAccountLabel(value) {
 }
 
 export function importAccountKey(value) {
-  return normalizeImportAccountLabel(value).toLocaleLowerCase();
+  const normalized = normalizeImportAccountLabel(value).toLocaleLowerCase();
+  if (normalized === "__proto__" || normalized === "constructor" || normalized === "prototype") {
+    return `_${normalized}`;
+  }
+  return normalized;
 }
 
 /**
@@ -172,8 +197,15 @@ export function parseImportGrid(grid, mappings) {
   if (!Array.isArray(grid) || grid.length === 0) {
     return { rows: [], skipped: [{ rowNumber: 0, reason: "File has no rows." }], headers: [], dataRowCount: 0 };
   }
+  if (grid.length > MAX_IMPORT_ROWS) {
+    throw new Error(`Import exceeds maximum allowed rows (${MAX_IMPORT_ROWS.toLocaleString()}).`);
+  }
+  const firstRow = grid[0] ?? [];
+  if (firstRow.length > MAX_IMPORT_COLUMNS) {
+    throw new Error(`Import exceeds maximum allowed columns (${MAX_IMPORT_COLUMNS}).`);
+  }
 
-  const headerCells = (grid[0] ?? []).map((cell) => String(cell ?? "").trim());
+  const headerCells = firstRow.map((cell) => String(cell ?? "").trim());
   const looksLikeHeader = headerCells.some((cell) => {
     const lower = cell.toLowerCase();
     return lower.includes("date") || lower.includes("amount") || lower.includes("category");
@@ -196,6 +228,15 @@ export function parseImportGrid(grid, mappings) {
     }
 
     try {
+      if (cells.length > MAX_IMPORT_COLUMNS) {
+        throw new Error(`Row exceeds maximum allowed columns (${MAX_IMPORT_COLUMNS}).`);
+      }
+      for (const cell of cells) {
+        if (String(cell ?? "").length > MAX_CELL_LENGTH) {
+          throw new Error(`Cell content exceeds maximum length of ${MAX_CELL_LENGTH} characters.`);
+        }
+      }
+
       if (resolvedMappings.Amount < 0) {
         throw new Error("Amount column is unmapped.");
       }
@@ -279,6 +320,9 @@ export function parseImportGrid(grid, mappings) {
  * @returns {unknown[][]}
  */
 export function csvTextToGrid(text) {
+  if (typeof text === "string" && text.length > MAX_IMPORT_FILE_BYTES) {
+    throw new Error(`CSV file exceeds maximum supported size of 5 MB.`);
+  }
   const parsed = Papa.parse(String(text ?? "").replace(/^\uFEFF/, ""), {
     header: false,
     skipEmptyLines: "greedy",
@@ -295,6 +339,16 @@ export function csvTextToGrid(text) {
  * @returns {unknown[][]}
  */
 export function xlsxToGrid(input, type = "base64") {
+  if (typeof input === "string") {
+    const estimatedBytes = Math.ceil((input.length * 3) / 4);
+    if (estimatedBytes > MAX_IMPORT_FILE_BYTES) {
+      throw new Error(`Excel file exceeds maximum supported size of 5 MB.`);
+    }
+  } else if (input && typeof input.byteLength === "number") {
+    if (input.byteLength > MAX_IMPORT_FILE_BYTES) {
+      throw new Error(`Excel file exceeds maximum supported size of 5 MB.`);
+    }
+  }
   const workbook = XLSX.read(input, {
     type,
     cellDates: false,

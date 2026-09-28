@@ -6,9 +6,13 @@
  * @property {undefined} Entry
  * @property {undefined} SmartTips
  * @property {undefined} StudentEats
+ * @property {{ transactionId: number }} TransactionDetail
+ * @property {{ transactionId: number }} EditTransaction
  *
  * @typedef {Object} HistoryStackParamList
  * @property {undefined} HistoryList
+ * @property {{ transactionId: number }} TransactionDetail
+ * @property {{ transactionId: number }} EditTransaction
  *
  * @typedef {Object} BudgetsStackParamList
  * @property {undefined} BudgetsOverview

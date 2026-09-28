@@ -236,7 +236,7 @@ export async function fetchSmartTipsFromGemini(options) {
     return cached;
   }
 
-  const apiKey = getGeminiApiKey();
+  const apiKey = (typeof options.apiKey === "string" ? options.apiKey.trim() : "") || getGeminiApiKey();
   if (apiKey.length === 0) {
     return null;
   }

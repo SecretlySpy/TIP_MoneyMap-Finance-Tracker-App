@@ -302,7 +302,13 @@ export function DashboardScreen({ navigation }) {
             title="No transactions yet"
           />
         ) : (
-          recent.map((transaction) => <TransactionRow key={transaction.id} {...transaction} />)
+          recent.map((transaction) => (
+            <TransactionRow
+              key={transaction.id}
+              {...transaction}
+              onPress={() => navigation.navigate("TransactionDetail", { transactionId: transaction.id })}
+            />
+          ))
         )}
       </SectionCard>
     </ScreenContainer>

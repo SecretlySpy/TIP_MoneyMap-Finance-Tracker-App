@@ -116,11 +116,20 @@ export function parseBackup(raw) {
     validateBackup(backup);
     return backup;
 }
-function escapeCsv(value) {
-    if (/[",\n\r]/.test(value)) {
-        return `"${value.replace(/"/g, '""')}"`;
+export function sanitizeForSpreadsheet(value) {
+    const str = String(value ?? "");
+    if (/^\s*[=+\-@\t\r]/.test(str)) {
+        return `'${str}`;
     }
-    return value;
+    return str;
+}
+
+export function escapeCsv(value) {
+    const sanitized = sanitizeForSpreadsheet(value);
+    if (/[",\n\r]/.test(sanitized)) {
+        return `"${sanitized.replace(/"/g, '""')}"`;
+    }
+    return sanitized;
 }
 function formatCsvAmount(amountMinor) {
     const whole = Math.trunc(amountMinor / 100);
@@ -150,7 +159,7 @@ export function buildTransactionsCsv(transactions, categoriesById, accountsById)
             transaction.type,
             formatCsvAmount(transaction.amountMinor),
             escapeCsv(category),
-            accountLabel,
+            escapeCsv(accountLabel),
             escapeCsv(note),
         ].join(",");
     });
@@ -271,23 +280,41 @@ export async function shareText(title, message) {
  * @returns {Promise<'file'|'text'>} which path was used
  */
 export async function shareDocument(title, fileName, contents) {
+    let uri = null;
+    let FileSystem = null;
     try {
-        const FileSystem = await import("expo-file-system/legacy");
-        const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+        try {
+            FileSystem = require("expo-file-system/legacy");
+        } catch {
+            FileSystem = null;
+        }
+        const directory = FileSystem?.cacheDirectory ?? FileSystem?.documentDirectory;
         if (!directory) {
             throw new Error("No writable directory.");
         }
-        const uri = `${directory}${fileName}`;
+        uri = `${directory}${fileName}`;
         await FileSystem.writeAsStringAsync(uri, contents, {
-            encoding: FileSystem.EncodingType.UTF8,
+            encoding: FileSystem.EncodingType?.UTF8 ?? "utf8",
         });
         await Share.share({ title, url: uri, message: title });
         return "file";
     }
-    catch {
-        // Intent-extra path: fine for small exports, the only option without expo-file-system.
-        await Share.share({ title, message: contents });
-        return "text";
+    catch (error) {
+        if (!uri) {
+            // Intent-extra path: fine for small exports, the only option without expo-file-system.
+            await Share.share({ title, message: contents });
+            return "text";
+        }
+        throw error;
+    }
+    finally {
+        if (uri && FileSystem?.deleteAsync) {
+            try {
+                await FileSystem.deleteAsync(uri, { idempotent: true });
+            } catch {
+                // Ignore cleanup error if already removed
+            }
+        }
     }
 }
 /**

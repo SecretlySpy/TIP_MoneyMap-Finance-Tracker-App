@@ -15,6 +15,8 @@ jest.mock("../src/store/uiStore", () => ({
 }));
 import { BudgetCard } from "../src/components/BudgetCard";
 import { HistoryBody } from "../src/screens/HistoryScreen";
+import { TransactionRow } from "../src/components/TransactionRow";
+
 describe("Figma reusable UI states", () => {
     it("reports over-budget percentage while clamping only the visual bar", async () => {
         const screen = await render(<BudgetCard emoji="🛍️" limitMinor={400_000} name="Shopping" percent={118} spentMinor={473_000} state="over"/>);
@@ -37,5 +39,36 @@ describe("Figma reusable UI states", () => {
         expect(screen.getByText("No matching transactions")).toBeTruthy();
         await fireEvent.press(screen.getByRole("button", { name: "Clear filters" }));
         expect(onClearFilters).toHaveBeenCalledTimes(1);
+    });
+    it("renders TransactionRow as an interactive button when onPress is provided", async () => {
+        const onPress = jest.fn();
+        const screen = await render(
+            <TransactionRow
+                amountMinor={35_000}
+                emoji="📚"
+                meta="School · E-wallet"
+                onPress={onPress}
+                title="School supplies"
+                type="EXPENSE"
+            />,
+        );
+        const button = screen.getByRole("button", { name: /School supplies/ });
+        expect(button).toBeTruthy();
+        await fireEvent.press(button);
+        expect(onPress).toHaveBeenCalledTimes(1);
+    });
+    it("renders TransactionRow as accessible static container when onPress is omitted", async () => {
+        const screen = await render(
+            <TransactionRow
+                amountMinor={150_000}
+                emoji="💵"
+                meta="Allowance · Cash"
+                title="Monthly allowance"
+                type="INCOME"
+            />,
+        );
+        expect(screen.getByText("Monthly allowance")).toBeTruthy();
+        expect(screen.getByText("+₱1,500.00")).toBeTruthy();
+        expect(screen.queryByRole("button")).toBeNull();
     });
 });

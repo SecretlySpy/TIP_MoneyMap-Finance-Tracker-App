@@ -11,6 +11,8 @@ import { BudgetsScreen } from "../screens/BudgetsScreen";
 import { DashboardScreen } from "../screens/DashboardScreen";
 import { EntryScreen } from "../screens/EntryScreen";
 import { HistoryScreen } from "../screens/HistoryScreen";
+import { TransactionDetailScreen } from "../screens/TransactionDetailScreen";
+import { EditTransactionScreen } from "../screens/EditTransactionScreen";
 import { ManageAccountsScreen } from "../screens/ManageAccountsScreen";
 import { ManageCategoriesScreen } from "../screens/ManageCategoriesScreen";
 import { PasteImportScreen } from "../screens/PasteImportScreen";
@@ -35,17 +37,23 @@ function HomeNavigator() {
       <HomeStack.Screen name="Entry" component={EntryScreen} options={{ animation: "slide_from_bottom" }}/>
       <HomeStack.Screen name="SmartTips" component={SmartTipsScreen}/>
       <HomeStack.Screen name="StudentEats" component={StudentEatsScreen}/>
+      <HomeStack.Screen name="TransactionDetail" component={TransactionDetailScreen}/>
+      <HomeStack.Screen name="EditTransaction" component={EditTransactionScreen}/>
     </HomeStack.Navigator>);
 }
 function HistoryNavigator() {
     return (<HistoryStack.Navigator screenOptions={{ headerShown: false }}>
       <HistoryStack.Screen name="HistoryList" component={HistoryScreen}/>
+      <HistoryStack.Screen name="TransactionDetail" component={TransactionDetailScreen}/>
+      <HistoryStack.Screen name="EditTransaction" component={EditTransactionScreen}/>
     </HistoryStack.Navigator>);
 }
 function BudgetsNavigator() {
     return (<BudgetsStack.Navigator screenOptions={{ headerShown: false }}>
       <BudgetsStack.Screen name="BudgetsOverview" component={BudgetsScreen}/>
       <BudgetsStack.Screen name="Recurring" component={RecurringScreen}/>
+      <BudgetsStack.Screen name="TransactionDetail" component={TransactionDetailScreen}/>
+      <BudgetsStack.Screen name="EditTransaction" component={EditTransactionScreen}/>
     </BudgetsStack.Navigator>);
 }
 function SettingsNavigator() {
@@ -56,6 +64,8 @@ function SettingsNavigator() {
       <SettingsStack.Screen name="ManageAccounts" component={ManageAccountsScreen}/>
       <SettingsStack.Screen name="PasteImport" component={PasteImportScreen}/>
       <SettingsStack.Screen name="Import" component={ImportScreen}/>
+      <SettingsStack.Screen name="TransactionDetail" component={TransactionDetailScreen}/>
+      <SettingsStack.Screen name="EditTransaction" component={EditTransactionScreen}/>
       <SettingsStack.Screen name="Splash" component={SplashScreen}/>
     </SettingsStack.Navigator>);
 }

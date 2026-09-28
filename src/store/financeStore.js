@@ -189,6 +189,72 @@ export const useFinanceStore = create((set, get) => ({
         await get().refresh();
         return created;
     },
+    updateTransaction: async (id, patch) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const numericId = Number(id);
+        const existing = get().transactions.find((tx) => tx.id === numericId)
+            ?? (await new TransactionRepository(database).getById(numericId));
+        if (!existing) {
+            throw new Error("Transaction not found.");
+        }
+        if (existing.recurringRuleId !== null) {
+            if (patch.dateEpochMillis !== undefined && patch.dateEpochMillis !== existing.dateEpochMillis) {
+                throw new Error("Cannot change the scheduled date of a recurring transaction occurrence.");
+            }
+        }
+        const targetType = patch.type ?? existing.type;
+        const repoPatch = {};
+        if (patch.amountMinor !== undefined) {
+            if (!Number.isInteger(patch.amountMinor) || patch.amountMinor <= 0) {
+                throw new Error("Amount must be greater than zero.");
+            }
+            repoPatch.amountMinor = patch.amountMinor;
+        }
+        if (patch.type !== undefined) {
+            repoPatch.type = patch.type;
+        }
+        if (patch.categoryName !== undefined) {
+            const category = findCategory(get().categories, patch.categoryName, targetType);
+            repoPatch.categoryId = category.id;
+        } else if (patch.categoryId !== undefined) {
+            const targetCat = get().categories.find((c) => c.id === patch.categoryId);
+            if (targetCat && targetCat.type !== targetType) {
+                throw new TypeError("Transaction type must match the category type.");
+            }
+            repoPatch.categoryId = patch.categoryId;
+        } else if (patch.type !== undefined && patch.type !== existing.type) {
+            const existingCat = get().categories.find((c) => c.id === existing.categoryId);
+            if (existingCat?.type !== targetType) {
+                const defaultCat = get().categories.find((c) => c.type === targetType);
+                if (defaultCat) {
+                    repoPatch.categoryId = defaultCat.id;
+                }
+            }
+        }
+        if (patch.accountId !== undefined) {
+            const account = findActiveAccountById(get().accounts, patch.accountId);
+            repoPatch.accountId = account.id;
+        }
+        if (patch.dateEpochMillis !== undefined) {
+            if (!Number.isSafeInteger(patch.dateEpochMillis)) {
+                throw new Error("Invalid transaction date.");
+            }
+            repoPatch.dateEpochMillis = patch.dateEpochMillis;
+        }
+        if (patch.note !== undefined) {
+            repoPatch.note = patch.note?.trim() ? patch.note.trim() : null;
+        }
+        const updated = await new TransactionRepository(database).update(numericId, repoPatch);
+        if (updated === null) {
+            throw new Error("Transaction could not be updated.");
+        }
+        await get().refresh();
+        return updated;
+    },
     addBudget: async (input) => {
         await get().ensureHydrated();
         const database = databaseRef;

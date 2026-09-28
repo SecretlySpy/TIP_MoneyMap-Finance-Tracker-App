@@ -146,17 +146,29 @@ export function SettingsScreen({ navigation }) {
         }
     };
     const handleBackup = async () => {
-        try {
-            const backup = buildBackup({ accounts, categories, transactions, budgets, recurringRules, goals });
-            await shareDocument(
-                "MoneyMap backup",
-                exportFileName("moneymap-backup", "json"),
-                serializeBackup(backup),
-            );
-        }
-        catch (error) {
-            Alert.alert("Backup failed", error instanceof Error ? error.message : "Could not share backup.");
-        }
+        Alert.alert(
+            "Share Plaintext Backup?",
+            "This backup contains your unencrypted accounts, balances, and complete transaction history. Share only with trusted destinations.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Share Backup",
+                    onPress: async () => {
+                        try {
+                            const backup = buildBackup({ accounts, categories, transactions, budgets, recurringRules, goals });
+                            await shareDocument(
+                                "MoneyMap backup",
+                                exportFileName("moneymap-backup", "json"),
+                                serializeBackup(backup),
+                            );
+                        }
+                        catch (error) {
+                            Alert.alert("Backup failed", error instanceof Error ? error.message : "Could not share backup.");
+                        }
+                    },
+                },
+            ],
+        );
     };
     return (<ScreenContainer contentContainerStyle={{ gap: theme.spacing.xl }} testID="settings-screen">
       <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.screenTitle }}>

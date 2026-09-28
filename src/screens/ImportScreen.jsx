@@ -11,19 +11,32 @@ import {
   unresolvedImportAccountSources,
 } from "../domain/services/importAccounts";
 import { IMPORT_FIELDS, emptyImportMappings } from "../domain/services/importParser";
+import { formatMinor } from "../domain/services/money";
 import { parseGridWithMappings, pickAndParseImportFile } from "../services/importFile";
 import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 
-// FR-11: pick CSV/XLSX → preview & map columns (Figma 16) → resolve accounts (Figma 16b) → transactional bulk insert
+function isSameDay(epochA, epochB) {
+  const dateA = new Date(epochA);
+  const dateB = new Date(epochB);
+  return (
+    dateA.getFullYear() === dateB.getFullYear()
+    && dateA.getMonth() === dateB.getMonth()
+    && dateA.getDate() === dateB.getDate()
+  );
+}
+
 export function ImportScreen({ navigation }) {
   const tabNavigation = navigation.getParent();
   const theme = useTheme(useUiStore((state) => state.themePreference));
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
   const importCsvRows = useFinanceStore((state) => state.importCsvRows);
   const accounts = useFinanceStore((state) => state.accounts);
+  const existingTransactions = useFinanceStore((state) => state.transactions);
 
-  const [step, setStep] = useState("PICK"); // "PICK" | "MAP" (16) | "RESOLVE" (16b)
+  // Steps: PICK -> MAP (16) -> RESOLVE (16b) -> REVIEW (19/19b) -> COMPLETE (19c) | UNCERTAIN (19d)
+  const [step, setStep] = useState("PICK");
   const [fileName, setFileName] = useState("");
   const [format, setFormat] = useState("csv");
   const [grid, setGrid] = useState([]);
@@ -31,6 +44,11 @@ export function ImportScreen({ navigation }) {
   const [mappings, setMappings] = useState(emptyImportMappings());
   const [isInserting, setIsInserting] = useState(false);
   const [accountResolutions, setAccountResolutions] = useState({});
+
+  // Review step state
+  const [selectedDuplicateIndices, setSelectedDuplicateIndices] = useState(new Set());
+  const [outcome, setOutcome] = useState({ created: 0, duplicatesSkipped: 0, invalidSkipped: 0 });
+  const [outcomeError, setOutcomeError] = useState(null);
 
   const parsed = useMemo(
     () => (grid.length > 0 ? parseGridWithMappings(grid, mappings) : null),
@@ -55,6 +73,61 @@ export function ImportScreen({ navigation }) {
   useEffect(() => {
     setAccountResolutions(buildAutomaticAccountResolutions(parsed?.rows ?? [], accounts));
   }, [accounts, parsed]);
+
+  // Candidate duplicate detection
+  const { readyRows, duplicateRows, invalidRows } = useMemo(() => {
+    if (!parsed) {
+      return { readyRows: [], duplicateRows: [], invalidRows: [] };
+    }
+
+    const ready = [];
+    const duplicates = [];
+
+    parsed.rows.forEach((row, index) => {
+      const resolution = accountResolutions[row.accountKey];
+      const targetAccountId = resolution?.kind === "existing" ? resolution.accountId : null;
+
+      const matchedExisting = existingTransactions.find((tx) => {
+        if (tx.type !== row.type) return false;
+        if (tx.amountMinor !== row.amountMinor) return false;
+        if (targetAccountId !== null && tx.accountId !== targetAccountId) return false;
+        return isSameDay(tx.dateEpochMillis, row.dateEpochMillis);
+      });
+
+      if (matchedExisting) {
+        duplicates.push({
+          row,
+          originalIndex: index,
+          reason: `Matches existing ${matchedExisting.type.toLowerCase()} of ${formatMinor(matchedExisting.amountMinor, currencySymbol)} on ${formatLocalDateISO(matchedExisting.dateEpochMillis)}`,
+        });
+      } else {
+        ready.push(row);
+      }
+    });
+
+    return {
+      readyRows: ready,
+      duplicateRows: duplicates,
+      invalidRows: parsed.skipped ?? [],
+    };
+  }, [parsed, accountResolutions, existingTransactions, currencySymbol]);
+
+  // Reset duplicate selections when rows change
+  useEffect(() => {
+    setSelectedDuplicateIndices(new Set());
+  }, [parsed]);
+
+  const toggleDuplicateSelection = (index) => {
+    setSelectedDuplicateIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
 
   const handlePickFile = async () => {
     try {
@@ -81,10 +154,8 @@ export function ImportScreen({ navigation }) {
     });
   };
 
-  // Build cycle options for a given source account resolution
   const cycleResolution = (sourceKey, sourceLabel) => {
     const current = accountResolutions[sourceKey];
-    // List all options: existing accounts first, then new account types
     const options = [
       ...activeAccounts.map((a) => ({
         kind: "existing",
@@ -115,7 +186,7 @@ export function ImportScreen({ navigation }) {
     }
   };
 
-  const getResolutionLabel = (sourceKey, sourceLabel) => {
+  const getResolutionLabel = (sourceKey) => {
     const res = accountResolutions[sourceKey];
     if (!res) return "Unresolved";
     if (res.kind === "existing") {
@@ -126,48 +197,46 @@ export function ImportScreen({ navigation }) {
     return `New: ${typeLabel}`;
   };
 
-  const handleBulkInsert = async () => {
-    if (parsed === null) {
+  const handleCommitImport = async () => {
+    if (!parsed) return;
+
+    // Ready rows + explicitly selected duplicate rows
+    const rowsToImport = [
+      ...readyRows,
+      ...duplicateRows.filter((_, idx) => selectedDuplicateIndices.has(idx)).map((d) => d.row),
+    ];
+
+    if (rowsToImport.length === 0) {
+      Alert.alert("Nothing to import", "Please select at least one transaction to import.");
       return;
     }
+
     setIsInserting(true);
+    setOutcomeError(null);
     try {
-      if (parsed.rows.length === 0) {
-        Alert.alert(
-          "No Data",
-          parsed.skipped.length > 0
-            ? `No valid transactions. ${parsed.skipped.length} row(s) skipped.`
-            : "No valid transactions found to import.",
-        );
-        return;
-      }
-      if (unresolvedAccounts.length > 0) {
-        Alert.alert(
-          "Resolve accounts",
-          `Choose where transactions from “${unresolvedAccounts[0].label}” should be imported.`,
-        );
-        return;
-      }
-      const summary = await importCsvRows(parsed.rows, {
+      const summary = await importCsvRows(rowsToImport, {
         skipped: parsed.skipped,
         accountResolutions,
       });
+
       const created = typeof summary === "object" && summary !== null ? summary.created : Number(summary);
-      const skippedCount = typeof summary === "object" && summary !== null ? summary.skipped : parsed.skipped.length;
-      const message = skippedCount > 0
-        ? `Imported ${created} transaction(s). Skipped ${skippedCount} malformed row(s).`
-        : `Successfully imported ${created} transaction(s).`;
-      Alert.alert("Import complete", message, [
-        { text: "View history", onPress: () => tabNavigation?.navigate("History", { screen: "HistoryList" }) },
-      ]);
+      const duplicatesSkipped = duplicateRows.length - selectedDuplicateIndices.size;
+      const invalidSkipped = invalidRows.length;
+
+      setOutcome({
+        created,
+        duplicatesSkipped,
+        invalidSkipped,
+      });
+      setStep("COMPLETE");
     } catch (error) {
-      Alert.alert("Import Error", error instanceof Error ? error.message : "Failed to import rows.");
+      setOutcomeError(error instanceof Error ? error.message : "Import failed unexpectedly.");
+      setStep("UNCERTAIN");
     } finally {
       setIsInserting(false);
     }
   };
 
-  // Preview table rows derived from parsed rows or raw grid
   const previewData = useMemo(() => {
     if (parsed?.rows && parsed.rows.length > 0) {
       return parsed.rows.slice(0, 3).map((r) => ({
@@ -190,6 +259,8 @@ export function ImportScreen({ navigation }) {
     ];
   }, [grid, mappings, parsed]);
 
+  const selectedCount = readyRows.length + selectedDuplicateIndices.size;
+
   return (
     <ScreenContainer contentContainerStyle={{ gap: theme.spacing.xl }} testID="import-screen">
       {/* Top Header */}
@@ -201,12 +272,15 @@ export function ImportScreen({ navigation }) {
             if (step === "PICK") navigation.goBack();
             else if (step === "MAP") setStep("PICK");
             else if (step === "RESOLVE") setStep("MAP");
+            else if (step === "REVIEW") setStep("RESOLVE");
+            else if (step === "COMPLETE") navigation.goBack();
+            else if (step === "UNCERTAIN") setStep("REVIEW");
           }}
         >
           <Text style={{ color: theme.colors.text, fontSize: theme.typeScale.lockTitle }}>←</Text>
         </Pressable>
         <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.subScreenTitle }}>
-          Import data
+          {step === "REVIEW" ? "Review Import" : step === "COMPLETE" ? "Import Complete" : step === "UNCERTAIN" ? "Import Status" : "Import data"}
         </Text>
       </View>
 
@@ -222,14 +296,13 @@ export function ImportScreen({ navigation }) {
         </View>
       ) : null}
 
-      {/* Step 2: Figma 16 Import Data (PreviewTable + MappingCard + ReadyBanner + "Resolve accounts") */}
+      {/* Step 2: MAP */}
       {step === "MAP" ? (
         <View style={{ gap: theme.spacing.lg, flex: 1 }}>
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
-            File: {fileName || "demo-transactions.csv"} ({format.toUpperCase()})
+            File: {fileName || "transactions.csv"} ({format.toUpperCase()})
           </Text>
 
-          {/* PreviewTable */}
           <SectionCard padding={theme.spacing.md} style={{ gap: theme.spacing.sm }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", paddingBottom: theme.spacing.xs }}>
               <Text style={{ flex: 1, color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>Date</Text>
@@ -250,7 +323,6 @@ export function ImportScreen({ navigation }) {
             Tap a field to cycle through the mapped column
           </Text>
 
-          {/* MappingCard */}
           <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.md }}>
             {IMPORT_FIELDS.map((field, fIdx) => {
               const mappingIndex = mappings[field];
@@ -286,7 +358,6 @@ export function ImportScreen({ navigation }) {
             })}
           </SectionCard>
 
-          {/* ReadyBanner */}
           <View
             style={{
               backgroundColor: theme.colors.tint,
@@ -317,35 +388,17 @@ export function ImportScreen({ navigation }) {
         </View>
       ) : null}
 
-      {/* Step 3: Figma 16b Import Data — Resolve Accounts (PreviewTable + Account MappingCard + ReadyBanner + "Confirm & Import") */}
+      {/* Step 3: RESOLVE ACCOUNTS */}
       {step === "RESOLVE" ? (
         <View style={{ gap: theme.spacing.lg, flex: 1 }}>
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
-            File: {fileName || "demo-transactions.csv"} ({format.toUpperCase()})
+            File: {fileName || "transactions.csv"} ({format.toUpperCase()})
           </Text>
-
-          {/* PreviewTable */}
-          <SectionCard padding={theme.spacing.md} style={{ gap: theme.spacing.sm }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", paddingBottom: theme.spacing.xs }}>
-              <Text style={{ flex: 1, color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>Date</Text>
-              <Text style={{ flex: 1, textAlign: "right", color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>Amount</Text>
-              <Text style={{ flex: 1, textAlign: "right", color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>Type</Text>
-            </View>
-            <View style={{ height: 1, backgroundColor: theme.colors.outline }} />
-            {previewData.map((row, idx) => (
-              <View key={`resolve-preview-${idx}`} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: theme.spacing.xxs }}>
-                <Text style={{ flex: 1, color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>{row.date}</Text>
-                <Text style={{ flex: 1, textAlign: "right", color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>{row.amount}</Text>
-                <Text style={{ flex: 1, textAlign: "right", color: row.type === "INCOME" ? theme.colors.income : theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>{row.type}</Text>
-              </View>
-            ))}
-          </SectionCard>
 
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
             Resolve every source account before import (tap to change)
           </Text>
 
-          {/* Account Resolution MappingCard */}
           <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.md }}>
             {accountSources.length === 0 ? (
               <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body }}>
@@ -353,7 +406,7 @@ export function ImportScreen({ navigation }) {
               </Text>
             ) : (
               accountSources.map((source, sIdx) => {
-                const pillLabel = getResolutionLabel(source.key, source.label);
+                const pillLabel = getResolutionLabel(source.key);
                 return (
                   <View key={source.key} style={{ gap: theme.spacing.md }}>
                     {sIdx > 0 ? <View style={{ height: 1, backgroundColor: theme.colors.outline }} /> : null}
@@ -386,7 +439,6 @@ export function ImportScreen({ navigation }) {
             )}
           </SectionCard>
 
-          {/* ReadyBanner */}
           <View
             style={{
               backgroundColor: unresolvedAccounts.length === 0 ? theme.colors.tint : theme.colors.amberBg,
@@ -404,17 +456,388 @@ export function ImportScreen({ navigation }) {
             </Text>
             <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
               {unresolvedAccounts.length === 0
-                ? `${parsed?.rows?.length ?? 0} valid rows will import atomically. Re-importing the same file may create duplicates.`
-                : `Resolve ${unresolvedAccounts.length} source account(s) before confirming.`}
+                ? "Next: review duplicate and invalid rows before committing to your database."
+                : `Resolve ${unresolvedAccounts.length} source account(s) before reviewing.`}
             </Text>
           </View>
 
           <PrimaryButton
-            disabled={isInserting || unresolvedAccounts.length > 0 || (parsed?.rows?.length ?? 0) === 0}
-            onPress={() => void handleBulkInsert()}
+            disabled={unresolvedAccounts.length > 0 || (parsed?.rows?.length ?? 0) === 0}
+            onPress={() => setStep("REVIEW")}
           >
-            {isInserting ? "Inserting…" : "Confirm & Import"}
+            Review import
           </PrimaryButton>
+        </View>
+      ) : null}
+
+      {/* Step 4: REVIEW (Frames 19 & 19b) */}
+      {step === "REVIEW" ? (
+        <ScrollView contentContainerStyle={{ gap: theme.spacing.lg }}>
+          {/* Summary Tiles: Ready, Duplicate, Invalid */}
+          <View style={{ flexDirection: "row", gap: theme.spacing.sm }}>
+            <View
+              style={{
+                alignItems: "center",
+                backgroundColor: theme.colors.tint,
+                borderRadius: theme.radii.card,
+                flex: 1,
+                gap: theme.spacing.xxs,
+                padding: theme.spacing.md,
+              }}
+            >
+              <Text style={{ color: theme.colors.income, fontFamily: theme.fonts.bold, fontSize: 24 }}>
+                {readyRows.length}
+              </Text>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                Ready
+              </Text>
+            </View>
+
+            <View
+              style={{
+                alignItems: "center",
+                backgroundColor: theme.colors.amberBg,
+                borderRadius: theme.radii.card,
+                flex: 1,
+                gap: theme.spacing.xxs,
+                padding: theme.spacing.md,
+              }}
+            >
+              <Text style={{ color: theme.colors.warning, fontFamily: theme.fonts.bold, fontSize: 24 }}>
+                {duplicateRows.length}
+              </Text>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                Duplicate
+              </Text>
+            </View>
+
+            <View
+              style={{
+                alignItems: "center",
+                backgroundColor: theme.colors.avatarBg,
+                borderRadius: theme.radii.card,
+                flex: 1,
+                gap: theme.spacing.xxs,
+                padding: theme.spacing.md,
+              }}
+            >
+              <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: 24 }}>
+                {invalidRows.length}
+              </Text>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                Invalid
+              </Text>
+            </View>
+          </View>
+
+          {/* Section: Rows needing attention (Duplicates & Invalid) */}
+          {(duplicateRows.length > 0 || invalidRows.length > 0) ? (
+            <View style={{ gap: theme.spacing.sm }}>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                Rows needing attention ({duplicateRows.length + invalidRows.length})
+              </Text>
+
+              {/* Possible duplicate rows */}
+              {duplicateRows.map((item, dIdx) => {
+                const isIncluded = selectedDuplicateIndices.has(dIdx);
+                const dateStr = formatLocalDateISO(item.row.dateEpochMillis);
+                const amountFormatted = formatMinor(item.row.amountMinor, currencySymbol);
+
+                return (
+                  <SectionCard key={`dup-${dIdx}`} padding={theme.spacing.md} style={{ gap: theme.spacing.sm }}>
+                    <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+                      <View style={{ gap: theme.spacing.xxs }}>
+                        <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                          {item.row.note?.trim() || item.row.categoryName}
+                        </Text>
+                        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+                          {dateStr} · {item.row.accountLabel}
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          color: item.row.type === "EXPENSE" ? theme.colors.expense : theme.colors.income,
+                          fontFamily: theme.fonts.bold,
+                          fontSize: theme.typeScale.body,
+                        }}
+                      >
+                        {item.row.type === "EXPENSE" ? `-${amountFormatted}` : `+${amountFormatted}`}
+                      </Text>
+                    </View>
+
+                    {/* Frame 19b Badge & Reason */}
+                    <View
+                      style={{
+                        backgroundColor: theme.colors.amberBg,
+                        borderColor: theme.colors.warning,
+                        borderRadius: theme.radii.small,
+                        borderWidth: 1,
+                        gap: theme.spacing.xxs,
+                        padding: theme.spacing.sm,
+                      }}
+                    >
+                      <View style={{ alignItems: "center", flexDirection: "row", gap: theme.spacing.xs }}>
+                        <Text style={{ fontSize: 12 }}>⚠️</Text>
+                        <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                          Possible duplicate
+                        </Text>
+                      </View>
+                      <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+                        {item.reason}
+                      </Text>
+                    </View>
+
+                    {/* Inclusion toggle */}
+                    <Pressable
+                      accessibilityLabel="Include this duplicate row anyway"
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: isIncluded }}
+                      onPress={() => toggleDuplicateSelection(dIdx)}
+                      style={{
+                        alignItems: "center",
+                        flexDirection: "row",
+                        gap: theme.spacing.sm,
+                        paddingTop: theme.spacing.xs,
+                      }}
+                    >
+                      <View
+                        style={{
+                          alignItems: "center",
+                          backgroundColor: isIncluded ? theme.colors.primary : "transparent",
+                          borderColor: isIncluded ? theme.colors.primary : theme.colors.outline,
+                          borderRadius: 4,
+                          borderWidth: 1.5,
+                          height: 20,
+                          justifyContent: "center",
+                          width: 20,
+                        }}
+                      >
+                        {isIncluded ? (
+                          <Text style={{ color: theme.colors.onPrimary, fontFamily: theme.fonts.bold, fontSize: 12 }}>✓</Text>
+                        ) : null}
+                      </View>
+                      <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                        Include this row anyway
+                      </Text>
+                    </Pressable>
+                  </SectionCard>
+                );
+              })}
+
+              {/* Invalid rows (never selectable) */}
+              {invalidRows.map((skipped, sIdx) => (
+                <SectionCard key={`inv-${sIdx}`} padding={theme.spacing.md} style={{ gap: theme.spacing.xs, opacity: 0.85 }}>
+                  <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                      Row {skipped.rowNumber}
+                    </Text>
+                    <View
+                      style={{
+                        backgroundColor: theme.colors.avatarBg,
+                        borderRadius: theme.radii.chip,
+                        paddingHorizontal: theme.spacing.sm,
+                        paddingVertical: theme.spacing.xxs,
+                      }}
+                    >
+                      <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                        Invalid
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+                    Reason: {skipped.reason}
+                  </Text>
+                </SectionCard>
+              ))}
+            </View>
+          ) : null}
+
+          {/* Section: Ready rows */}
+          {readyRows.length > 0 ? (
+            <View style={{ gap: theme.spacing.sm }}>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                Ready to import ({readyRows.length})
+              </Text>
+              <SectionCard padding={theme.spacing.md} style={{ gap: theme.spacing.sm }}>
+                {readyRows.slice(0, 5).map((row, rIdx) => {
+                  const dateStr = formatLocalDateISO(row.dateEpochMillis);
+                  const amountFormatted = formatMinor(row.amountMinor, currencySymbol);
+                  return (
+                    <View key={`ready-${rIdx}`} style={{ gap: theme.spacing.xs }}>
+                      {rIdx > 0 ? <View style={{ backgroundColor: theme.colors.outline, height: 1 }} /> : null}
+                      <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+                        <View>
+                          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+                            {row.note?.trim() || row.categoryName}
+                          </Text>
+                          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+                            {dateStr} · {row.accountLabel}
+                          </Text>
+                        </View>
+                        <Text
+                          style={{
+                            color: row.type === "EXPENSE" ? theme.colors.expense : theme.colors.income,
+                            fontFamily: theme.fonts.bold,
+                            fontSize: theme.typeScale.body,
+                          }}
+                        >
+                          {row.type === "EXPENSE" ? `-${amountFormatted}` : `+${amountFormatted}`}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+                {readyRows.length > 5 ? (
+                  <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small, textAlign: "center", paddingTop: theme.spacing.xs }}>
+                    + {readyRows.length - 5} more ready transaction(s)
+                  </Text>
+                ) : null}
+              </SectionCard>
+            </View>
+          ) : null}
+
+          {/* Dynamic action button reflecting selected count */}
+          <PrimaryButton
+            accessibilityLabel={`Import ${selectedCount} transaction${selectedCount === 1 ? "" : "s"}`}
+            disabled={isInserting || selectedCount === 0}
+            onPress={() => void handleCommitImport()}
+            style={{ marginBottom: theme.spacing.xxl, marginTop: theme.spacing.sm }}
+          >
+            {isInserting
+              ? "Importing…"
+              : `Import ${selectedCount} transaction${selectedCount === 1 ? "" : "s"}`}
+          </PrimaryButton>
+        </ScrollView>
+      ) : null}
+
+      {/* Step 5: COMPLETE (Frame 19c) */}
+      {step === "COMPLETE" ? (
+        <View style={{ alignItems: "center", flex: 1, gap: theme.spacing.lg, justifyContent: "center", paddingVertical: theme.spacing.xl }}>
+          <View
+            style={{
+              alignItems: "center",
+              backgroundColor: theme.colors.tint,
+              borderRadius: theme.radii.round,
+              height: 64,
+              justifyContent: "center",
+              width: 64,
+            }}
+          >
+            <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: 32 }}>✓</Text>
+          </View>
+
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.screenTitle, textAlign: "center" }}>
+            Import complete!
+          </Text>
+
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body, textAlign: "center" }}>
+            Your transactions were successfully imported into your ledger.
+          </Text>
+
+          {/* Stat card */}
+          <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.sm, width: "100%" }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+                Imported
+              </Text>
+              <Text style={{ color: theme.colors.income, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                {outcome.created} transaction(s)
+              </Text>
+            </View>
+
+            <View style={{ backgroundColor: theme.colors.outline, height: 1 }} />
+
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+                Duplicates excluded
+              </Text>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                {outcome.duplicatesSkipped} transaction(s)
+              </Text>
+            </View>
+
+            <View style={{ backgroundColor: theme.colors.outline, height: 1 }} />
+
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+                Invalid rows skipped
+              </Text>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                {outcome.invalidSkipped} row(s)
+              </Text>
+            </View>
+          </SectionCard>
+
+          <PrimaryButton
+            accessibilityLabel="View imported transactions"
+            onPress={() => tabNavigation?.navigate("History", { screen: "HistoryList" })}
+            style={{ marginTop: theme.spacing.md }}
+          >
+            View imported transactions
+          </PrimaryButton>
+        </View>
+      ) : null}
+
+      {/* Step 6: UNCERTAIN (Frame 19d) */}
+      {step === "UNCERTAIN" ? (
+        <View style={{ alignItems: "center", flex: 1, gap: theme.spacing.lg, justifyContent: "center", paddingVertical: theme.spacing.xl }}>
+          <View
+            style={{
+              alignItems: "center",
+              backgroundColor: theme.colors.amberBg,
+              borderRadius: theme.radii.round,
+              height: 64,
+              justifyContent: "center",
+              width: 64,
+            }}
+          >
+            <Text style={{ fontSize: 32 }}>⚠️</Text>
+          </View>
+
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.screenTitle, textAlign: "center" }}>
+            Import needs attention
+          </Text>
+
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body, maxWidth: 320, textAlign: "center" }}>
+            The import encountered an issue and was rolled back to keep your database consistent. No duplicate or partial transactions were written.
+          </Text>
+
+          {outcomeError ? (
+            <SectionCard padding={theme.spacing.md} style={{ width: "100%" }}>
+              <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                {outcomeError}
+              </Text>
+            </SectionCard>
+          ) : null}
+
+          <View style={{ gap: theme.spacing.sm, width: "100%" }}>
+            <PrimaryButton
+              accessibilityLabel="Return to review"
+              onPress={() => setStep("REVIEW")}
+            >
+              Return to review
+            </PrimaryButton>
+
+            <Pressable
+              accessibilityLabel="View History"
+              accessibilityRole="button"
+              onPress={() => tabNavigation?.navigate("History", { screen: "HistoryList" })}
+              style={{
+                alignItems: "center",
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.outline,
+                borderRadius: theme.radii.button,
+                borderWidth: 1,
+                height: theme.sizes.primaryButton,
+                justifyContent: "center",
+                width: "100%",
+              }}
+            >
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+                View History
+              </Text>
+            </Pressable>
+          </View>
         </View>
       ) : null}
     </ScreenContainer>
