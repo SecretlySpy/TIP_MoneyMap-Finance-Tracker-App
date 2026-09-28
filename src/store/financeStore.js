@@ -8,6 +8,7 @@ import { buildAutomaticAccountResolutions, listImportAccountSources, unresolvedI
 import { importAccountKey } from "../domain/services/importParser";
 import { ACCOUNT_TYPES } from "../domain/types";
 import { runRecurringCatchUp } from "../services/recurringCatchUp";
+import { validateBackup } from "../services/dataTransfer";
 import { registerFinanceSnapshotProvider, syncRemindersFromStores } from "./uiStore";
 const DEFAULT_ACCOUNTS = [
     { name: "Cash", type: "CASH" },
@@ -607,6 +608,8 @@ export const useFinanceStore = create((set, get) => ({
         return summary;
     },
     restoreBackup: async (backup) => {
+        // Reject corrupt links/duplicate identities before the replacement transaction starts.
+        validateBackup(backup);
         await get().ensureHydrated();
         const database = databaseRef;
         if (database === null) {
@@ -656,7 +659,7 @@ export const useFinanceStore = create((set, get) => ({
                 const categoryId = categoryIdMap.get(rule.categoryId);
                 const accountId = accountIdMap.get(rule.accountId);
                 if (categoryId === undefined || accountId === undefined) {
-                    continue;
+                    throw new Error("Backup recurring rule references could not be restored.");
                 }
                 const nextId = await insertReturningId(tx, `INSERT INTO recurring_rules (
               amount_minor, type, category_id, account_id, note, frequency,
@@ -681,7 +684,7 @@ export const useFinanceStore = create((set, get) => ({
                 const categoryId = categoryIdMap.get(transaction.categoryId);
                 const accountId = accountIdMap.get(transaction.accountId);
                 if (categoryId === undefined || accountId === undefined) {
-                    continue;
+                    throw new Error("Backup transaction references could not be restored.");
                 }
                 const recurringRuleId = transaction.recurringRuleId === null
                     ? null
@@ -701,7 +704,7 @@ export const useFinanceStore = create((set, get) => ({
             for (const budget of backup.budgets) {
                 const categoryId = categoryIdMap.get(budget.categoryId);
                 if (categoryId === undefined) {
-                    continue;
+                    throw new Error("Backup budget references could not be restored.");
                 }
                 await tx.execute(`INSERT INTO budgets (category_id, month_year, limit_minor)
            VALUES (?, ?, ?)`, [categoryId, budget.monthYear, budget.limitMinor]);

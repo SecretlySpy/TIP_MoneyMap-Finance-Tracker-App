@@ -36,6 +36,8 @@ flowchart LR
 
 ## Reliability and observability
 
+QA update (2026-09-28): recurring duplicate checks/posts/schedule advancement share one transaction; goal increments are atomic SQL updates. Budget spending and posted recurring occurrences are indexed once in memory instead of repeatedly scanning the ledger. Restore validates identities/references and safe integer values before replacing rows. The schema remains version 4. `npm run test:stress` runs an isolated synthetic file-backed SQLite workload with resource/latency metrics; it sends no remote traffic. See [QA Verification Report](./QA%20Verification%20Report%202026-09-28.md) for actual measurements and native limits.
+
 - Database migrations and imports run transactionally; foreign keys and a five-second busy timeout are on.
 - Recurring catch-up is idempotent for a rule/scheduled timestamp and preserves the monthly anchor day.
 - UI errors stay in context; success navigation happens only after the store action resolves.

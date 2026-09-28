@@ -99,8 +99,8 @@ export async function fetchNearbyEats(options = {}) {
     });
 
     if (!response.ok) {
-      // Fallback: Nominatim text search near campus (coarser).
-      return fetchNominatimFallback(origin, radiusM, fetchImpl, now);
+      // Route HTTP failures through the same single fallback as transport/JSON failures.
+      throw new Error("Overpass request failed.");
     }
 
     const body = await response.json();
@@ -118,7 +118,7 @@ export async function fetchNearbyEats(options = {}) {
     };
   } catch {
     try {
-      return await fetchNominatimFallback(origin, radiusM, fetchImpl, now);
+      return await fetchNominatimFallback(origin, radiusM, fetchImpl, now, controller?.signal);
     } catch {
       return {
         places: [],
@@ -135,12 +135,14 @@ export async function fetchNearbyEats(options = {}) {
   }
 }
 
-async function fetchNominatimFallback(origin, radiusM, fetchImpl, now) {
+async function fetchNominatimFallback(origin, radiusM, fetchImpl, now, signal) {
   const url =
     `${NOMINATIM_URL}?format=json&limit=20&q=${encodeURIComponent("restaurant near TIP Quezon City")}`
     + `&viewbox=${origin.longitude - 0.02},${origin.latitude + 0.02},${origin.longitude + 0.02},${origin.latitude - 0.02}`
     + "&bounded=1";
   const response = await fetchImpl(url, {
+    // Both providers share the request deadline, including response-body parsing.
+    signal,
     headers: {
       Accept: "application/json",
       "User-Agent": "MoneyMap-StudentEats/0.1 (offline-first student finance app)",

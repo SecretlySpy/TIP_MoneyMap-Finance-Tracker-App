@@ -1,5 +1,11 @@
 # Decisions and Handover
 
+## QA handover (2026-09-28)
+
+Current source is based on `21d0efb`, with uncommitted QA fixes and evidence. **199 tests / 32 suites pass**, Expo Doctor is **18/18**, Android JS export passes, and **1,829 synthetic stress operations have zero errors**. Confirmed corrections cover transaction composition, concurrent goal/recurring writes, partial recurring failure, corrupt/unsafe restore, places fallback deadline, Smart Tips payload validation, aggregation cost, and five compatible SDK patch versions. The schema and existing IDs remain unchanged.
+
+Current owner/evidence: [QA Verification Report](./QA%20Verification%20Report%202026-09-28.md) and [`docs/qa/2026-09-28/`](../docs/qa/2026-09-28/). Reproduce with `npm test`, `npm run test:stress`, Expo Doctor, and Android export. Native build/device checks remain **UNVERIFIED**: Kotlin daemon failures, missing SDK build tools, old APK package mismatch and emulator system ANR. QA helpers were stopped; no production data was touched. Production audit still has 24 advisories, including vulnerable `xlsx`; a maintained parser decision and fresh native verification are the next release requirements. Preserve these notes and the GitHub sensitive-information rule; no staging/push was performed.
+
 Updated: 2026-09-27  
 Baseline: `main` / `origin/main` at `fe14d83bb5aeb4c5b4ecb499a6c79c1b3f34139d`
 

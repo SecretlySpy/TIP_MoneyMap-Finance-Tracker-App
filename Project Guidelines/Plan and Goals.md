@@ -1,5 +1,11 @@
 # Plan and Goals
 
+## QA execution scope (2026-09-28)
+
+The subsequent user request authorizes direct remediation of QA findings and a documented local stress baseline. This is a manual Markdown adaptation, with no native Plannable state. Scope: the existing mobile UI/store/repository flow, local SQLite integrity/concurrency, mocked external-client failures/privacy, SDK patch compatibility, and synthetic load up to 10,000 starting transactions / 100 budgets and recurring rules / 32 local operations or connections. No owned HTTP server exists, and no production/public-provider load was performed. The five SDK 54 patch updates are part of this later QA scope; the earlier reconciliation non-goals remain historical.
+
+Acceptance: exact accounting under concurrent writes, atomic negative cases, valid backup round trips with corrupt-input rejection, controlled network deadlines, full Jest regression, and separately labeled native/external gaps. Desktop stress targets are zero errors, dashboard p95 below 50 ms, and writer p99 below 5,000 ms. Local implementation and checks passed; native release acceptance and dependency security remain open. See [QA Verification Report](./QA%20Verification%20Report%202026-09-28.md).
+
 Updated: 2026-09-27  
 Status: implementation complete; native device verification open
 

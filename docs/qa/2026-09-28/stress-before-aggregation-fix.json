@@ -1,0 +1,238 @@
+{
+  "recordedAt": "2026-09-28T06:30:30.961Z",
+  "environment": {
+    "node": "v24.16.0",
+    "platform": "win32",
+    "architecture": "x64",
+    "cpuModel": "Intel(R) Core(TM) i7-10875H CPU @ 2.30GHz",
+    "logicalCpus": 16,
+    "driver": "better-sqlite3",
+    "sqlcipher": false,
+    "journalMode": "WAL",
+    "synchronous": "FULL"
+  },
+  "workload": {
+    "initialRows": 10000,
+    "budgets": 100,
+    "rules": 100,
+    "maxConcurrency": 32,
+    "finalRows": 18580,
+    "synthetic": true,
+    "remoteRequests": 0
+  },
+  "scenarios": [
+    {
+      "name": "atomic-10000-row-import",
+      "operations": 1,
+      "successes": 1,
+      "errors": 0,
+      "errorRate": 0,
+      "elapsedMs": 1122.1495999999997,
+      "successfulOpsPerSecond": 0.8911467775776066,
+      "p50Ms": 1122.1464999999998,
+      "p95Ms": 1122.1464999999998,
+      "p99Ms": 1122.1464999999998,
+      "maxMs": 1122.1464999999998,
+      "errorSignatures": [],
+      "rows": 10000
+    },
+    {
+      "name": "dashboard-10000-rows-100-budgets-100-rules",
+      "operations": 100,
+      "successes": 100,
+      "errors": 0,
+      "errorRate": 0,
+      "elapsedMs": 7871.957799999999,
+      "successfulOpsPerSecond": 12.703320132127741,
+      "p50Ms": 72.73270000000048,
+      "p95Ms": 109.96949999999924,
+      "p99Ms": 128.97080000000005,
+      "maxMs": 129.01230000000032,
+      "errorSignatures": []
+    },
+    {
+      "name": "goal-contribution-concurrency-1",
+      "operations": 16,
+      "successes": 16,
+      "errors": 0,
+      "errorRate": 0,
+      "elapsedMs": 123.34619999999995,
+      "successfulOpsPerSecond": 129.71619717510558,
+      "p50Ms": 1.2379000000000815,
+      "p95Ms": 52.78759999999966,
+      "p99Ms": 52.78759999999966,
+      "maxMs": 52.78759999999966,
+      "errorSignatures": [],
+      "concurrency": 1
+    },
+    {
+      "name": "goal-contribution-concurrency-4",
+      "operations": 64,
+      "successes": 64,
+      "errors": 0,
+      "errorRate": 0,
+      "elapsedMs": 57.42239999999947,
+      "successfulOpsPerSecond": 1114.5476329794747,
+      "p50Ms": 2.0406999999995605,
+      "p95Ms": 3.7497999999995955,
+      "p99Ms": 3.9724999999998545,
+      "maxMs": 3.9724999999998545,
+      "errorSignatures": [],
+      "concurrency": 4
+    },
+    {
+      "name": "goal-contribution-concurrency-16",
+      "operations": 256,
+      "successes": 256,
+      "errors": 0,
+      "errorRate": 0,
+      "elapsedMs": 255.76020000000062,
+      "successfulOpsPerSecond": 1000.9375970147012,
+      "p50Ms": 8.165100000000166,
+      "p95Ms": 15.1903999999995,
+      "p99Ms": 22.230099999998856,
+      "maxMs": 24.058000000000902,
+      "errorSignatures": [],
+      "concurrency": 16
+    },
+    {
+      "name": "goal-contribution-concurrency-32",
+      "operations": 512,
+      "successes": 512,
+      "errors": 0,
+      "errorRate": 0,
+      "elapsedMs": 533.7463000000007,
+      "successfulOpsPerSecond": 959.2572351321205,
+      "p50Ms": 15.790000000000873,
+      "p95Ms": 43.06339999999909,
+      "p99Ms": 63.630799999999,
+      "maxMs": 68.32460000000174,
+      "errorSignatures": [],
+      "concurrency": 32
+    },
+    {
+      "name": "recurring-catch-up-concurrency-32",
+      "operations": 32,
+      "successes": 32,
+      "errors": 0,
+      "errorRate": 0,
+      "elapsedMs": 63.904200000000856,
+      "successfulOpsPerSecond": 500.7495594968652,
+      "p50Ms": 46.79320000000007,
+      "p95Ms": 63.22730000000047,
+      "p99Ms": 63.314399999999296,
+      "maxMs": 63.314399999999296,
+      "errorSignatures": [],
+      "concurrency": 32,
+      "postedRuns": 100
+    },
+    {
+      "name": "wal-writer-concurrency-1",
+      "operations": 16,
+      "successes": 16,
+      "errors": 0,
+      "errorRate": 0,
+      "elapsedMs": 41.811399999998685,
+      "successfulOpsPerSecond": 382.6707548659099,
+      "p50Ms": 2.1476999999995314,
+      "p95Ms": 4.432199999999284,
+      "p99Ms": 4.432199999999284,
+      "maxMs": 4.432199999999284,
+      "errorSignatures": [],
+      "concurrency": 1,
+      "rowsPerOperation": 10,
+      "includesWorkerStartup": false
+    },
+    {
+      "name": "wal-writer-concurrency-4",
+      "operations": 64,
+      "successes": 64,
+      "errors": 0,
+      "errorRate": 0,
+      "elapsedMs": 254.56780000000072,
+      "successfulOpsPerSecond": 251.4065015292579,
+      "p50Ms": 2.2453000000004977,
+      "p95Ms": 17.615899999997055,
+      "p99Ms": 205.3747999999996,
+      "maxMs": 205.3747999999996,
+      "errorSignatures": [],
+      "concurrency": 4,
+      "rowsPerOperation": 10,
+      "includesWorkerStartup": false
+    },
+    {
+      "name": "wal-writer-concurrency-16",
+      "operations": 256,
+      "successes": 256,
+      "errors": 0,
+      "errorRate": 0,
+      "elapsedMs": 1450.7318999999989,
+      "successfulOpsPerSecond": 176.46265309255293,
+      "p50Ms": 2.1116000000001804,
+      "p95Ms": 141.0014999999985,
+      "p99Ms": 1201.4197999999997,
+      "maxMs": 1419.8804000000018,
+      "errorSignatures": [],
+      "concurrency": 16,
+      "rowsPerOperation": 10,
+      "includesWorkerStartup": false
+    },
+    {
+      "name": "wal-writer-concurrency-32",
+      "operations": 512,
+      "successes": 512,
+      "errors": 0,
+      "errorRate": 0,
+      "elapsedMs": 3345.1596000000027,
+      "successfulOpsPerSecond": 153.05697222936675,
+      "p50Ms": 2.068299999998999,
+      "p95Ms": 263.08970000000045,
+      "p99Ms": 2498.2356999999975,
+      "maxMs": 3046.1648999999998,
+      "errorSignatures": [],
+      "concurrency": 32,
+      "rowsPerOperation": 10,
+      "includesWorkerStartup": false
+    }
+  ],
+  "integrity": "ok",
+  "foreignKeyViolations": 0,
+  "queryPlans": {
+    "monthRange": [
+      {
+        "id": 5,
+        "parent": 0,
+        "notused": 163,
+        "detail": "SEARCH transactions USING INDEX idx_transactions_date_epoch_millis (date_epoch_millis>? AND date_epoch_millis<?)"
+      }
+    ],
+    "recurringDuplicateCheck": [
+      {
+        "id": 4,
+        "parent": 0,
+        "notused": 61,
+        "detail": "SEARCH transactions USING INDEX idx_transactions_recurring_rule_id (recurring_rule_id=?)"
+      }
+    ]
+  },
+  "cpuTimeMicros": {
+    "user": 16063000,
+    "system": 2219000
+  },
+  "memory": {
+    "startRssBytes": 108929024,
+    "endRssBytes": 373673984,
+    "startHeapBytes": 30081368,
+    "endHeapBytes": 24997520
+  },
+  "eventLoop": {
+    "p95Ms": 95.092735,
+    "p99Ms": 111.280127,
+    "maxMs": 1112.539135
+  },
+  "limits": [
+    "Desktop SQLite driver; not native SQLCipher or device UI performance.",
+    "RSS delta includes module loading and warmup; not proof of leak freedom.",
+    "Concurrency is local operations/connections, not remote users or HTTP RPS."
+  ]
+}

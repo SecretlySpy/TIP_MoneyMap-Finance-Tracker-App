@@ -174,15 +174,19 @@ export function budgetStateFor(percent) {
     return "normal";
 }
 export function buildBudgetCards(budgets, transactions, categoriesById, monthYear) {
+    // Aggregate once: large ledgers should cost O(transactions + budgets), not O(T * B).
+    const spendingByCategoryId = new Map();
+    for (const transaction of transactions) {
+        if (transaction.type === "EXPENSE" && transactionInMonth(transaction, monthYear)) {
+            spendingByCategoryId.set(transaction.categoryId,
+                (spendingByCategoryId.get(transaction.categoryId) ?? 0) + transaction.amountMinor);
+        }
+    }
     return budgets
         .filter((budget) => budget.monthYear === monthYear)
         .map((budget) => {
         const category = categoriesById.get(budget.categoryId);
-        const spentMinor = transactions
-            .filter((transaction) => transaction.type === "EXPENSE" &&
-            transaction.categoryId === budget.categoryId &&
-            transactionInMonth(transaction, monthYear))
-            .reduce((sum, transaction) => sum + transaction.amountMinor, 0);
+        const spentMinor = spendingByCategoryId.get(budget.categoryId) ?? 0;
         const percent = budget.limitMinor <= 0 ? 0 : Math.round((spentMinor / budget.limitMinor) * 100);
         const name = category?.name ?? "Budget";
         return {

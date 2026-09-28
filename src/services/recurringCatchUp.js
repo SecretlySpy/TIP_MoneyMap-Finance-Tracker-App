@@ -36,49 +36,49 @@ async function hasPostedRun(database, recurringRuleId, runEpochMillis) {
  */
 export async function runRecurringCatchUp(database, options = {}) {
   const nowEpochMillis = options.nowEpochMillis ?? Date.now();
-  const recurringRepo = new RecurringRepository(database);
-  const transactionRepo = new TransactionRepository(database);
-  const rules = await recurringRepo.list();
-
   let transactionsCreated = 0;
   let transactionsSkippedDuplicate = 0;
   let rulesProcessed = 0;
 
-  for (const rule of rules) {
-    if (!rule.isActive) {
-      continue;
-    }
-    rulesProcessed += 1;
-    const plan = planRecurringCatchUp(rule, nowEpochMillis);
-    if (plan.posts.length === 0) {
-      continue;
-    }
-
-    for (const post of plan.posts) {
-      const alreadyPosted = await hasPostedRun(database, rule.id, post.runEpochMillis);
-      if (alreadyPosted) {
-        transactionsSkippedDuplicate += 1;
-      } else {
-        await transactionRepo.create({
-          amountMinor: rule.amountMinor,
-          type: rule.type,
-          categoryId: rule.categoryId,
-          accountId: rule.accountId,
-          dateEpochMillis: post.runEpochMillis,
-          note: rule.note,
-          recurringRuleId: rule.id,
-        });
-        transactionsCreated += 1;
+  // Serialize the duplicate check, posts, and schedule advance as one atomic unit.
+  // Read rules inside the transaction so queued foreground/background callers see commits.
+  await database.transaction(async (tx) => {
+    const recurringRepo = new RecurringRepository(tx);
+    const transactionRepo = new TransactionRepository(tx);
+    const rules = await recurringRepo.list();
+    for (const rule of rules) {
+      if (!rule.isActive) {
+        continue;
       }
+      rulesProcessed += 1;
+      const plan = planRecurringCatchUp(rule, nowEpochMillis);
+      if (plan.posts.length === 0) {
+        continue;
+      }
+      for (const post of plan.posts) {
+        const alreadyPosted = await hasPostedRun(tx, rule.id, post.runEpochMillis);
+        if (alreadyPosted) {
+          transactionsSkippedDuplicate += 1;
+        } else {
+          await transactionRepo.create({
+            amountMinor: rule.amountMinor,
+            type: rule.type,
+            categoryId: rule.categoryId,
+            accountId: rule.accountId,
+            dateEpochMillis: post.runEpochMillis,
+            note: rule.note,
+            recurringRuleId: rule.id,
+          });
+          transactionsCreated += 1;
+        }
+      }
+      // Persist the schedule and anchor together with the posts, including short months.
+      await recurringRepo.update(rule.id, {
+        nextRunEpochMillis: plan.nextRunEpochMillis,
+        anchorDay: plan.anchorDay,
+      });
     }
-
-    // plan.nextRunEpochMillis is already advanced past the last posted run.
-    // Persist anchorDay too, so a clamped short month cannot erase the intended due day.
-    await recurringRepo.update(rule.id, {
-      nextRunEpochMillis: plan.nextRunEpochMillis,
-      anchorDay: plan.anchorDay,
-    });
-  }
+  });
 
   return {
     rulesProcessed,

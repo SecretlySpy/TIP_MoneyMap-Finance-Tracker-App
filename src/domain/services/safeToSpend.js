@@ -38,16 +38,11 @@ function monthlyGoalContribution(goal, bounds) {
   return Math.ceil(remaining / Math.max(1, monthsThroughDeadline));
 }
 
-function projectedRecurring(rule, transactions, bounds) {
+function projectedRecurring(rule, postedRuns, bounds) {
   const empty = { count: 0, minor: 0 };
   if (!rule.isActive || rule.type !== "EXPENSE" || rule.nextRunEpochMillis > bounds.end) {
     return empty;
   }
-  const postedRuns = new Set(
-    transactions
-      .filter((transaction) => transaction.recurringRuleId === rule.id)
-      .map((transaction) => transaction.dateEpochMillis),
-  );
   let nextRun = rule.nextRunEpochMillis;
   let minor = 0;
   let count = 0;
@@ -56,7 +51,7 @@ function projectedRecurring(rule, transactions, bounds) {
     ? rule.frequency
     : "MONTHLY";
   while (nextRun <= bounds.end && guard < MAX_PROJECTED_RECURRING_RUNS) {
-    if (nextRun >= bounds.start && !postedRuns.has(nextRun)) {
+    if (nextRun >= bounds.start && !postedRuns?.has(nextRun)) {
       minor += Math.max(0, rule.amountMinor);
       count += 1;
     }
@@ -92,8 +87,17 @@ export function computeSafeToSpend(input) {
   const rawBudgetHeadroomMinor = summary.limitMinor - summary.spentMinor;
   const remainingBudgetsMinor = Math.max(0, rawBudgetHeadroomMinor);
 
+  // Index posted occurrences once instead of scanning the ledger for every rule.
+  const postedRunsByRule = new Map();
+  for (const transaction of input.transactions ?? []) {
+    if (transaction.recurringRuleId == null) continue;
+    if (!postedRunsByRule.has(transaction.recurringRuleId)) {
+      postedRunsByRule.set(transaction.recurringRuleId, new Set());
+    }
+    postedRunsByRule.get(transaction.recurringRuleId).add(transaction.dateEpochMillis);
+  }
   const projected = (input.recurringRules ?? []).map((rule) =>
-    projectedRecurring(rule, input.transactions ?? [], bounds)
+    projectedRecurring(rule, postedRunsByRule.get(rule.id), bounds)
   );
   const upcomingRecurringMinor = projected.reduce((sum, item) => sum + item.minor, 0);
   const upcomingRecurringCount = projected.reduce((sum, item) => sum + item.count, 0);

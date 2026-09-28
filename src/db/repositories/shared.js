@@ -1,10 +1,8 @@
 import { DataIntegrityError, assertPositiveInteger } from "../validation";
 export async function insertRow(database, statement, parameters) {
-    let insertedId;
-    await database.transaction(async (transaction) => {
-        const result = await transaction.execute(statement, parameters);
-        insertedId = result.insertId;
-    });
+    // One SQLite statement is atomic and also works on an outer transaction's executor.
+    const result = await database.execute(statement, parameters);
+    const insertedId = result.insertId;
     if (insertedId === undefined || !Number.isSafeInteger(insertedId) || insertedId <= 0) {
         throw new DataIntegrityError("SQLite did not return a valid inserted row identifier.");
     }
@@ -16,21 +14,14 @@ export async function updateRow(database, table, id, assignments) {
         throw new TypeError("An update must include at least one defined field.");
     }
     const setClause = assignments.map(({ column }) => `${column} = ?`).join(", ");
-    let rowsAffected = 0;
-    await database.transaction(async (transaction) => {
-        const result = await transaction.execute(`UPDATE ${table} SET ${setClause} WHERE id = ?`, [...assignments.map(({ value }) => value), id]);
-        rowsAffected = result.rowsAffected;
-    });
-    return rowsAffected === 1;
+    // Let the caller own any multi-statement transaction instead of nesting BEGIN.
+    const result = await database.execute(`UPDATE ${table} SET ${setClause} WHERE id = ?`, [...assignments.map(({ value }) => value), id]);
+    return result.rowsAffected === 1;
 }
 export async function deleteRow(database, table, id) {
     assertPositiveInteger(id, "id");
-    let rowsAffected = 0;
-    await database.transaction(async (transaction) => {
-        const result = await transaction.execute(`DELETE FROM ${table} WHERE id = ?`, [id]);
-        rowsAffected = result.rowsAffected;
-    });
-    return rowsAffected === 1;
+    const result = await database.execute(`DELETE FROM ${table} WHERE id = ?`, [id]);
+    return result.rowsAffected === 1;
 }
 export async function findRowById(database, table, id) {
     assertPositiveInteger(id, "id");

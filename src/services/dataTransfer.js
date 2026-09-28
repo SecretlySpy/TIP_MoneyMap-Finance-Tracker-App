@@ -20,6 +20,59 @@ export function buildBackup(snapshot) {
 export function serializeBackup(backup) {
     return `${JSON.stringify(backup, null, 2)}\n`;
 }
+export function validateBackup(backup) {
+    // Validate identity and references before restore can replace any local data.
+    const collections = ["accounts", "categories", "transactions", "budgets", "recurringRules", "goals"];
+    const integerFields = {
+        accounts: ["startingBalanceMinor"], categories: [],
+        transactions: ["amountMinor", "dateEpochMillis"], budgets: ["limitMinor"],
+        recurringRules: ["amountMinor", "nextRunEpochMillis", "reminderLeadDays"],
+        goals: ["targetMinor", "currentMinor", "createdEpochMillis"],
+    };
+    const ids = new Map();
+    for (const field of collections) {
+        const rows = backup[field] ?? (field === "goals" ? [] : undefined);
+        if (!Array.isArray(rows)) {
+            throw new Error(`Backup ${field} must be an array.`);
+        }
+        const seen = new Set();
+        for (const row of rows) {
+            if (row === null || typeof row !== "object" || !Number.isSafeInteger(row.id) || row.id <= 0 || seen.has(row.id)) {
+                throw new Error(`Backup ${field} contains invalid or duplicate identifiers.`);
+            }
+            seen.add(row.id);
+            // SQLite accepts 64-bit values that JS cannot represent exactly; reject before COMMIT.
+            for (const integerField of integerFields[field]) {
+                if (!Number.isSafeInteger(row[integerField])) {
+                    throw new Error(`Backup ${field} contains an unsafe ${integerField}.`);
+                }
+            }
+            if (field === "goals" && row.deadlineEpochMillis != null && !Number.isSafeInteger(row.deadlineEpochMillis)) {
+                throw new Error("Backup goals contains an unsafe deadline.");
+            }
+        }
+        ids.set(field, seen);
+    }
+    const categories = new Map(backup.categories.map((row) => [row.id, row]));
+    for (const field of ["transactions", "recurringRules"]) {
+        for (const row of backup[field]) {
+            if (!ids.get("accounts").has(row.accountId) || categories.get(row.categoryId)?.type !== row.type) {
+                throw new Error(`Backup ${field} contains an invalid account or category reference.`);
+            }
+            if (!Number.isSafeInteger(row.amountMinor) || row.amountMinor <= 0) {
+                throw new Error(`Backup ${field} contains an invalid amount.`);
+            }
+            if (field === "transactions" && row.recurringRuleId != null && !ids.get("recurringRules").has(row.recurringRuleId)) {
+                throw new Error("Backup transactions contains an invalid recurring rule reference.");
+            }
+        }
+    }
+    for (const row of backup.budgets) {
+        if (categories.get(row.categoryId)?.type !== "EXPENSE") {
+            throw new Error("Backup budgets contains an invalid expense category reference.");
+        }
+    }
+}
 export function parseBackup(raw) {
     let parsed;
     try {
@@ -41,7 +94,13 @@ export function parseBackup(raw) {
     if (!Array.isArray(record.accounts) || !Array.isArray(record.categories)) {
         throw new Error("Backup is missing accounts or categories.");
     }
-    return {
+    // Legacy omitted collections remain supported; present malformed collections fail closed.
+    for (const field of ["transactions", "budgets", "recurringRules", "goals"]) {
+        if (record[field] !== undefined && !Array.isArray(record[field])) {
+            throw new Error(`Backup ${field} must be an array.`);
+        }
+    }
+    const backup = {
         format: BACKUP_FORMAT,
         version: BACKUP_VERSION,
         exportedAtIso: typeof record.exportedAtIso === "string" ? record.exportedAtIso : new Date().toISOString(),
@@ -54,6 +113,8 @@ export function parseBackup(raw) {
         // were included simply restore none rather than failing to parse.
         goals: Array.isArray(record.goals) ? record.goals : [],
     };
+    validateBackup(backup);
+    return backup;
 }
 function escapeCsv(value) {
     if (/[",\n\r]/.test(value)) {

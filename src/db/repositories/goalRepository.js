@@ -98,14 +98,22 @@ export class GoalRepository {
   }
 
   async contribute(id, amountMinor) {
+    assertPositiveInteger(id, "id");
     assertPositiveInteger(amountMinor, "amountMinor");
-    const existing = await this.getById(id);
-    if (existing === null) {
+    // Increment in SQLite so simultaneous contributions cannot overwrite one another.
+    // Guard before addition to keep all persisted money within JS's safe integer range.
+    const result = await this.database.execute(
+      `UPDATE savings_goals SET current_minor = current_minor + ?
+       WHERE id = ? AND current_minor <= ? RETURNING *`,
+      [amountMinor, id, Number.MAX_SAFE_INTEGER - amountMinor],
+    );
+    if (result.rows.length > 0) {
+      return mapGoal(result.rows[0]);
+    }
+    if (await this.getById(id) === null) {
       throw new TypeError("Goal not found.");
     }
-    const next = existing.currentMinor + amountMinor;
-    assertSafeInteger(next, "currentMinor");
-    return this.update(id, { currentMinor: next });
+    throw new RangeError("currentMinor must be a safe integer.");
   }
 
   delete(id) {

@@ -1,5 +1,11 @@
 # Verification and Evaluation
 
+## Current QA evidence (2026-09-28)
+
+See [QA Verification Report 2026-09-28](./QA%20Verification%20Report%202026-09-28.md) for the current evidence: **32 suites / 199 tests pass without exclusions**, Expo Doctor **18/18**, Android JS export passes, and **1,829 local stress operations have zero errors**. The workload starts with 10,000 rows, 100 budgets/rules, and reaches 32 actual SQLite writers. Final dashboard p95 is **15.19 ms**; writer p99 at concurrency 32 is **2,517.33 ms**. These are desktop SQLite observations, not native SQLCipher/device acceptance.
+
+Native build/device E2E remains **UNVERIFIED** after Kotlin daemon failures and an isolated emulator system ANR. The production audit remains **24 advisories (18 moderate, 6 high)**. Older counts and parity assertions below are historical evidence and must not be used as current device acceptance. Machine-readable evidence is in [`docs/qa/2026-09-28/`](../docs/qa/2026-09-28/).
+
 Updated: 2026-09-27
 
 ## Requirement-to-check matrix

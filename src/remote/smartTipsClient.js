@@ -98,7 +98,12 @@ export function assertAnonymizedPayload(payload) {
       return { ok: false, reason: `forbidden field: ${key}` };
     }
   }
-  if (typeof record.period !== "string" || !/^\d{4}-\d{2}$/.test(record.period)) {
+  // An allowlist also blocks identifiers hidden under previously unknown field names.
+  const allowed = ["period", "currencySymbol", "remainingBudgetMinor", "limitBudgetMinor", "spentBudgetMinor", "categorySpendRatios"];
+  if (Object.keys(record).some((key) => !allowed.includes(key))) {
+    return { ok: false, reason: "payload contains unexpected fields" };
+  }
+  if (typeof record.period !== "string" || !/^\d{4}-(0[1-9]|1[0-2])$/.test(record.period)) {
     return { ok: false, reason: "period must be YYYY-MM" };
   }
   if (typeof record.currencySymbol !== "string") {
@@ -116,10 +121,10 @@ export function assertAnonymizedPayload(payload) {
     if (row === null || typeof row !== "object") {
       return { ok: false, reason: "invalid ratio row" };
     }
-    if (typeof row.category !== "string" || typeof row.ratio !== "number") {
+    if (typeof row.category !== "string" || !Number.isFinite(row.ratio) || row.ratio < 0 || row.ratio > 1) {
       return { ok: false, reason: "ratio row needs category + ratio" };
     }
-    if ("note" in row || "accountId" in row || "transactionId" in row) {
+    if (Object.keys(row).some((key) => !["category", "ratio"].includes(key))) {
       return { ok: false, reason: "ratio row contains forbidden identifiers" };
     }
   }

@@ -42,6 +42,12 @@ erDiagram
 
 ## Lifecycle, privacy, and recovery
 
+### QA integrity corrections (2026-09-28)
+
+Single-statement repository helpers now accept both a database and a caller-owned transaction executor. Goal contributions increment atomically in SQL, with a safe-integer overflow guard. Recurring catch-up reads schedules, checks prior posts, inserts, and advances schedules in one serialized transaction, so concurrent callers cannot post duplicate runs or leave partial posts after failure. No migration or schema version changed.
+
+Restore validates collection shapes, unique source IDs, required references, and safe integer money/timestamps before replacing local data. Unmapped references fail instead of silently skipping rows. Thirty-two concurrent contribution/catch-up checks and rollback/unsafe-backup reproductions pass on real desktop SQLite; native SQLCipher remains unverified. Details and query plans: [QA Verification Report](./QA%20Verification%20Report%202026-09-28.md).
+
 - SQLCipher keys are generated separately from App Lock PIN material and stored through SecureStore.
 - Android automatic backup is disabled; explicit app backup/export is the supported recovery path.
 - Foreign keys, `STRICT` tables, WAL, `synchronous=FULL`, and `foreign_key_check` protect local integrity.

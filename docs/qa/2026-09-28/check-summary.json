@@ -1,0 +1,1021 @@
+﻿{
+    "recordedAt":  "2026-09-28T06:45:46.5465007Z",
+    "baselineCommit":  "21d0efb",
+    "functional":  {
+                       "suites":  32,
+                       "passedSuites":  32,
+                       "failedSuites":  0,
+                       "tests":  199,
+                       "passed":  199,
+                       "failed":  0,
+                       "skipped":  0,
+                       "durationSeconds":  13.083,
+                       "suitesAndCases":  [
+                                              {
+                                                  "path":  "__tests__/qaStoreFlows.test.jsx",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "saves the Lunch template from the entry screen to SQLite and opens History",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "keeps the entry screen and data intact after a persistence failure",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "imports a named account atomically and rolls back a malformed row",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "round-trips transactions and goals through backup/restore",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects dangling backup references and preserves all pre-restore data",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "refuses malformed backup collections instead of silently restoring empty data",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects unsafe backup money before committing replacement rows",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/qaPersistence.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "composes repository CRUD inside one native transaction and rolls it all back",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "retains all 32 simultaneous goal contributions",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects unsafe contribution totals without changing stored savings",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "posts each scheduled run once when 32 catch-up callers race",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rolls back recurring posts if advancing the schedule fails",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "restricts account deletion and preserves category/type consistency",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "upgrades a real version-2 schema and is repeatable",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "refuses a newer database without rewriting its version",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/qaRegressions.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "segments sum to the real month total",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "percentages total exactly 100",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "the Other slice reports only its own spend plus the tail",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "still folds the tail correctly when no category is named Other",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "reports the unset state when nothing has been configured",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "still reports over when real commitments exceed the budget",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "reports comfortable when there is genuine headroom",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "buildBackup serializes goals",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "survives serialize then parse without losing goal fields",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "still accepts an older backup written before goals existed",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "tolerates a snapshot with no goals key",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "returns to the 31st after a short February",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "clamps to 30 in a 30-day month and still recovers",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "handles a leap February",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects a minus sign by default",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "accepts one when the caller opts in",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects an empty amount instead of silently returning zero",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "allows the first attempts without a cooldown",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "escalates the cooldown after the free attempts are spent",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "caps the ladder rather than growing without bound",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/androidSecureScreenPlugin.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "adds FLAG_SECURE inside onCreate for Kotlin activities",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "adds FLAG_SECURE inside onCreate for Java activities",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "is idempotent across repeated prebuilds",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "fails loudly when MainActivity has no recognizable onCreate",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/importParser.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "detects csv and xlsx extensions",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "parses standard MoneyMap CSV through the shared pipeline",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "parses a real spreadsheet buffer through the same pipeline",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "preserves named accounts instead of silently coercing them to Cash",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects rows until the account column is mapped",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "inserts good rows, auto-creates category/account, and leaves DB consistent",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rolls back the whole import when a statement fails mid-transaction",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/uiComponents.test.jsx",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "reports over-budget percentage while clamping only the visual bar",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "renders and activates the approved empty-history call to action",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "distinguishes an empty filter result from an empty ledger",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/e2eVerification.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "parses decimal amounts into exact integer minor units without floating-point artifacts",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "formats minor units cleanly into localized strings",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "accurately computes category spend against budget limits",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "accurately builds safe-to-spend models",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "constructs recurring bills with clean frequency labels",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "generates an active reminder preview banner",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "handles partial contribution and completion with overflow",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "auto-detects columns and parses rows with correct data types",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "identifies account sources and allows clean mapping to existing or new accounts",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "generates actionable heuristics without requiring internet connection",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "ranks nearby student-friendly food spots by distance, price, and heuristic signals",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/dataTransfer.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "round-trips a MoneyMap backup payload",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "builds and parses transaction CSV with quoted notes",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects unknown backup formats",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "exports a named account without collapsing it to its generic type",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/repositories.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "creates, reads, updates, lists, and deletes an account",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "creates, reads, updates, lists, and deletes a category",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "creates, reads, updates, lists, and deletes a transaction",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects a transaction whose category type does not match",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "creates, reads, updates, lists, and deletes a unique expense budget",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects a budget for an income category",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "creates, reads, updates, lists, and deletes a recurring rule",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "sets a linked transaction recurring ID to null when its rule is deleted",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects unsafe money integers and undefined-only update patches",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/smartTipsClient.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "includes only period, budget totals, ratios, and currency — never raw rows",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects payloads that smuggle raw data",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "makes zero network calls when disabled",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "makes zero network calls without consent",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "falls back to null on network/API errors",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "parses Gemini JSON tip arrays",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/importAccounts.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "matches a source label to one active named account",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "leaves unknown labels unresolved instead of mapping them to Cash",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "does not resolve to an archived account",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/theme.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "matches the exact light palette",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "uses the approved dark surfaces and brighter accent",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "resolveThemeMode honors explicit preference over system",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/storeIntegration.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "reproduces every approved Figma dashboard and safe-to-spend figure from real rows",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "commits a resolved import atomically and rolls back failures without partial writes",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "enforces the 14-day reminder default and keeps catch-up idempotent on unposted runs",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/schema.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "migrates a fresh database to the latest version with domain tables including goals",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "seeds Cash and the twelve student categories with the required type split",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "is idempotent for both migrations and an explicitly repeated seed",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects a database created by a newer application version",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rolls back the entire initial migration when a schema statement fails",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/recurringCatchUp.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "advances daily and weekly by fixed calendar steps",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "advances monthly across a month boundary and clamps end-of-month",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "keeps the intended day-of-month when an anchor survives a short month",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "advances monthly across a year boundary",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "posts nothing when next run is in the future",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "skips inactive rules",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "plans exactly one post for a single overdue period",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "plans multi-period catch-up after multi-day downtime",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "plans monthly catch-up across a month boundary",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "posts exactly once per period and is idempotent on re-run",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "catches up multi-period monthly gaps across a month boundary once",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "does not post inactive rules",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "skips duplicate rows if a run was already posted",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/androidOpenSslPackagingPlugin.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "adds the SQLCipher runtime extraction before native-library merging",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "is idempotent across repeated Expo prebuilds",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "fails loudly when Expo\u0027s Gradle template no longer has the expected anchor",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/goals.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "computes progress and remaining in minor units",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "sorts incomplete goals before complete",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "creates, contributes, and archives goals",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/preferences.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "normalizes partial preference payloads",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "surfaces bills inside their lead window",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/qaAggregation.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "keeps exact per-category totals across 100 budgets and 10000 mixed-month rows",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "indexes posted runs by rule and date without hiding another rule\u0027s commitment",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/keyManager.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "encodes bytes as fixed-width lowercase hexadecimal",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "creates one 256-bit key and then reuses it",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "fails closed when a stored key is malformed",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects a random provider that returns the wrong byte count",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/uiFidelityStatic.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "keeps hexadecimal colors out of screens and reusable components",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "keeps screens free of direct fetch; remote clients own networking",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "avoids Fabric-incompatible pressed-state style callbacks",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "commits all four exact Figma navigation exports",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "ships plain JavaScript sources without TypeScript extensions in app code",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "keeps offline Smart Tips reachable when online personalization is off",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "keeps every dashboard destination reachable with labeled actions",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "uses named account ids for Entry and removes unsupported GPS claims",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/safeToSpend.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "subtracts unposted bills and this month\u0027s deadline-based goal contribution",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "marks over when bills + goals exceed remaining budgets",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "does not reserve an open-ended goal without a monthly deadline commitment",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "does not count an already-posted recurring occurrence twice",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "counts each unposted weekly bill occurrence due in the selected month",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/eatsRanking.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "computes haversine distance in meters",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "infers student-friendly price levels",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "scores nearer cheaper places higher",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "ranks Overpass-like elements and drops nameless/far nodes",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "formats distances for UI",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "builds anonymized AI payload without coordinates",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/qaRemoteResilience.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "returns a controlled places error when both HTTP providers fail",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "aborts a stalled Nominatim fallback within the original 18-second deadline",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "falls back after malformed Overpass JSON and releases its timer",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "uses offline Smart Tips after HTTP 401 with an actual mocked API key",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "uses offline Smart Tips after HTTP 429 with an actual mocked API key",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "uses offline Smart Tips after HTTP 500 with an actual mocked API key",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "uses offline Smart Tips after HTTP 503 with an actual mocked API key",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "aborts a stalled Smart Tips request and releases the timer",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "returns offline eats tips after malformed Gemini response",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects malformed or unexpected outbound payload fields: {\"period\":\"2026-09\",\"currencySymbol\":\"₱\",\"remainingBudgetMinor\":100,\"limitBudgetMinor\":200,\"spentBudgetMinor\":100,\"categorySpendRatios\":[],\"address\":\"private fixture\"}",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects malformed or unexpected outbound payload fields: {\"period\":\"2026-99\",\"currencySymbol\":\"₱\",\"remainingBudgetMinor\":100,\"limitBudgetMinor\":200,\"spentBudgetMinor\":100,\"categorySpendRatios\":[]}",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects malformed or unexpected outbound payload fields: {\"period\":\"2026-09\",\"currencySymbol\":\"₱\",\"remainingBudgetMinor\":100,\"limitBudgetMinor\":200,\"spentBudgetMinor\":100,\"categorySpendRatios\":[{\"category\":\"Food\",\"ratio\":null}]}",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects malformed or unexpected outbound payload fields: {\"period\":\"2026-09\",\"currencySymbol\":\"₱\",\"remainingBudgetMinor\":100,\"limitBudgetMinor\":200,\"spentBudgetMinor\":100,\"categorySpendRatios\":[{\"category\":\"Food\",\"ratio\":-1}]}",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects malformed or unexpected outbound payload fields: {\"period\":\"2026-09\",\"currencySymbol\":\"₱\",\"remainingBudgetMinor\":100,\"limitBudgetMinor\":200,\"spentBudgetMinor\":100,\"categorySpendRatios\":[{\"category\":\"Food\",\"ratio\":0.5,\"notes\":\"private fixture\"}]}",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/tips.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "counts inclusive days left in the current month",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "computes daily allowance from remaining minor units",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "derives daily allowance and food per-day tips from budgets",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "flags a category trending over budget",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "surfaces repeated small expenses as a monthly total",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "compares category spend to the previous period",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "returns a get-started tip when there is no usable data",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/appLock.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "validates 4-digit PINs only",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "stores and verifies a PIN",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "rejects invalid PIN on set",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "clears stored PIN material",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "reports unavailable when hardware is missing",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "reports unavailable when nothing is enrolled",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "returns success when authenticateAsync succeeds",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "returns failed when the user cancels or mismatches",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "falls back to unavailable when the native module throws",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/remindersScheduling.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "fires lead days before due at 09:00 local",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "builds notification copy with formatted minor units",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "uses stable identifiers that change when nextRun advances (month boundary)",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "schedules one DATE notification before the lead window",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "schedules ASAP once inside the lead window without duplicating across re-plans",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "plans distinct notifications across a month boundary when nextRun advances",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "returns empty plan when reminders are disabled or rule reminders off",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "skips past-due nextRun (stale before catch-up)",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "surfaces bills inside their lead window",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/emojiAndDueDate.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "detects emoji icons vs ionicon names",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "prefers custom icon over name map",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "parses local YYYY-MM-DD to noon",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "fires exactly 14 days before due at 09:00 local",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "defaultDueDateISO is lead days ahead",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/money.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "formats grouped peso values only at the display boundary",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "derives transaction signs from the transaction type",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "parses decimal keypad text without floating-point currency math",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "applies keypad events as a bounded string state machine",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/placesClient.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "ranks Overpass JSON through the shared pipeline",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "falls back when Overpass fails",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/financeView.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "formats and shifts month-year keys",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "computes lifetime balance with month income/expense",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "builds UI transactions and history groups",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "aggregates spending segments and budget cards",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "builds recurring bill previews",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              },
+                                              {
+                                                  "path":  "__tests__/entityGuards.test.js",
+                                                  "status":  "passed",
+                                                  "cases":  [
+                                                                {
+                                                                    "title":  "blocks category delete when referenced",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "requires at least one active account when deleting",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "blocks account delete when used by transactions or recurring rules",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "canArchiveAccount delegates to canDeleteAccount",
+                                                                    "status":  "passed"
+                                                                },
+                                                                {
+                                                                    "title":  "validates category rename uniqueness",
+                                                                    "status":  "passed"
+                                                                }
+                                                            ]
+                                              }
+                                          ]
+                   },
+    "expoDoctor":  {
+                       "total":  18,
+                       "passed":  18
+                   },
+    "androidJsExport":  "PASS",
+    "nativeBuildAndDeviceAcceptance":  "UNVERIFIED",
+    "nativeLimit":  "Kotlin daemon failures, terminated build, old APK package mismatch and emulator system ANR",
+    "audit":  {
+                  "info":  0,
+                  "low":  0,
+                  "moderate":  18,
+                  "high":  6,
+                  "critical":  0,
+                  "total":  24
+              },
+    "stressArtifact":  "stress-final.json",
+    "whitespace":  "PASS"
+}
