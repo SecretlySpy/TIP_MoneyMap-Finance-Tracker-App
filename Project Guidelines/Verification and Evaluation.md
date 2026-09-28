@@ -69,3 +69,19 @@ Updated: 2026-09-27
   - `14 Manage Categories` & `15 Manage Accounts`: Complete custom category and account management.
   - `16 Import Data` & `16b Import Data — Resolve Accounts`: PreviewTable (Date, Amount, Type), mapping card with cycling pills, ReadyBanner, and account resolution flow with atomic transaction confirmation (`ImportScreen.jsx`).
 - **Design Tokens**: All screens strictly consume `src/theme/tokens.js`. No raw `#hex` values exist in any UI component or screen file.
+
+## Repository cleanup audit (2026-09-28)
+
+Scope: root config/entry/docs, `AI Skills/`, `Project Guidelines/`, `docs/` and screenshot evidence, `src/`, `assets/`, `plugins/`, `scripts/`, `__tests__/`, local IDE/agent metadata, and ignored generated directories. There were 277 tracked paths at inspection. The two root documentation deletions and their untracked copies under `Project Guidelines/` existed before this cleanup; preserve those copies when staging future work. No application logic, database schema, migration, asset, package, or endpoint was modified by this cleanup.
+
+| Check | Executed observation | Status / limit |
+|---|---|---|
+| `git status --short --untracked-files=all`, `git ls-files`, `.gitignore` and targeted reference scans | Traced root documentation relocations, protected uncommitted edits, published README/root-page links and the import-free deprecated `src/screens/fixtures.js` stub | PASS for scoped inventory; no blanket deletion of ignored or user-owned state |
+| `npm ls --depth=0` | All installed direct dependencies resolved without missing/invalid package reports | PASS for local dependency graph, not a security audit |
+| `npm test -- --watch=false` | 27 suites / 167 tests passed; one test in the pre-existing untracked `__tests__/storeIntegration.test.js` failed because `TestSqliteDatabase.transaction` attempted nested `BEGIN IMMEDIATE` | FAIL at baseline, before any cleanup edit; the unrelated test and data paths were not changed |
+| `npm test -- --watch=false --testPathIgnorePatterns=storeIntegration.test.js` | 27 suites / 165 tests passed after the documentation-only cleanup | PASS for tracked tests, explicitly excluding the baseline failure |
+| `npx expo export --platform android` | Metro bundled 1,556 modules and produced an Android Hermes bundle with referenced assets | PASS for static import and bundling, not a native device/Gradle smoke test |
+| `npm run build:readme-page` | Regenerated `docs/index.html` from the repaired `README.md`; resulting diff contains only the two expected URL/text updates | PASS for generated documentation mirror |
+| `git diff --check` | Flagged trailing whitespace in already-modified `AGENTS.md`, `AIO.md`, and `Project-Operating-Directives.md` revision lines; none in cleanup edits | FAIL for whole worktree (pre-existing), PASS for cleanup-specific whitespace by diff inspection |
+
+Potential deletion: `src/screens/fixtures.js` is an empty deprecated export and has no active imports in scoped text search, but file removal failed in the patch tool, so it remains. Generated `coverage/`, `dist/`, `.expo/`, `android/`, and `node_modules/` are ignored and were not deleted; `.kilo/worktrees/` is managed session state, not a disposable repository duplicate. The root `.nojekyll` and `docs/.nojekyll` have different possible GitHub Pages publication roots, and the screenshot ZIP is linked from the setup guide. No further relocation is justified without a concrete reference/ownership check.

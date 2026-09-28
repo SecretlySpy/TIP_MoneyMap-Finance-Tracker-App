@@ -30,7 +30,7 @@ The Pages site is the polished setup guide: root [`index.html`](./index.html) (s
 
 ### Known gaps (reconciled 2026-09-27)
 
-A full QA pass is recorded in [AI Documentation Notes.md](./AI%20Documentation%20Notes.md#qa-audit--2026-08-31).
+The current verification matrix is in [Verification and Evaluation.md](./Project%20Guidelines/Verification%20and%20Evaluation.md).
 "Done" above means the feature ships, not that it matches every expectation of a mainstream
 expense tracker. Still missing:
 
@@ -52,7 +52,7 @@ device behavior still requires the Android verification path below.
 4. `npm test` (26 suites, 154 tests at the 2026-09-27 reconciliation)
 5. Start an emulator/device, then `npm run android` (dev client required — **Expo Go unsupported** because of SQLCipher).
 
-Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or the [live Pages site](https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/). Also see [Tech Stack Setup Guide.md](./Tech%20Stack%20Setup%20Guide.md) and [docs/local-environment-audit-linux.md](./docs/local-environment-audit-linux.md).
+Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or the [live Pages site](https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/). Also see [Tech Stack Setup Guide.md](./Project%20Guidelines/Tech%20Stack%20Setup%20Guide.md) and [docs/local-environment-audit-linux.md](./docs/local-environment-audit-linux.md).
 
 ## Architecture (short)
 

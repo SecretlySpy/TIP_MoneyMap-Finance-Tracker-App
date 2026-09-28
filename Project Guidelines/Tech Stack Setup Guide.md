@@ -27,7 +27,7 @@
 | Package manager | npm | 10 or newer (verified `10.9.8`) | Dependency installation and scripts |
 | Android tooling | Android SDK cmdline-tools / Studio, JDK | SDK platform 35, build-tools 35, NDK 27.1, Emulator, JDK 21 | API 26+ emulator/device builds; Java 25+ is unsupported by this Gradle stack |
 
-**Tasks 1–18 are complete** in v0.1.0. Live setup guide: [index.html](./index.html) / [GitHub Pages](https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/). Expo Go is unsupported (SQLCipher).
+**Tasks 1–18 are complete** in v0.1.0. Live setup guide: [index.html](../index.html) / [GitHub Pages](https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/). Expo Go is unsupported (SQLCipher).
 
 ## Architecture visualization
 
@@ -229,8 +229,8 @@ For a native debug APK, run `npx expo prebuild --platform android --clean`, ente
 
 ## Full-page mobile screenshots (2026-09-06)
 
-Open the [screenshot gallery](docs/screenshots/2026-09-06/index.html) or download the
-[31-image ZIP](docs/screenshots/moneymap-full-page-2026-09-06.zip). It covers all 14 registered
+Open the [screenshot gallery](../docs/screenshots/2026-09-06/index.html) or download the
+[31-image ZIP](../docs/screenshots/moneymap-full-page-2026-09-06.zip). It covers all 14 registered
 screens, including empty/populated views, both transaction modes, import steps and embedded forms.
 The images are native Android captures at 1080 px width, with heights up to 7379 px.
 
@@ -240,7 +240,7 @@ keeping the same mobile width. Pages beyond Android's height limit use overlappi
 frames joined at verified scroll offsets. A normal `adb screencap` alone captures only
 the current visible area.
 
-See the [capture README](docs/screenshots/2026-09-06/README.md) for prerequisites,
+See the [capture README](../docs/screenshots/2026-09-06/README.md) for prerequisites,
 reproduction commands, sample-data scope and measurement evidence. The gallery was checked
 at desktop and mobile widths. These development-build images do not validate native release
 packaging; the current release configuration's screenshot protection remains unchanged.

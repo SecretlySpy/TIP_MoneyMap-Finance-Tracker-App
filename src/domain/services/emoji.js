@@ -13,7 +13,7 @@ const NAME_EMOJI = {
   "Load/Data": "📱",
   Shopping: "🛍️",
   Entertainment: "🎮",
-  Fun: "🎮",
+  Fun: "🎯",
   Bills: "🧾",
   Health: "💊",
   Other: "📦",

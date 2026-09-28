@@ -520,7 +520,7 @@ export function RecurringScreen({ navigation }) {
             <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
               Choose icon
             </Text>
-            <EmojiGrid onSelect={setDraftEmoji} selectedEmoji={draftEmoji} />
+            <EmojiGrid onChange={setDraftEmoji} value={draftEmoji} />
           </View>
 
           <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.md }}>
