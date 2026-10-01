@@ -16,6 +16,8 @@ import { delimiter, dirname, posix, resolve, win32 } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { getConnectedDevices, startEmulator } from "./emulator.mjs";
+
 // Resolve project-relative files from this script instead of relying on the
 // terminal's current directory, which varies between IDEs and operating systems.
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
@@ -205,7 +207,7 @@ function readLocalProperties(workspaceRoot) {
 
 // Select an SDK only when platform-tools is installed. Expo needs ADB to install
 // and open the development build, so accepting an incomplete SDK would fail later.
-function resolveAndroidSdk(options) {
+export function resolveAndroidSdk(options) {
   const executableName = options.targetPlatform === "win32" ? "adb.exe" : "adb";
   const pathApi = pathApiFor(options.targetPlatform);
   const candidates = androidSdkCandidates(options);
@@ -331,6 +333,27 @@ async function run() {
     if (checkOnly) {
       printCheckResult(configuration);
       return;
+    }
+
+    // Ensure an Android device or emulator is running and booted before launching Expo.
+    // This eliminates the race condition where Expo queries ADB before an emulator finishes booting.
+    const hasDeviceArg = forwardedArguments.some(
+      (arg) => arg === "-d" || arg.startsWith("--device"),
+    );
+    if (!hasDeviceArg) {
+      const adbExecutable =
+        configuration.targetPlatform === "win32" ? "adb.exe" : "adb";
+      const adbPath = resolve(
+        configuration.androidSdk,
+        "platform-tools",
+        adbExecutable,
+      );
+      const devices = getConnectedDevices(adbPath);
+      const activeDevice = devices.find((d) => d.state === "device");
+      if (!activeDevice) {
+        console.log("[MoneyMap] No booted Android device detected. Launching emulator...");
+        await startEmulator();
+      }
     }
 
     const expoArguments = [

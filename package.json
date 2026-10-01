@@ -14,6 +14,9 @@
     "test:android-launcher": "node --test scripts/run-android.test.mjs",
     "test:coverage": "jest --runInBand --coverage",
     "build:readme-page": "node ./scripts/build-readme-page.mjs",
+    "emulator": "node scripts/emulator.mjs status",
+    "emulator:start": "node scripts/emulator.mjs start",
+    "emulator:stop": "node scripts/emulator.mjs stop",
     "ios": "expo run:ios"
   },
   "op-sqlite": {

@@ -2,26 +2,14 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "MoneyMap: Run on Android emulator",
-      "type": "process",
-      "command": "powershell.exe",
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\android-emulator.ps1",
-        "-Action",
-        "Run"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
+      "label": "MoneyMap: Run on Android",
+      "type": "npm",
+      "script": "android",
       "group": {
         "kind": "build",
         "isDefault": true
       },
+      "problemMatcher": [],
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
@@ -30,21 +18,9 @@
       }
     },
     {
-      "label": "MoneyMap: Quick launch installed build",
-      "type": "process",
-      "command": "powershell.exe",
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\android-emulator.ps1",
-        "-Action",
-        "Launch"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
+      "label": "MoneyMap: Android preflight check",
+      "type": "npm",
+      "script": "android:check",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -55,44 +31,8 @@
     },
     {
       "label": "MoneyMap: Start Android emulator",
-      "type": "process",
-      "command": "powershell.exe",
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\android-emulator.ps1",
-        "-Action",
-        "Start"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": false,
-        "clear": true
-      }
-    },
-    {
-      "label": "MoneyMap: Android environment status",
-      "type": "process",
-      "command": "powershell.exe",
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\android-emulator.ps1",
-        "-Action",
-        "Status"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
+      "type": "npm",
+      "script": "emulator:start",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -103,19 +43,47 @@
     },
     {
       "label": "MoneyMap: Stop Android emulator",
-      "type": "process",
-      "command": "powershell.exe",
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\android-emulator.ps1",
-        "-Action",
-        "Stop"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
+      "type": "npm",
+      "script": "emulator:stop",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": true
+      }
+    },
+    {
+      "label": "MoneyMap: Android environment status",
+      "type": "npm",
+      "script": "emulator",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": true
+      }
+    },
+    {
+      "label": "MoneyMap: Start Metro",
+      "type": "npm",
+      "script": "start",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": true
+      }
+    },
+    {
+      "label": "MoneyMap: Run Tests",
+      "type": "npm",
+      "script": "test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
       },
       "problemMatcher": [],
       "presentation": {
