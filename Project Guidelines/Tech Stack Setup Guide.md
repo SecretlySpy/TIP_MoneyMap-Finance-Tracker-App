@@ -90,13 +90,36 @@ sequenceDiagram
 4. Copy `.env.example` to `.env`. Optional `GEMINI_API_KEY` enables online Smart Tips after in-app consent; offline tips work without it.
 5. Run `npm ci` (preferred with lockfile) or `npm install`.
 6. Run `npm run asset:splash` only after changing the source Home SVG or launch color; identical input produces an identical PNG hash.
-7. Run `npm test` (26 suites / 154 tests expected at the 2026-09-27 reconciliation).
+7. Run `npm test` (37 suites / 232 tests verified on 2026-10-01).
 8. Run `npx expo-doctor` and optionally `npx expo export --platform android --clear`.
 9. Start an emulator or connect an Android device with USB debugging, then run `npm run android` (first run performs a native dev-client build).
 
 This project requires an Expo development build. Expo Go cannot load OP-SQLite or SQLCipher.
 
 There is no `npm run typecheck` script: application sources are JavaScript/JSX under Metro.
+
+## Android Studio shared run configurations
+
+The project stores three cross-platform, Node-backed Shell Script configurations under `.idea/runConfigurations/`. Android Studio bundles the Shell Scripts plugin, so these actions do not depend on the optional JavaScript/npm plugin.
+
+| Run configuration | Node entry point | Purpose |
+|---|---|---|
+| `MoneyMap: Run on Android` | `scripts/run-android.mjs` | Resolve the local SDK/JDK, then run Expo's native Android workflow. |
+| `MoneyMap: Start Metro` | `node_modules/expo/bin/cli start --dev-client` | Start the Expo development-client bundler. |
+| `MoneyMap: Run Tests` | `node_modules/jest/bin/jest.js --runInBand` | Run the Jest suite in-band. |
+
+Each configuration sets `node` as the interpreter and uses only project-relative script paths. They do not invoke `/bin/bash`, initialize NVM, source a user-specific environment file, or require the optional Node.js plugin. This removes the previous `/home/kakashi70-0/.moneymap-env.sh` failure and keeps the checked-in definitions portable across Windows, macOS, and Linux.
+
+One-time IDE setup:
+
+1. Install Node 22 LTS and run `node --version` in Android Studio's built-in terminal. The command must be available to the IDE process.
+2. If NVM supplies Node on macOS/Linux, run `nvm use 22` and start Android Studio from that terminal, or expose a stable Node 22 executable to GUI applications. No personal environment file is required.
+3. Confirm Android Studio's bundled **Shell Scripts** plugin is enabled under **Settings → Plugins → Installed**.
+4. Run `npm ci` from the project root.
+5. Run `npm run android:check`. The preflight must identify the Android SDK, a JDK from 17 through 21, and the project-local Expo CLI.
+6. Start a device or AVD. Select **MoneyMap: Run on Android** in the Run widget and press Run.
+
+The launcher in `scripts/run-android.mjs` checks explicit environment variables first, then `android/local.properties`, then conventional OS paths. It exports the resolved values only to the Expo child process; it does not edit shell profiles or machine-wide configuration. Set `MONEYMAP_JAVA_HOME` when JDK 21 is installed in a nonstandard directory.
 
 **Polished walkthrough with OS tabs, SVG previews, and troubleshooting:** [https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/](https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/)
 
@@ -209,6 +232,9 @@ For a native debug APK, run `npx expo prebuild --platform android --clean`, ente
 | Symptom | Likely cause | Resolution |
 |---|---|---|
 | `SDK location not found` | Android SDK environment is missing | Set `ANDROID_HOME` and/or create `android/local.properties` after prebuild. |
+| `source: no such file or directory: /home/.../.moneymap-env.sh` | An old personal run configuration is still cached in Android Studio | Reload the project configuration, select the checked-in Node-backed **MoneyMap: Run on Android** configuration, and delete any duplicate that still contains the old command. |
+| Android Studio reports that `node` cannot be found | The GUI process did not inherit the NVM-managed Node path | Select Node 22 before starting Android Studio from a terminal, or install/expose a stable Node 22 executable to GUI applications; confirm it in the IDE terminal. |
+| `A compatible JDK was not found` from `android:check` | No JDK 17–21 exists in the configured or conventional locations | Install JDK 21 or set `MONEYMAP_JAVA_HOME` to its home directory, then rerun the preflight. |
 | `Unsupported class file major version 69` | Gradle was started with Java 25 | Point `JAVA_HOME` to JDK 21, stop the incompatible Gradle daemon, and rebuild. |
 | Ninja reports a filename longer than 260 characters | Generated React Native C++ target and object paths exceed Windows `MAX_PATH` | Run a clean prebuild so `withAndroidCmakeObjectPathLimit` injects the Java-temp staging directory and `CMAKE_OBJECT_PATH_MAX=250`, then rebuild. |
 | Emulator remains `offline` and exits after WHPX initialization | Emulator binary is incompatible with the Windows/CPU combination | Run the VS Code task, which prefers the verified Google Emulator 35.6.11 compatibility build; use **MoneyMap: Android environment status** to confirm the selected binary. |

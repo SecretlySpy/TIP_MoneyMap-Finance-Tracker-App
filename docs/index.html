@@ -126,9 +126,22 @@ device behavior still requires the Android verification path below.
 <li>Install <strong>Node.js 22 LTS</strong>, <strong>JDK 21</strong>, Android SDK (API 35 recommended).</li>
 <li><code>npm ci</code></li>
 <li>Copy <code>.env.example</code> → <code>.env</code> (optional <code>GEMINI_API_KEY</code> for online tips).</li>
-<li><code>npm test</code> (26 suites, 154 tests at the 2026-09-27 reconciliation)</li>
+<li><code>npm test</code> (37 suites, 232 tests verified on 2026-10-01)</li>
 <li>Start an emulator/device, then <code>npm run android</code> (dev client required — <strong>Expo Go unsupported</strong> because of SQLCipher).</li>
 </ol>
+<h3>Android Studio run button</h3>
+<p>
+The shared <strong>MoneyMap: Run on Android</strong> configuration uses Android Studio&#39;s bundled Shell Script runner with <code>node</code> as the interpreter. It executes the project-owned <code>scripts/run-android.mjs</code> launcher directly, without Bash, <code>~/.moneymap-env.sh</code>, an optional npm plugin, or a developer-specific home path.
+</p>
+<ol>
+<li>Install Node 22 LTS and confirm <code>node --version</code> works in Android Studio&#39;s built-in terminal. If Node is managed by NVM on macOS/Linux, start Android Studio from a terminal after <code>nvm use 22</code>, or otherwise expose a stable <code>node</code> executable to GUI applications.</li>
+<li>Open <strong>Run → Edit Configurations</strong>, select <strong>MoneyMap: Run on Android</strong>, and verify that its interpreter is <code>node</code> and its script is <code>scripts/run-android.mjs</code>.</li>
+<li>Run <code>npm run android:check</code> once. It reports the selected Android SDK, compatible JDK, and local Expo CLI without starting an emulator or build.</li>
+<li>Start an Android device or AVD, select <strong>MoneyMap: Run on Android</strong>, and press the green Run button.</li>
+</ol>
+<p>
+The launcher discovers standard SDK/JDK locations on Windows, macOS, and Linux. Explicit <code>ANDROID_SDK_ROOT</code>, <code>ANDROID_HOME</code>, <code>MONEYMAP_JAVA_HOME</code>, and compatible <code>JAVA_HOME</code> values take priority.
+</p>
 <p>
 Full walkthrough (Windows / macOS / Linux): <strong><a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/index.html">index.html</a></strong> or the <a href="https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/">live Pages site</a>. Also see <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/Project%20Guidelines/Tech%20Stack%20Setup%20Guide.md">Tech Stack Setup Guide.md</a> and <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/docs/local-environment-audit-linux.md">docs/local-environment-audit-linux.md</a>.
 </p>

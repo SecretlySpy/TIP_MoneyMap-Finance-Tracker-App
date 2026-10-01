@@ -1,3 +1,5 @@
+// Import the navigation factories, routed screens, shared UI, state, and theme
+// dependencies used to assemble the application's complete navigation tree.
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -25,12 +27,17 @@ import { SplashScreen } from "../screens/SplashScreen";
 import { StudentEatsScreen } from "../screens/StudentEatsScreen";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
+
+// Give each feature area its own stack so screens can push details or editors
+// without resetting the other bottom tabs' navigation history.
 const RootStack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
 const HistoryStack = createNativeStackNavigator();
 const BudgetsStack = createNativeStackNavigator();
 const SettingsStack = createNativeStackNavigator();
+
+// Own the dashboard flow and every route launched from its primary actions.
 function HomeNavigator() {
     return (<HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="Dashboard" component={DashboardScreen}/>
@@ -41,6 +48,8 @@ function HomeNavigator() {
       <HomeStack.Screen name="EditTransaction" component={EditTransactionScreen}/>
     </HomeStack.Navigator>);
 }
+
+// Keep transaction review, detail, and edit screens in one history workflow.
 function HistoryNavigator() {
     return (<HistoryStack.Navigator screenOptions={{ headerShown: false }}>
       <HistoryStack.Screen name="HistoryList" component={HistoryScreen}/>
@@ -48,6 +57,8 @@ function HistoryNavigator() {
       <HistoryStack.Screen name="EditTransaction" component={EditTransactionScreen}/>
     </HistoryStack.Navigator>);
 }
+
+// Keep budget overview and recurring-payment routes in the budget workflow.
 function BudgetsNavigator() {
     return (<BudgetsStack.Navigator screenOptions={{ headerShown: false }}>
       <BudgetsStack.Screen name="BudgetsOverview" component={BudgetsScreen}/>
@@ -56,6 +67,8 @@ function BudgetsNavigator() {
       <BudgetsStack.Screen name="EditTransaction" component={EditTransactionScreen}/>
     </BudgetsStack.Navigator>);
 }
+
+// Group preference, data-management, goal, and splash-preview screens together.
 function SettingsNavigator() {
     return (<SettingsStack.Navigator screenOptions={{ headerShown: false }}>
       <SettingsStack.Screen name="SettingsOverview" component={SettingsScreen}/>
@@ -69,16 +82,23 @@ function SettingsNavigator() {
       <SettingsStack.Screen name="Splash" component={SplashScreen}/>
     </SettingsStack.Navigator>);
 }
+
+// Map route names to the shared icon component's stable semantic icon keys.
 const tabIcons = {
     Home: "home",
     History: "history",
     Budgets: "budgets",
     Settings: "settings",
 };
+
+// Build the persistent four-tab shell and derive its appearance from the active
+// theme plus the device's bottom safe-area inset.
 function MainTabs() {
     const theme = useTheme(useUiStore((state) => state.themePreference));
     const insets = useSafeAreaInsets();
     return (<Tabs.Navigator screenOptions={({ route }) => {
+            // Inspect the focused child route so the full-screen entry form can
+            // temporarily hide the tab bar without changing global navigation.
             const nestedRoute = getFocusedRouteNameFromRoute(route) ?? "Dashboard";
             const hideForEntry = route.name === "Home" && nestedRoute === "Entry";
             return {
@@ -105,6 +125,7 @@ function MainTabs() {
                     },
             };
         }}>
+      {/* Register each feature stack as one persistent bottom-tab destination. */}
       <Tabs.Screen name="Home" component={HomeNavigator}/>
       <Tabs.Screen name="History" component={HistoryNavigator}/>
       <Tabs.Screen name="Budgets" component={BudgetsNavigator}/>
@@ -113,15 +134,20 @@ function MainTabs() {
 }
 // App Lock sits above navigation when enabled; unlocked sessions reach the tab shell.
 export function RootNavigator() {
+    // Subscribe only to the UI state required to select the initial root route.
     const isLocked = useUiStore((state) => state.isLocked);
     const hasSeenSplash = useUiStore((state) => state.hasSeenSplash);
     const preferencesReady = useUiStore((state) => state.preferencesReady);
     const ensurePreferencesLoaded = useUiStore((state) => state.ensurePreferencesLoaded);
     const themePreference = useUiStore((state) => state.themePreference);
     const theme = useTheme(themePreference);
+
+    // Restore persisted preferences once when the store action becomes available.
     useEffect(() => {
         void ensurePreferencesLoaded();
     }, [ensurePreferencesLoaded]);
+
+    // Keep navigation hidden until persisted lock, splash, and theme state is ready.
     if (!preferencesReady) {
         return (
           <View
@@ -142,6 +168,9 @@ export function RootNavigator() {
           </View>
         );
     }
+
+    // First-time users see Splash before Main; AppLock remains registered so the
+    // application can enable or enter its security flow without rebuilding the root.
     if (!hasSeenSplash) {
         return (
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
@@ -151,6 +180,9 @@ export function RootNavigator() {
           </RootStack.Navigator>
         );
     }
+
+    // Put the active initial screen first while keeping both Main and AppLock
+    // registered for later navigation during the same application session.
     return (<RootStack.Navigator screenOptions={{ headerShown: false }}>
       {isLocked ? (
         <>

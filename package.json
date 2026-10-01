@@ -5,11 +5,13 @@
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start --dev-client",
-    "android": "expo run:android",
+    "android": "node scripts/run-android.mjs",
+    "android:check": "node scripts/run-android.mjs --check",
     "asset:splash": "node scripts/render-splash-icon.mjs",
     "prebuild": "expo prebuild",
     "test": "jest --runInBand",
     "test:stress": "node scripts/qa-stress.cjs",
+    "test:android-launcher": "node --test scripts/run-android.test.mjs",
     "test:coverage": "jest --runInBand --coverage",
     "build:readme-page": "node ./scripts/build-readme-page.mjs",
     "ios": "expo run:ios"

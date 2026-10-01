@@ -49,8 +49,19 @@ device behavior still requires the Android verification path below.
 1. Install **Node.js 22 LTS**, **JDK 21**, Android SDK (API 35 recommended).
 2. `npm ci`
 3. Copy `.env.example` → `.env` (optional `GEMINI_API_KEY` for online tips).
-4. `npm test` (26 suites, 154 tests at the 2026-09-27 reconciliation)
+4. `npm test` (37 suites, 232 tests verified on 2026-10-01)
 5. Start an emulator/device, then `npm run android` (dev client required — **Expo Go unsupported** because of SQLCipher).
+
+### Android Studio run button
+
+The shared **MoneyMap: Run on Android** configuration uses Android Studio's bundled Shell Script runner with `node` as the interpreter. It executes the project-owned `scripts/run-android.mjs` launcher directly, without Bash, `~/.moneymap-env.sh`, an optional npm plugin, or a developer-specific home path.
+
+1. Install Node 22 LTS and confirm `node --version` works in Android Studio's built-in terminal. If Node is managed by NVM on macOS/Linux, start Android Studio from a terminal after `nvm use 22`, or otherwise expose a stable `node` executable to GUI applications.
+2. Open **Run → Edit Configurations**, select **MoneyMap: Run on Android**, and verify that its interpreter is `node` and its script is `scripts/run-android.mjs`.
+3. Run `npm run android:check` once. It reports the selected Android SDK, compatible JDK, and local Expo CLI without starting an emulator or build.
+4. Start an Android device or AVD, select **MoneyMap: Run on Android**, and press the green Run button.
+
+The launcher discovers standard SDK/JDK locations on Windows, macOS, and Linux. Explicit `ANDROID_SDK_ROOT`, `ANDROID_HOME`, `MONEYMAP_JAVA_HOME`, and compatible `JAVA_HOME` values take priority.
 
 Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or the [live Pages site](https://secretlyspy.github.io/TIP_MoneyMap-Finance-Tracker-App/). Also see [Tech Stack Setup Guide.md](./Project%20Guidelines/Tech%20Stack%20Setup%20Guide.md) and [docs/local-environment-audit-linux.md](./docs/local-environment-audit-linux.md).
 

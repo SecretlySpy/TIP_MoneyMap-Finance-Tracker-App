@@ -1,5 +1,9 @@
 # Decisions and Handover
 
+## Android Studio run-configuration handover (2026-10-01)
+
+The three checked-in Android Studio actions now use the bundled Shell Script runner with `node` as their interpreter instead of a Bash command that sourced `/home/kakashi70-0/.moneymap-env.sh`. The Android action executes the commented `scripts/run-android.mjs` launcher, which discovers supported Android SDK and JDK locations for Windows, macOS, and Linux without changing the user's shell profile. This does not require Android Studio's optional JavaScript/npm plugin. The safe `npm run android:check` preflight and 3 platform-resolution tests pass on the current Windows checkout. A real Gradle/device launch and physical macOS/Linux IDE execution remain **UNVERIFIED**; run them under the documented Node 22/JDK 21 baseline before native acceptance.
+
 ## QA handover (2026-09-28)
 
 Current source is based on `21d0efb`, with uncommitted QA fixes and evidence. **199 tests / 32 suites pass**, Expo Doctor is **18/18**, Android JS export passes, and **1,829 synthetic stress operations have zero errors**. Confirmed corrections cover transaction composition, concurrent goal/recurring writes, partial recurring failure, corrupt/unsafe restore, places fallback deadline, Smart Tips payload validation, aggregation cost, and five compatible SDK patch versions. The schema and existing IDs remain unchanged.

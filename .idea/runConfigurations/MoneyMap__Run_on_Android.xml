@@ -1,16 +1,21 @@
 <component name="ProjectRunConfigurationManager">
+  <!-- Use Android Studio's bundled Shell Script runner without requiring Bash or the optional Node.js plugin. -->
   <configuration default="false" name="MoneyMap: Run on Android" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="export NVM_DIR=&quot;$HOME/.nvm&quot; &amp;&amp; [ -s &quot;$NVM_DIR/nvm.sh&quot; ] &amp;&amp; \. &quot;$NVM_DIR/nvm.sh&quot; &amp;&amp; source /home/kakashi70-0/.moneymap-env.sh &amp;&amp; npm run android" />
+    <!-- Execute the project-owned Node launcher as a file instead of embedding a machine-specific shell command. -->
+    <option name="SCRIPT_TEXT" value="" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
-    <option name="SCRIPT_PATH" value="" />
+    <option name="SCRIPT_PATH" value="$PROJECT_DIR$/scripts/run-android.mjs" />
     <option name="SCRIPT_OPTIONS" value="" />
+    <!-- Keep relative Expo and node_modules lookups anchored to the repository root. -->
     <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
     <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <!-- Resolve the portable node executable from Android Studio's environment on every desktop OS. -->
     <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
-    <option name="INTERPRETER_PATH" value="/bin/bash" />
+    <option name="INTERPRETER_PATH" value="node" />
     <option name="INTERPRETER_OPTIONS" value="" />
+    <!-- Show the long-running Expo/Gradle output in Android Studio's Terminal tool window. -->
     <option name="EXECUTE_IN_TERMINAL" value="true" />
-    <option name="EXECUTE_SCRIPT_FILE" value="false" />
+    <option name="EXECUTE_SCRIPT_FILE" value="true" />
     <envs />
     <method v="2" />
   </configuration>

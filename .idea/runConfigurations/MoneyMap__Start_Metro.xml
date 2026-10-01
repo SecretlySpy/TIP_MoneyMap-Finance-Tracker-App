@@ -1,16 +1,21 @@
 <component name="ProjectRunConfigurationManager">
+  <!-- Start Metro through the bundled Shell Script runner without Bash or personal dotfiles. -->
   <configuration default="false" name="MoneyMap: Start Metro" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="export NVM_DIR=&quot;$HOME/.nvm&quot; &amp;&amp; [ -s &quot;$NVM_DIR/nvm.sh&quot; ] &amp;&amp; \. &quot;$NVM_DIR/nvm.sh&quot; &amp;&amp; source /home/kakashi70-0/.moneymap-env.sh &amp;&amp; npm start" />
+    <!-- Run Expo's project-local JavaScript CLI with the same arguments as the package start script. -->
+    <option name="SCRIPT_TEXT" value="" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
-    <option name="SCRIPT_PATH" value="" />
-    <option name="SCRIPT_OPTIONS" value="" />
+    <option name="SCRIPT_PATH" value="$PROJECT_DIR$/node_modules/expo/bin/cli" />
+    <option name="SCRIPT_OPTIONS" value="start --dev-client" />
+    <!-- Anchor Expo's configuration and dependency discovery to the checkout root. -->
     <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
     <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <!-- Use the cross-platform node executable exposed to the Android Studio process. -->
     <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
-    <option name="INTERPRETER_PATH" value="/bin/bash" />
+    <option name="INTERPRETER_PATH" value="node" />
     <option name="INTERPRETER_OPTIONS" value="" />
+    <!-- Keep Metro interactive and visible in Android Studio's Terminal tool window. -->
     <option name="EXECUTE_IN_TERMINAL" value="true" />
-    <option name="EXECUTE_SCRIPT_FILE" value="false" />
+    <option name="EXECUTE_SCRIPT_FILE" value="true" />
     <envs />
     <method v="2" />
   </configuration>

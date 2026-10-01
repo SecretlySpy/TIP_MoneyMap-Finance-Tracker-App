@@ -91,3 +91,16 @@ Scope: root config/entry/docs, `AI Skills/`, `Project Guidelines/`, `docs/` and 
 | `git diff --check` | Flagged trailing whitespace in already-modified `AGENTS.md`, `AIO.md`, and `Project-Operating-Directives.md` revision lines; none in cleanup edits | FAIL for whole worktree (pre-existing), PASS for cleanup-specific whitespace by diff inspection |
 
 Potential deletion: `src/screens/fixtures.js` is an empty deprecated export and has no active imports in scoped text search, but file removal failed in the patch tool, so it remains. Generated `coverage/`, `dist/`, `.expo/`, `android/`, and `node_modules/` are ignored and were not deleted; `.kilo/worktrees/` is managed session state, not a disposable repository duplicate. The root `.nojekyll` and `docs/.nojekyll` have different possible GitHub Pages publication roots, and the screenshot ZIP is linked from the setup guide. No further relocation is justified without a concrete reference/ownership check.
+
+## Android Studio launcher verification (2026-10-01)
+
+| Check | Executed observation | Status / limit |
+|---|---|---|
+| `node --check scripts/run-android.mjs` | Cross-platform launcher parsed without syntax errors | PASS |
+| `npm run test:android-launcher` | 3/3 tests passed for Gradle path decoding plus Windows, macOS, and Linux SDK/JDK candidate generation | PASS for path-resolution logic; not three physical hosts |
+| `npm run android:check` | Located the Windows Android SDK, JDK 21 MoneyMap toolchain, and project-local Expo CLI; warned that the active Node runtime is 24 instead of the documented Node 22 baseline | PASS for non-destructive Windows preflight |
+| `.idea/runConfigurations/*.xml` parse and command audit | All three shared configurations use the bundled `ShConfigurationType`, `node` interpreter, and project-relative scripts; no `/bin/bash`, NVM initialization, username, or `.moneymap-env.sh` reference remains | PASS for structure and current-workstation inspection; physical macOS/Linux IDE launch remains unverified |
+| `npm test -- --watch=false` | 37/37 suites and 232/232 tests passed after the run-configuration and comment changes | PASS for automated JavaScript regression coverage |
+| `npm run build:readme-page` | Regenerated `docs/index.html` from the updated Android Studio setup instructions | PASS |
+
+The native Gradle build and device launch remain **UNVERIFIED** in this launcher preflight. Run the shared Android configuration with Node 22, a started device/AVD, and the target host's Android Studio installation before treating native execution as accepted.
