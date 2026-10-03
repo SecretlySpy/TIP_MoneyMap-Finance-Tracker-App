@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
+import { BrandMark } from "../components/BrandMark";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { canUseBiometrics, isValidPin } from "../services/appLock";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
-/**
- * Human-readable cooldown, e.g. "30 seconds" / "5 minutes".
- * @param {number} seconds
- */
+
 function formatCooldown(seconds) {
     if (seconds >= 3600) {
         const hours = Math.ceil(seconds / 3600);
@@ -26,7 +24,6 @@ const lockKeypad = [
     ["7", "8", "9"],
     ["👆", "0", "⌫"],
 ];
-// PIN setup/unlock with optional biometric affordance when hardware is enrolled.
 export function AppLockScreen({ navigation }) {
     const theme = useTheme(useUiStore((state) => state.themePreference));
     const hasPin = useUiStore((state) => state.hasPin);
@@ -89,8 +86,6 @@ export function AppLockScreen({ navigation }) {
     const title = mode === "create" ? "Optional app lock — create a 4-digit PIN" : mode === "confirm" ? "Confirm your PIN" : "Enter your PIN to unlock";
     const canLeaveWithoutUnlock = !isLocked || !appLockEnabled || !hasPin;
     const finishUnlock = () => {
-        // Root-level lock swaps navigators when isLocked becomes false.
-        // Setup/preview navigated from Settings still needs an explicit pop.
         if (navigation.canGoBack()) {
             navigation.goBack();
         }
@@ -122,7 +117,6 @@ export function AppLockScreen({ navigation }) {
             setBusySafe(false);
         }
     }, [navigation, unlockWithBiometrics]);
-    // Cold-start / re-lock: offer biometrics once when unlock is required and hardware is ready.
     useEffect(() => {
         if (mode !== "unlock" || !hasPin || !isLocked || !biometricsAvailable || autoBiometricAttempted.current) {
             return;
@@ -211,16 +205,7 @@ export function AppLockScreen({ navigation }) {
             paddingHorizontal: theme.spacing.xxl,
             paddingTop: theme.sizes.lockTopInset,
         }} safeBottom scroll={false} testID="app-lock-screen">
-      <View style={{
-            alignItems: "center",
-            backgroundColor: theme.colors.tint,
-            borderRadius: theme.radii.round,
-            height: theme.sizes.lockCircle,
-            justifyContent: "center",
-            width: theme.sizes.lockCircle,
-        }}>
-        <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.heroAmount }}>🔒</Text>
-      </View>
+      <BrandMark loading={busy} size={96} />
 
       <View style={{ alignItems: "center", gap: theme.spacing.xxs, marginTop: theme.spacing.xxl }}>
         <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.lockTitle }}>
