@@ -12,6 +12,7 @@ import {
   computeDashboardTotals,
   recentUiTransactions,
   spendingByCategory,
+  transactionInMonth,
 } from "../domain/services/financeView";
 import { formatMinor } from "../domain/services/money";
 import { computeSafeToSpend } from "../domain/services/safeToSpend";
@@ -42,13 +43,13 @@ export function DashboardScreen({ navigation }) {
     [accounts, transactions, selectedMonthYear],
   );
   const spending = useMemo(
-    () => spendingByCategory(transactions, categoriesById, selectedMonthYear),
-    [transactions, categoriesById, selectedMonthYear],
+    () => spendingByCategory(transactions, categoriesById, selectedMonthYear, accounts),
+    [transactions, categoriesById, selectedMonthYear, accounts],
   );
-  const recent = useMemo(
-    () => recentUiTransactions(transactions, categoriesById, accountsById, 5),
-    [transactions, categoriesById, accountsById],
-  );
+  const recent = useMemo(() => {
+    const scoped = transactions.filter((t) => transactionInMonth(t, selectedMonthYear));
+    return recentUiTransactions(scoped, categoriesById, accountsById, 5);
+  }, [transactions, categoriesById, accountsById, selectedMonthYear]);
   const dueReminders = useMemo(
     () => (remindersEnabled ? computeDueReminders(recurringRules, categoriesById) : []),
     [remindersEnabled, recurringRules, categoriesById],

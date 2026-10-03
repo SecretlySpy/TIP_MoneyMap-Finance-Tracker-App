@@ -21,7 +21,7 @@ describe("MonthChip calendar period selection", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Selected month Jan 2026" }));
     await fireEvent.press(screen.getByRole("button", { name: "Next month" }));
     await fireEvent.press(screen.getByRole("button", { name: "February 14, 2026" }));
-    await fireEvent.press(screen.getByRole("button", { name: "Use Feb 14, 2026" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Choose Feb 14, 2026" }));
     expect(useFinanceStore.getState().selectedMonthYear).toBe("2026-02");
 
     await fireEvent.press(screen.getByRole("button", { name: "Selected month Feb 2026" }));
@@ -29,7 +29,7 @@ describe("MonthChip calendar period selection", () => {
     await fireEvent.changeText(screen.getByLabelText("Calendar year"), "2027");
     await fireEvent.press(screen.getByRole("button", { name: "Dec" }));
     await fireEvent.press(screen.getByRole("button", { name: "December 3, 2027" }));
-    await fireEvent.press(screen.getByRole("button", { name: "Use Dec 3, 2027" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Choose Dec 3, 2027" }));
     expect(useFinanceStore.getState().selectedMonthYear).toBe("2027-12");
   });
 

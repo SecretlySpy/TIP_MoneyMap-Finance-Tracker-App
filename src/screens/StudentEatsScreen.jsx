@@ -17,7 +17,10 @@ import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 
-const PRICE_LABEL = { 1: "₱", 2: "₱₱", 3: "₱₱₱", 4: "₱₱₱₱" };
+function getPriceLabel(priceLevel, currencySymbol = "₱") {
+  const count = Math.min(Math.max(priceLevel ?? 2, 1), 4);
+  return (currencySymbol || "₱").repeat(count);
+}
 
 /**
  * Mini map: relative plot of places around origin (no native maps dependency).
@@ -306,7 +309,7 @@ export function StudentEatsScreen({ navigation }) {
                   <Text numberOfLines={1} style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
                     {formatDistance(place.distanceM)}
                     {" · "}
-                    {PRICE_LABEL[place.priceLevel] ?? "₱₱"}
+                    {getPriceLabel(place.priceLevel, currencySymbol)}
                     {" · ★ "}
                     {place.rating}
                     {place.cuisine ? ` · ${place.cuisine}` : ""}

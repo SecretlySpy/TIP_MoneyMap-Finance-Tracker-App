@@ -7,6 +7,7 @@ import { clearOnboardingDraft, createOnboardingDraft, loadOnboardingDraftResult,
 import { DEFAULT_PREFERENCES, loadPreferencesResult, savePreferences, } from "../services/preferences";
 let preferencesPromise = null;
 let onboardingWriteQueue = Promise.resolve();
+let preferenceWriteQueue = Promise.resolve();
 let appStateSubscriptionAttached = false;
 const SPLASH_SEEN_KEY = "moneymap.splash.seen.v1";
 /** Optional finance snapshot supplier registered by financeStore to avoid a circular import. */
@@ -24,8 +25,28 @@ function preferencesFromState(state) {
         themePreference: state.themePreference,
     };
 }
+function queuePreferenceWrite(operation) {
+    const pending = preferenceWriteQueue.catch(() => undefined).then(operation);
+    preferenceWriteQueue = pending;
+    return pending;
+}
 async function persist(state) {
-    await savePreferences(preferencesFromState(state));
+    await queuePreferenceWrite(() => savePreferences(preferencesFromState(state)));
+}
+async function updatePreferenceWithRollback(set, get, patch, sideEffect) {
+    const previous = preferencesFromState(get());
+    set(patch);
+    try {
+        await queuePreferenceWrite(async () => {
+            await savePreferences(preferencesFromState(get()));
+            if (sideEffect) {
+                await sideEffect();
+            }
+        });
+    } catch (error) {
+        set(previous);
+        throw error;
+    }
 }
 export function shouldFailClosedPreferenceLoad(preferenceStatus, pinExists) {
     return pinExists && preferenceStatus !== "loaded";
@@ -233,52 +254,48 @@ export const useUiStore = create((set, get) => ({
     setAppLockEnabled: async (enabled) => {
         if (enabled) {
             const pinExists = await hasStoredPin();
-            set({ appLockEnabled: true, hasPin: pinExists, isLocked: pinExists });
+            await updatePreferenceWithRollback(set, get, { appLockEnabled: true, hasPin: pinExists, isLocked: pinExists });
         }
         else {
-            set({ appLockEnabled: false, isLocked: false });
+            await updatePreferenceWithRollback(set, get, { appLockEnabled: false, isLocked: false });
         }
-        await persist(get());
     },
     setRemindersEnabled: async (enabled) => {
-        set({ remindersEnabled: enabled, notificationHint: null });
-        await persist(get());
-        // Prompt only when the user turns reminders on — never on cold start.
-        await syncRemindersFromStores({ requestPermissionIfNeeded: enabled });
+        await updatePreferenceWithRollback(
+            set,
+            get,
+            { remindersEnabled: enabled, notificationHint: null },
+            () => syncRemindersFromStores({ requestPermissionIfNeeded: enabled }),
+        );
     },
     setCurrencySymbol: async (symbol) => {
         const next = symbol.trim().slice(0, 4) || "₱";
-        set({ currencySymbol: next });
-        await persist(get());
-        if (get().remindersEnabled) {
-            void syncRemindersFromStores({ requestPermissionIfNeeded: false });
-        }
+        await updatePreferenceWithRollback(
+            set,
+            get,
+            { currencySymbol: next },
+            () => {
+                if (get().remindersEnabled) {
+                    void syncRemindersFromStores({ requestPermissionIfNeeded: false });
+                }
+            },
+        );
     },
     setSmartTipsEnabled: async (enabled) => {
-        if (!enabled) {
-            set({ smartTipsEnabled: false });
-            await persist(get());
-            return;
-        }
-        set({ smartTipsEnabled: true });
-        await persist(get());
+        await updatePreferenceWithRollback(set, get, { smartTipsEnabled: enabled });
     },
     acceptSmartTipsConsent: async () => {
-        set({ smartTipsConsentAccepted: true, smartTipsEnabled: true });
-        await persist(get());
+        await updatePreferenceWithRollback(set, get, { smartTipsConsentAccepted: true, smartTipsEnabled: true });
     },
     declineSmartTipsConsent: async () => {
-        set({ smartTipsConsentAccepted: false, smartTipsEnabled: false });
-        await persist(get());
+        await updatePreferenceWithRollback(set, get, { smartTipsConsentAccepted: false, smartTipsEnabled: false });
     },
     setThemePreference: async (theme) => {
-        set({ themePreference: theme });
-        await persist(get());
+        await updatePreferenceWithRollback(set, get, { themePreference: theme });
     },
     setupPin: async (pin) => {
         await setPin(pin);
-        set({ hasPin: true, appLockEnabled: true, isLocked: false });
-        await persist(get());
+        await updatePreferenceWithRollback(set, get, { hasPin: true, appLockEnabled: true, isLocked: false });
     },
     clearStoredPin: async () => {
         await clearPin();

@@ -122,10 +122,18 @@ export function recentUiTransactions(transactions, categoriesById, accountsById,
         .slice(0, limit)
         .map((transaction) => buildUiTransaction(transaction, categoriesById, accountsById));
 }
-export function spendingByCategory(transactions, categoriesById, monthYear) {
+export function spendingByCategory(transactions, categoriesById, monthYear, accounts = []) {
+    const activeAccountIds = accounts.length > 0
+        ? new Set(accounts.filter((a) => !a.isArchived).map((a) => a.id))
+        : null;
     const spent = new Map();
     for (const transaction of transactions) {
         if (transaction.type !== "EXPENSE" || !transactionInMonth(transaction, monthYear)) {
+            continue;
+        }
+        if (activeAccountIds && transaction.accountId !== undefined
+            && accounts.some((a) => a.id === transaction.accountId)
+            && !activeAccountIds.has(transaction.accountId)) {
             continue;
         }
         const name = categoriesById.get(transaction.categoryId)?.name ?? "Other";
@@ -173,11 +181,19 @@ export function budgetStateFor(percent) {
     }
     return "normal";
 }
-export function buildBudgetCards(budgets, transactions, categoriesById, monthYear) {
+export function buildBudgetCards(budgets, transactions, categoriesById, monthYear, accounts = []) {
+    const activeAccountIds = accounts.length > 0
+        ? new Set(accounts.filter((a) => !a.isArchived).map((a) => a.id))
+        : null;
     // Aggregate once: large ledgers should cost O(transactions + budgets), not O(T * B).
     const spendingByCategoryId = new Map();
     for (const transaction of transactions) {
         if (transaction.type === "EXPENSE" && transactionInMonth(transaction, monthYear)) {
+            if (activeAccountIds && transaction.accountId !== undefined
+                && accounts.some((a) => a.id === transaction.accountId)
+                && !activeAccountIds.has(transaction.accountId)) {
+                continue;
+            }
             spendingByCategoryId.set(transaction.categoryId,
                 (spendingByCategoryId.get(transaction.categoryId) ?? 0) + transaction.amountMinor);
         }
@@ -189,13 +205,15 @@ export function buildBudgetCards(budgets, transactions, categoriesById, monthYea
         const spentMinor = spendingByCategoryId.get(budget.categoryId) ?? 0;
         const percent = budget.limitMinor <= 0 ? 0 : Math.round((spentMinor / budget.limitMinor) * 100);
         const name = category?.name ?? "Budget";
+        const isOver = budget.limitMinor > 0 && spentMinor >= budget.limitMinor;
+        const state = isOver ? "over" : (percent >= 80 ? "warning" : "normal");
         return {
             emoji: resolveDisplayEmoji({ icon: category?.icon, name }),
             limitMinor: budget.limitMinor,
             name,
             percent,
             spentMinor,
-            state: budgetStateFor(percent),
+            state,
         };
     })
         .sort((left, right) => right.percent - left.percent);
@@ -212,7 +230,8 @@ function startOfLocalDay(epochMillis) {
 }
 function historyGroupLabel(dayStart, now = new Date()) {
     const todayStart = startOfLocalDay(now.getTime());
-    const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const yesterdayStart = startOfLocalDay(yesterday.getTime());
     const date = new Date(dayStart);
     const month = MONTH_LABELS[date.getMonth()];
     const day = date.getDate();
@@ -252,7 +271,7 @@ const FREQUENCY_LABEL = {
     MONTHLY: "Monthly",
 };
 // Paused rules are still listed so they can be resumed; active ones sort first.
-export function buildRecurringBills(rules, categoriesById) {
+export function buildRecurringBills(rules, categoriesById, accountsById) {
     return rules
         .slice()
         .sort((left, right) => {
@@ -263,11 +282,14 @@ export function buildRecurringBills(rules, categoriesById) {
     })
         .map((rule) => {
         const category = categoriesById.get(rule.categoryId);
+        const account = accountsById?.get?.(rule.accountId);
         const name = rule.note?.trim() || category?.name || "Bill";
         const dueDate = new Date(rule.nextRunEpochMillis);
         const frequencyLabel = FREQUENCY_LABEL[rule.frequency] ?? "Monthly";
         return {
             id: String(rule.id),
+            accountId: rule.accountId,
+            accountName: account?.name ?? null,
             amountMinor: rule.amountMinor,
             due: `${MONTH_LABELS[dueDate.getMonth()]} ${dueDate.getDate()}`,
             emoji: resolveDisplayEmoji({ icon: rule.icon, name }),

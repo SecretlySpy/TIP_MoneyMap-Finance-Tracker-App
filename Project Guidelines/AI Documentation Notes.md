@@ -1328,12 +1328,12 @@ This file retains the historical module notes relocated from the repository root
 
 # Module / File: scripts/render-splash-icon.mjs
 ## Function: module initialization
-- **Purpose**: Deterministically rasterize the exact Figma Home SVG geometry into Expo's source splash PNG.
+- **Purpose**: Deterministically rasterize the canonical MoneyMap Donut Mark SVG into Expo's source splash and launcher PNG.
 - **Inputs**:
-  - `assets/icons/home.svg` (`UTF-8 SVG`): Committed source geometry and neutral design stroke.
+  - `assets/icons/app-icon-donut.svg` (`UTF-8 SVG`): Canonical Donut Mark source geometry without background rect.
 - **Outputs**: `assets/splash-icon.png`, a transparent 384 by 384 PNG.
 - **Dependencies**: Node path/file APIs and development-only Sharp 0.35.3.
-- **Behavior**: Resolves repository paths from the module URL, reads the SVG, substitutes the MoneyMap primary color, rasterizes at high density, resizes with contain semantics, and writes PNG output.
+- **Behavior**: Resolves repository paths from the module URL, reads the SVG, strips the background rect to ensure transparency across light and dark splash surfaces, rasterizes at high density, resizes with contain semantics, and writes PNG output.
 - **Side Effects**: Replaces only the generated splash PNG when the npm asset script runs.
 - **DSA Used**: O(n + p) time for `n` SVG bytes and `p` output pixels; O(n + p) temporary memory in the rasterizer.
 - **Data Analysis Notes**: Repeated generation from identical input produces the same SHA-256 hash.

@@ -22,6 +22,7 @@ export function BudgetsScreen({ navigation }) {
   const budgets = useFinanceStore((state) => state.budgets);
   const categories = useFinanceStore((state) => state.categories);
   const transactions = useFinanceStore((state) => state.transactions);
+  const accounts = useFinanceStore((state) => state.accounts);
   const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
   const addBudget = useFinanceStore((state) => state.addBudget);
   const addCategory = useFinanceStore((state) => state.addCategory);
@@ -42,8 +43,8 @@ export function BudgetsScreen({ navigation }) {
     [categories],
   );
   const cards = useMemo(
-    () => buildBudgetCards(budgets, transactions, categoriesById, selectedMonthYear),
-    [budgets, transactions, categoriesById, selectedMonthYear],
+    () => buildBudgetCards(budgets, transactions, categoriesById, selectedMonthYear, accounts),
+    [budgets, transactions, categoriesById, selectedMonthYear, accounts],
   );
   const summary = useMemo(() => budgetSummary(cards), [cards]);
 
@@ -268,6 +269,7 @@ export function BudgetsScreen({ navigation }) {
         visible={sheetStep === "name"}
       >
         <TextInput
+          accessibilityLabel="Budget category"
           autoFocus
           onChangeText={setPendingCategoryName}
           placeholder="Sample supplies"
@@ -307,6 +309,7 @@ export function BudgetsScreen({ navigation }) {
         visible={sheetStep === "limit"}
       >
         <TextInput
+          accessibilityLabel="Monthly limit"
           autoFocus
           keyboardType="decimal-pad"
           onChangeText={setPendingLimitInput}

@@ -50,6 +50,15 @@ export class CategoryRepository {
         }
         if (patch.type !== undefined) {
             assertOneOf(patch.type, TRANSACTION_TYPES, "type");
+            const existing = await this.getById(id);
+            if (existing !== null && existing.type !== patch.type) {
+                const budgetRef = await this.database.execute("SELECT id FROM budgets WHERE category_id = ? LIMIT 1", [id]);
+                const txRef = await this.database.execute("SELECT id FROM transactions WHERE category_id = ? LIMIT 1", [id]);
+                const ruleRef = await this.database.execute("SELECT id FROM recurring_rules WHERE category_id = ? LIMIT 1", [id]);
+                if (budgetRef.rows.length > 0 || txRef.rows.length > 0 || ruleRef.rows.length > 0) {
+                    throw new Error("Cannot change category type when budgets, transactions, or recurring rules reference it.");
+                }
+            }
             assignments.push({ column: "type", value: patch.type });
         }
         if (patch.isCustom !== undefined) {

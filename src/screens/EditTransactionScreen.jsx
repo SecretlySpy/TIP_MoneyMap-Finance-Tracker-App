@@ -14,6 +14,51 @@ import { listAccountChips, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
 
+function MissingTransactionView({ navigation, theme }) {
+  return (
+    <ScreenContainer contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }} testID="edit-missing-transaction-screen">
+      <View style={{ alignItems: "center", gap: theme.spacing.lg, justifyContent: "center", paddingVertical: theme.spacing.xxl }}>
+        <View
+          style={{
+            alignItems: "center",
+            backgroundColor: theme.colors.avatarBg,
+            borderRadius: theme.radii.round,
+            height: 64,
+            justifyContent: "center",
+            width: 64,
+          }}
+        >
+          <Text style={{ fontSize: 32 }}>⚠️</Text>
+        </View>
+        <Text
+          style={{
+            color: theme.colors.text,
+            fontFamily: theme.fonts.bold,
+            fontSize: theme.typeScale.screenTitle,
+            textAlign: "center",
+          }}
+        >
+          Transaction unavailable
+        </Text>
+        <Text
+          style={{
+            color: theme.colors.sub,
+            fontFamily: theme.fonts.regular,
+            fontSize: theme.typeScale.body,
+            maxWidth: 320,
+            textAlign: "center",
+          }}
+        >
+          This transaction could not be found. It may have been deleted.
+        </Text>
+        <PrimaryButton onPress={() => navigation.goBack()} style={{ marginTop: theme.spacing.md }}>
+          Back to History
+        </PrimaryButton>
+      </View>
+    </ScreenContainer>
+  );
+}
+
 export function EditTransactionScreen({ navigation, route }) {
   const theme = useTheme(useUiStore((state) => state.themePreference));
   const currencySymbol = useUiStore((state) => state.currencySymbol);
@@ -25,52 +70,32 @@ export function EditTransactionScreen({ navigation, route }) {
   const transactionId = Number(route?.params?.transactionId);
   const transaction = transactions.find((item) => item.id === transactionId);
 
-  // Missing record state
   if (!transaction) {
-    return (
-      <ScreenContainer contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }} testID="edit-missing-transaction-screen">
-        <View style={{ alignItems: "center", gap: theme.spacing.lg, justifyContent: "center", paddingVertical: theme.spacing.xxl }}>
-          <View
-            style={{
-              alignItems: "center",
-              backgroundColor: theme.colors.avatarBg,
-              borderRadius: theme.radii.round,
-              height: 64,
-              justifyContent: "center",
-              width: 64,
-            }}
-          >
-            <Text style={{ fontSize: 32 }}>⚠️</Text>
-          </View>
-          <Text
-            style={{
-              color: theme.colors.text,
-              fontFamily: theme.fonts.bold,
-              fontSize: theme.typeScale.screenTitle,
-              textAlign: "center",
-            }}
-          >
-            Transaction unavailable
-          </Text>
-          <Text
-            style={{
-              color: theme.colors.sub,
-              fontFamily: theme.fonts.regular,
-              fontSize: theme.typeScale.body,
-              maxWidth: 320,
-              textAlign: "center",
-            }}
-          >
-            This transaction could not be found. It may have been deleted.
-          </Text>
-          <PrimaryButton onPress={() => navigation.goBack()} style={{ marginTop: theme.spacing.md }}>
-            Back to History
-          </PrimaryButton>
-        </View>
-      </ScreenContainer>
-    );
+    return <MissingTransactionView navigation={navigation} theme={theme} />;
   }
 
+  return (
+    <EditTransactionForm
+      accounts={accounts}
+      categories={categories}
+      currencySymbol={currencySymbol}
+      navigation={navigation}
+      theme={theme}
+      transaction={transaction}
+      updateTransaction={updateTransaction}
+    />
+  );
+}
+
+function EditTransactionForm({
+  transaction,
+  navigation,
+  theme,
+  currencySymbol,
+  categories,
+  accounts,
+  updateTransaction,
+}) {
   const isRecurring = transaction.recurringRuleId !== null || transaction.scheduledDateEpochMillis !== null;
 
   // Form State
@@ -263,7 +288,7 @@ export function EditTransactionScreen({ navigation, route }) {
         >
           <Text
             style={{
-              color: type === "EXPENSE" ? theme.colors.onPrimary : theme.colors.sub,
+              color: type === "EXPENSE" ? (theme.mode === "dark" ? theme.colors.onAccent : theme.colors.onPrimary) : theme.colors.sub,
               fontFamily: theme.fonts.bold,
               fontSize: theme.typeScale.body,
             }}
@@ -293,7 +318,7 @@ export function EditTransactionScreen({ navigation, route }) {
         >
           <Text
             style={{
-              color: type === "INCOME" ? theme.colors.onPrimary : theme.colors.sub,
+              color: type === "INCOME" ? (theme.mode === "dark" ? theme.colors.onAccent : theme.colors.onPrimary) : theme.colors.sub,
               fontFamily: theme.fonts.bold,
               fontSize: theme.typeScale.body,
             }}

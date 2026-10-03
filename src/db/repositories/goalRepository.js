@@ -102,8 +102,9 @@ export class GoalRepository {
     assertPositiveInteger(amountMinor, "amountMinor");
     // Increment in SQLite so simultaneous contributions cannot overwrite one another.
     // Guard before addition to keep all persisted money within JS's safe integer range.
+    // Cap at target_minor.
     const result = await this.database.execute(
-      `UPDATE savings_goals SET current_minor = current_minor + ?
+      `UPDATE savings_goals SET current_minor = MIN(target_minor, current_minor + ?)
        WHERE id = ? AND current_minor <= ? RETURNING *`,
       [amountMinor, id, Number.MAX_SAFE_INTEGER - amountMinor],
     );

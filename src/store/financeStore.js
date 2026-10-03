@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import { initializeDatabase } from "../db/client";
 import { AccountRepository, BudgetRepository, CategoryRepository, GoalRepository, RecurringRepository, TransactionRepository, } from "../db/repositories";
-import { RECURRING_REMINDER_LEAD_DAYS } from "../domain/services/emoji";
-import { canDeleteAccount, canDeleteCategory, canRenameCategory, } from "../domain/services/entityGuards";
+import { canArchiveAccount, canDeleteAccount, canDeleteCategory, canRenameCategory, } from "../domain/services/entityGuards";
 import { toMonthYear, } from "../domain/services/financeView";
+import { advanceNextRunEpochMillis } from "../domain/services/recurringCatchUp";
 import { buildAutomaticAccountResolutions, listImportAccountSources, unresolvedImportAccountSources, } from "../domain/services/importAccounts";
 import { importAccountKey } from "../domain/services/importParser";
 import { ACCOUNT_TYPES } from "../domain/types";
@@ -33,6 +33,33 @@ const ENTRY_CATEGORY_SEED = [
 ];
 let databaseRef = null;
 let hydratePromise = null;
+let mutationTail = Promise.resolve();
+let inFlightRestorePromise = null;
+let inFlightRestoreSerialized = null;
+
+async function withMutationLock(action) {
+    const previous = mutationTail;
+    let release;
+    mutationTail = new Promise((resolve) => {
+        release = resolve;
+    });
+    try {
+        await previous;
+        return await action();
+    } finally {
+        release();
+    }
+}
+
+async function safeRefreshAfterCommit(get, set) {
+    try {
+        await get().refresh();
+        set({ refreshPending: false });
+    } catch (error) {
+        set({ refreshPending: true });
+    }
+}
+
 function repositories(database) {
     return {
         accounts: new AccountRepository(database),
@@ -128,6 +155,7 @@ export const useFinanceStore = create((set, get) => ({
     errorMessage: null,
     goals: [],
     recurringRules: [],
+    refreshPending: false,
     revision: 0,
     selectedMonthYear: toMonthYear(),
     status: "idle",
@@ -171,6 +199,7 @@ export const useFinanceStore = create((set, get) => ({
     refresh: async () => {
         const database = databaseRef ?? (await initializeDatabase());
         databaseRef = database;
+        await runRecurringCatchUp(database);
         const snapshot = await loadSnapshot(database);
         set({
             ...snapshot,
@@ -345,7 +374,15 @@ export const useFinanceStore = create((set, get) => ({
             throw new Error(`Add a${type === "INCOME" ? "n income" : "n expense"} category before creating a recurring rule.`);
         }
         const category = findCategory(get().categories, categoryName, type);
-        const account = findAccount(get().accounts, input.accountType ?? "CASH");
+        let account;
+        if (input.accountId !== undefined) {
+            account = get().accounts.find((a) => a.id === input.accountId && !a.isArchived);
+            if (!account) {
+                throw new Error("Selected account not found or archived.");
+            }
+        } else {
+            account = findAccount(get().accounts, input.accountType ?? "CASH");
+        }
         const leadDays = Number.isInteger(input.leadDays) && input.leadDays >= 0
             ? input.leadDays
             : RECURRING_REMINDER_LEAD_DAYS;
@@ -399,15 +436,24 @@ export const useFinanceStore = create((set, get) => ({
             }
             return existing;
         }
-        const created = await new CategoryRepository(database).create({
-            name,
-            icon: input.icon?.trim() || "pricetag",
-            colorHex: input.colorHex ?? (input.type === "INCOME" ? "#15803D" : "#64748B"),
-            type: input.type,
-            isCustom: true,
-        });
-        await get().refresh();
-        return created;
+        try {
+            const created = await new CategoryRepository(database).create({
+                name,
+                icon: input.icon?.trim() || "pricetag",
+                colorHex: input.colorHex ?? (input.type === "INCOME" ? "#15803D" : "#64748B"),
+                type: input.type,
+                isCustom: true,
+            });
+            await get().refresh();
+            return created;
+        } catch (error) {
+            if (error && (String(error.message).includes("UNIQUE constraint failed") || String(error.message).includes("already exists"))) {
+                await get().refresh();
+                const matched = get().categories.find((c) => c.name.toLowerCase() === name.toLowerCase() && c.type === input.type);
+                if (matched) return matched;
+            }
+            throw error;
+        }
     },
     updateAccount: async (input) => {
         await get().ensureHydrated();
@@ -452,21 +498,31 @@ export const useFinanceStore = create((set, get) => ({
         return updated;
     },
     deleteCategory: async (id) => {
-        await get().ensureHydrated();
-        const database = databaseRef;
-        if (database === null) {
-            throw new Error("Database is not ready.");
-        }
-        const guard = canDeleteCategory(id, {
-            transactions: get().transactions,
-            budgets: get().budgets,
-            recurringRules: get().recurringRules,
+        return withMutationLock(async () => {
+            await get().ensureHydrated();
+            const database = databaseRef;
+            if (database === null) {
+                throw new Error("Database is not ready.");
+            }
+            await database.transaction(async (tx) => {
+                const repos = repositories(tx);
+                const [transactions, budgets, recurringRules] = await Promise.all([
+                    repos.transactions.list(),
+                    repos.budgets.list(),
+                    repos.recurring.list(),
+                ]);
+                const guard = canDeleteCategory(id, {
+                    transactions,
+                    budgets,
+                    recurringRules,
+                });
+                if (!guard.ok) {
+                    throw new Error(guard.reason);
+                }
+                await repos.categories.delete(id);
+            });
+            await safeRefreshAfterCommit(get, set);
         });
-        if (!guard.ok) {
-            throw new Error(guard.reason);
-        }
-        await new CategoryRepository(database).delete(id);
-        await get().refresh();
     },
     createAccount: async (input) => {
         await get().ensureHydrated();
@@ -506,42 +562,60 @@ export const useFinanceStore = create((set, get) => ({
         return created;
     },
     deleteAccount: async (id) => {
-        await get().ensureHydrated();
-        const database = databaseRef;
-        if (database === null) {
-            throw new Error("Database is not ready.");
-        }
-        const guard = canDeleteAccount(id, {
-            accounts: get().accounts,
-            transactions: get().transactions,
-            recurringRules: get().recurringRules,
+        return withMutationLock(async () => {
+            await get().ensureHydrated();
+            const database = databaseRef;
+            if (database === null) {
+                throw new Error("Database is not ready.");
+            }
+            await database.transaction(async (tx) => {
+                const repos = repositories(tx);
+                const [accounts, transactions, recurringRules] = await Promise.all([
+                    repos.accounts.list(),
+                    repos.transactions.list(),
+                    repos.recurring.list(),
+                ]);
+                const guard = canDeleteAccount(id, {
+                    accounts,
+                    transactions,
+                    recurringRules,
+                });
+                if (!guard.ok) {
+                    throw new Error(guard.reason);
+                }
+                await repos.accounts.delete(id);
+            });
+            await safeRefreshAfterCommit(get, set);
         });
-        if (!guard.ok) {
-            throw new Error(guard.reason);
-        }
-        await new AccountRepository(database).delete(id);
-        await get().refresh();
     },
     /**
      * Hide an account without touching its history. Unlike delete, this is allowed for
      * accounts that already have transactions -- that is the whole point of archiving.
      */
     archiveAccount: async (id) => {
-        await get().ensureHydrated();
-        const database = databaseRef;
-        if (database === null) {
-            throw new Error("Database is not ready.");
-        }
-        const remaining = get().accounts.filter((account) => !account.isArchived && account.id !== id);
-        if (remaining.length === 0) {
-            throw new Error("Keep at least one active account.");
-        }
-        const updated = await new AccountRepository(database).update(id, { isArchived: true });
-        if (updated === null) {
-            throw new Error("Account could not be archived.");
-        }
-        await get().refresh();
-        return updated;
+        return withMutationLock(async () => {
+            await get().ensureHydrated();
+            const database = databaseRef;
+            if (database === null) {
+                throw new Error("Database is not ready.");
+            }
+            await database.transaction(async (tx) => {
+                const repos = repositories(tx);
+                const accounts = await repos.accounts.list();
+                const guard = canArchiveAccount(id, { accounts });
+                if (!guard.ok) {
+                    throw new Error(guard.reason);
+                }
+                const updated = await repos.accounts.update(id, { isArchived: true });
+                if (updated === null) {
+                    throw new Error("Account could not be archived.");
+                }
+                await tx.execute("UPDATE recurring_rules SET is_active = 0 WHERE account_id = ?", [id]);
+            });
+            await safeRefreshAfterCommit(get, set);
+            const updated = get().accounts.find((a) => a.id === id);
+            return updated;
+        });
     },
     unarchiveAccount: async (id) => {
         await get().ensureHydrated();
@@ -562,7 +636,27 @@ export const useFinanceStore = create((set, get) => ({
         if (database === null) {
             throw new Error("Database is not ready.");
         }
-        const updated = await new RecurringRepository(database).update(id, patch);
+        const existing = get().recurringRules.find((r) => r.id === id);
+        let finalPatch = { ...patch };
+        if (existing) {
+            const now = Date.now();
+            const frequency = patch.frequency ?? existing.frequency;
+            const anchorDay = patch.anchorDay ?? existing.anchorDay ?? new Date(existing.nextRunEpochMillis).getDate();
+            let nextRun = patch.nextRunEpochMillis ?? existing.nextRunEpochMillis;
+
+            if (patch.isActive === false || patch.isActive === 0) {
+                while (nextRun <= now) {
+                    nextRun = advanceNextRunEpochMillis(nextRun, frequency, anchorDay);
+                }
+                finalPatch.nextRunEpochMillis = nextRun;
+            } else if (patch.isActive === true || patch.isActive === 1) {
+                while (nextRun <= now) {
+                    nextRun = advanceNextRunEpochMillis(nextRun, frequency, anchorDay);
+                }
+                finalPatch.nextRunEpochMillis = nextRun;
+            }
+        }
+        const updated = await new RecurringRepository(database).update(id, finalPatch);
         if (updated === null) {
             throw new Error("Recurring bill could not be updated.");
         }
@@ -665,12 +759,7 @@ export const useFinanceStore = create((set, get) => ({
                 if (result.insertId !== undefined && Number.isSafeInteger(result.insertId) && result.insertId > 0) {
                     return result.insertId;
                 }
-                const idResult = await tx.execute("SELECT last_insert_rowid() AS id");
-                const id = Number(idResult.rows[0]?.id);
-                if (!Number.isSafeInteger(id) || id <= 0) {
-                    throw new Error("Import could not read inserted row ids.");
-                }
-                return id;
+                throw new Error("Import could not read inserted row ids.");
             };
 
             for (const row of rows) {
@@ -803,44 +892,43 @@ export const useFinanceStore = create((set, get) => ({
         if (database === null) {
             throw new Error("Database is not ready.");
         }
-        const insertReturningId = async (tx, statement, parameters) => {
-            const result = await tx.execute(statement, parameters);
-            if (result.insertId !== undefined &&
-                Number.isSafeInteger(result.insertId) &&
-                result.insertId > 0) {
-                return result.insertId;
-            }
-            const idResult = await tx.execute("SELECT last_insert_rowid() AS id");
-            const id = Number(idResult.rows[0]?.id);
-            if (!Number.isSafeInteger(id) || id <= 0) {
-                throw new Error("Backup restore could not read inserted row ids.");
-            }
-            return id;
-        };
-        await database.transaction(async (tx) => {
-            if (recordRecovery) {
-                const currentRepos = repositories(tx);
-                const recoveryBackup = buildBackup({
-                    accounts: await currentRepos.accounts.list(),
-                    categories: await currentRepos.categories.list(),
-                    transactions: await currentRepos.transactions.list(),
-                    budgets: await currentRepos.budgets.list(),
-                    recurringRules: await currentRepos.recurring.list(),
-                    goals: await currentRepos.goals.list(),
-                });
-                await tx.execute(`INSERT INTO restore_recovery_snapshot (id, backup_json, created_epoch_millis)
-              VALUES (1, ?, ?)
-              ON CONFLICT(id) DO UPDATE SET
-                backup_json = excluded.backup_json,
-                created_epoch_millis = excluded.created_epoch_millis`, [
-                    serializeBackup(recoveryBackup),
-                    Date.now(),
-                ]);
-            }
-            else {
-                // Consume the undo slot inside the replacement transaction, so a second undo cannot redo it.
-                await tx.execute("DELETE FROM restore_recovery_snapshot WHERE id = 1");
-            }
+        const serialized = serializeBackup(backup);
+        if (inFlightRestorePromise !== null && inFlightRestoreSerialized === serialized) {
+            return inFlightRestorePromise;
+        }
+        inFlightRestoreSerialized = serialized;
+        inFlightRestorePromise = (async () => {
+            try {
+                const insertReturningId = async (tx, statement, parameters) => {
+                    const result = await tx.execute(statement, parameters);
+                    if (result.insertId !== undefined &&
+                        Number.isSafeInteger(result.insertId) &&
+                        result.insertId > 0) {
+                        return result.insertId;
+                    }
+                    throw new Error("Backup restore could not read inserted row ids.");
+                };
+                await database.transaction(async (tx) => {
+                    if (recordRecovery) {
+                        const currentRepos = repositories(tx);
+                        const recoveryBackup = buildBackup({
+                            accounts: await currentRepos.accounts.list(),
+                            categories: await currentRepos.categories.list(),
+                            transactions: await currentRepos.transactions.list(),
+                            budgets: await currentRepos.budgets.list(),
+                            recurringRules: await currentRepos.recurring.list(),
+                            goals: await currentRepos.goals.list(),
+                        });
+                        await tx.execute(`INSERT OR IGNORE INTO restore_recovery_snapshot (id, backup_json, created_epoch_millis)
+                      VALUES (1, ?, ?)`, [
+                            serializeBackup(recoveryBackup),
+                            Date.now(),
+                        ]);
+                    }
+                    else {
+                        // Consume the undo slot inside the replacement transaction, so a second undo cannot redo it.
+                        await tx.execute("DELETE FROM restore_recovery_snapshot WHERE id = 1");
+                    }
             await tx.execute("DELETE FROM transactions");
             await tx.execute("DELETE FROM budgets");
             await tx.execute("DELETE FROM recurring_rules");
@@ -940,13 +1028,21 @@ export const useFinanceStore = create((set, get) => ({
         });
         try {
             await get().refresh();
-        }
-        catch (error) {
-            const refreshError = new Error("The backup was restored, but the refreshed ledger could not be displayed. Retry the ledger refresh or undo this restore; do not apply the backup again.");
-            refreshError.code = "RESTORE_COMMITTED_REFRESH_FAILED";
-            refreshError.cause = error;
-            throw refreshError;
-        }
+                    set({ refreshPending: false });
+                }
+                catch (error) {
+                    set({ refreshPending: true });
+                    const refreshError = new Error("The backup was restored, but the refreshed ledger could not be displayed. Retry the ledger refresh or undo this restore; do not apply the backup again.");
+                    refreshError.code = "RESTORE_COMMITTED_REFRESH_FAILED";
+                    refreshError.cause = error;
+                    throw refreshError;
+                }
+            } finally {
+                inFlightRestorePromise = null;
+                inFlightRestoreSerialized = null;
+            }
+        })();
+        return inFlightRestorePromise;
     },
     undoLastRestore: async () => {
         await get().ensureHydrated();

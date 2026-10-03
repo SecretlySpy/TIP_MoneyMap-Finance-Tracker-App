@@ -49,6 +49,7 @@ describe("QA screen/store/repository flows on real SQLite", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Save Transaction" }));
     await waitFor(() => expect(new TransactionRepository(database).list()).resolves.toHaveLength(1));
 
+    await fireEvent.press(screen.getByRole("button", { name: "Lunch ₱80" }));
     await fireEvent.press(screen.getByRole("button", { name: "Save Transaction" }));
     await waitFor(() => expect(new TransactionRepository(database).list()).resolves.toHaveLength(2));
   });
@@ -85,7 +86,7 @@ describe("QA screen/store/repository flows on real SQLite", () => {
     await fireEvent.changeText(screen.getByLabelText("Calendar year"), "2025");
     await fireEvent.press(screen.getByRole("button", { name: "Jan" }));
     await fireEvent.press(screen.getByRole("button", { name: "January 15, 2025" }));
-    await fireEvent.press(screen.getByRole("button", { name: "Use Jan 15, 2025" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Choose Jan 15, 2025" }));
     await fireEvent.press(screen.getByRole("button", { name: "Lunch ₱80" }));
     await fireEvent.press(screen.getByRole("button", { name: "Save Transaction" }));
 

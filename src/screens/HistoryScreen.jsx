@@ -23,6 +23,7 @@ export function HistoryBody({
   onDeleteTransaction,
   onSelectTransaction,
   searchQuery = "",
+  selectedMonthYear = "",
 }) {
   const theme = useTheme();
 
@@ -32,7 +33,7 @@ export function HistoryBody({
         <EmptyState
           actionLabel="Clear search"
           emoji="🔍"
-          message={`No transactions matched "${searchQuery.trim()}". Try checking for typos or clear your search.`}
+          message={`No transactions matched "${searchQuery.trim()}" in ${selectedMonthYear}. Try checking for typos, selecting another month, or clear your search.`}
           onAction={onClearSearch}
           title="No transactions found"
         />
@@ -105,7 +106,8 @@ export function HistoryScreen({ navigation }) {
       if (q.length > 0) {
         const noteText = (transaction.note ?? "").toLowerCase();
         const categoryName = (categoriesById.get(transaction.categoryId)?.name ?? "").toLowerCase();
-        if (!noteText.includes(q) && !categoryName.includes(q)) {
+        const accountName = (accountsById.get(transaction.accountId)?.name ?? "").toLowerCase();
+        if (!noteText.includes(q) && !categoryName.includes(q) && !accountName.includes(q)) {
           return false;
         }
       }
@@ -122,7 +124,7 @@ export function HistoryScreen({ navigation }) {
       }
       return true;
     });
-  }, [transactions, searchQuery, categoryFilter, accountFilter, categoriesById]);
+  }, [transactions, searchQuery, categoryFilter, accountFilter, categoriesById, accountsById]);
 
   const groups = useMemo(
     () => groupHistory(filteredTransactions, categoriesById, accountsById, selectedMonthYear),
@@ -372,6 +374,7 @@ export function HistoryScreen({ navigation }) {
           navigation.navigate("TransactionDetail", { transactionId: Number(transaction.id) });
         }}
         searchQuery={searchQuery}
+        selectedMonthYear={selectedMonthYear}
       />
     </ScreenContainer>
   );

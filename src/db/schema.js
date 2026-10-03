@@ -87,6 +87,8 @@ const CREATE_SCHEMA_STATEMENTS = [
     "CREATE INDEX idx_recurring_rules_account_id ON recurring_rules (account_id)",
     "CREATE INDEX idx_recurring_rules_next_run ON recurring_rules (is_active, next_run_epoch_millis)",
     "CREATE INDEX idx_budgets_category_id ON budgets (category_id)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_recurring_scheduled ON transactions (recurring_rule_id, scheduled_date_epoch_millis) WHERE recurring_rule_id IS NOT NULL AND scheduled_date_epoch_millis IS NOT NULL",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_type_name_nocase ON categories (type, name COLLATE NOCASE)",
 ];
 const CREATE_GOALS_STATEMENTS = [
     `CREATE TABLE savings_goals (
@@ -198,6 +200,7 @@ const MIGRATIONS = [
             await database.execute(`UPDATE transactions
               SET scheduled_date_epoch_millis = date_epoch_millis
               WHERE recurring_rule_id IS NOT NULL AND scheduled_date_epoch_millis IS NULL`);
+            await database.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_recurring_scheduled ON transactions (recurring_rule_id, scheduled_date_epoch_millis) WHERE recurring_rule_id IS NOT NULL AND scheduled_date_epoch_millis IS NOT NULL");
         },
     },
 ];
@@ -207,6 +210,18 @@ async function configureDatabase(database) {
     await database.execute("PRAGMA journal_mode = WAL");
     await database.execute("PRAGMA synchronous = FULL");
     await database.execute("PRAGMA trusted_schema = OFF");
+    const tables = await database.execute("SELECT name FROM sqlite_schema WHERE type='table'");
+    const tableNames = new Set((tables.rows ?? []).map((r) => r.name));
+    if (tableNames.has("transactions")) {
+        const columns = await database.execute("PRAGMA table_info(transactions)");
+        const hasScheduled = (columns.rows ?? []).some((r) => r.name === "scheduled_date_epoch_millis");
+        if (hasScheduled) {
+            await database.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_recurring_scheduled ON transactions (recurring_rule_id, scheduled_date_epoch_millis) WHERE recurring_rule_id IS NOT NULL AND scheduled_date_epoch_millis IS NOT NULL");
+        }
+    }
+    if (tableNames.has("categories")) {
+        await database.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_type_name_nocase ON categories (type, name COLLATE NOCASE)");
+    }
 }
 export async function getSchemaVersion(database) {
     const result = await database.execute("PRAGMA user_version");

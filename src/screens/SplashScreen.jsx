@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Alert, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
-import { BrandMark } from "../components/BrandMark";
 import { PrimaryButton } from "../components/Buttons";
+import { DonutMark } from "../components/DonutMark";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -81,7 +81,8 @@ export function SplashScreen({ navigation }) {
       testID="splash-screen"
     >
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: theme.spacing.lg }}>
-        <BrandMark loading={loading || busy} size={112} />
+        {/* Brand Donut Mark */}
+        <DonutMark animating={loading || busy} size={theme.sizes.lockCircle} />
 
         <View style={{ alignItems: "center", gap: theme.spacing.sm }}>
           <Text

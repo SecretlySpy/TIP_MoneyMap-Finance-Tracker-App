@@ -21,6 +21,17 @@ export function assertNonNegativeInteger(value, fieldName) {
         throw new RangeError(`${fieldName} must not be negative.`);
     }
 }
+export function assertValidEpochMillis(value, fieldName = "epochMillis") {
+    assertSafeInteger(value, fieldName);
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) {
+        throw new RangeError(`${fieldName} must be a valid date timestamp.`);
+    }
+    const year = date.getFullYear();
+    if (year < 1970 || year > 2100) {
+        throw new RangeError(`${fieldName} year ${year} is outside supported range (1970-2100).`);
+    }
+}
 export function assertNonBlank(value, fieldName) {
     if (value.trim().length === 0) {
         throw new TypeError(`${fieldName} must not be blank.`);

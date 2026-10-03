@@ -51,7 +51,7 @@ export class TestSqliteDatabase {
     return { rowsAffected: 0, rows: [] };
   }
 
-  async execute(query, parameters = []) {
+  executeDirect(query, parameters = []) {
     if (/^\s*PRAGMA\b/i.test(query)) {
       return this.applyPragma(query);
     }
@@ -70,11 +70,21 @@ export class TestSqliteDatabase {
     };
   }
 
+  async execute(query, parameters = []) {
+    if (this.inTransaction) {
+      return this.executeDirect(query, parameters);
+    }
+    const pending = this.transactionTail.then(() => this.executeDirect(query, parameters));
+    this.transactionTail = pending.catch(() => {});
+    return pending;
+  }
+
   async transaction(work) {
     const pending = this.transactionTail.then(async () => {
       // Assignment must occur before BEGIN, since SQLite ignores it inside a transaction.
       this.database.pragma("foreign_keys = ON");
       this.database.exec("BEGIN IMMEDIATE");
+      this.inTransaction = true;
       try {
         // Match src/db/sql.js rather than granting nested transactions to tests.
         await work({ execute: this.execute.bind(this) });
@@ -82,9 +92,10 @@ export class TestSqliteDatabase {
       } catch (error) {
         this.database.exec("ROLLBACK");
         throw error;
+      } finally {
+        this.inTransaction = false;
       }
     });
-    // A rejected transaction must release the queue for the next operation.
     this.transactionTail = pending.catch(() => {});
     await pending;
   }

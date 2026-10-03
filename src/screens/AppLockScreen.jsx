@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
-import { BrandMark } from "../components/BrandMark";
+import { DonutMark } from "../components/DonutMark";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { canUseBiometrics, isValidPin } from "../services/appLock";
 import { useUiStore } from "../store/uiStore";
@@ -205,7 +205,7 @@ export function AppLockScreen({ navigation }) {
             paddingHorizontal: theme.spacing.xxl,
             paddingTop: theme.sizes.lockTopInset,
         }} safeBottom scroll={false} testID="app-lock-screen">
-      <BrandMark loading={busy} size={96} />
+      <DonutMark animating={busy} size={theme.sizes.lockCircle} />
 
       <View style={{ alignItems: "center", gap: theme.spacing.xxs, marginTop: theme.spacing.xxl }}>
         <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.lockTitle }}>

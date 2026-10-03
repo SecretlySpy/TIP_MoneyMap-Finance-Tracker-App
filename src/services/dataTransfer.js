@@ -10,9 +10,9 @@ import {
 } from "../domain/services/importParser";
 import { parseDecimalToMinor } from "../domain/services/money";
 import { ACCOUNT_TYPES, RECURRING_FREQUENCIES, TRANSACTION_TYPES } from "../domain/types";
-import { assertMonthYear } from "../db/validation";
+import { assertMonthYear, assertValidEpochMillis } from "../db/validation";
 export const BACKUP_FORMAT = "moneymap-backup";
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
 export function buildBackup(snapshot) {
     return {
         format: BACKUP_FORMAT,
@@ -80,8 +80,17 @@ export function validateBackup(backup) {
                     throw new Error(`Backup ${field} contains an invalid ${booleanField} flag.`);
                 }
             }
-            if (field === "goals" && row.deadlineEpochMillis != null && !Number.isSafeInteger(row.deadlineEpochMillis)) {
-                throw new Error("Backup goals contains an unsafe deadline.");
+            if (field === "goals" && row.deadlineEpochMillis != null) {
+                assertValidEpochMillis(row.deadlineEpochMillis, "goal deadline");
+            }
+            if (field === "transactions") {
+                assertValidEpochMillis(row.dateEpochMillis, "transaction date");
+            }
+            if (field === "recurringRules") {
+                assertValidEpochMillis(row.nextRunEpochMillis, "recurring rule nextRun");
+            }
+            if (field === "goals") {
+                assertValidEpochMillis(row.createdEpochMillis, "goal created date");
             }
             if (field === "accounts") {
                 requireText(row.name, "account name");
@@ -170,14 +179,20 @@ export function parseBackup(raw) {
     if (record.format !== BACKUP_FORMAT) {
         throw new Error("This file is not a MoneyMap backup.");
     }
+    if (record.goals === undefined) {
+        throw new Error("Backup is missing the goals field. Restore failed to protect existing goals.");
+    }
     if (record.version !== BACKUP_VERSION) {
         throw new Error(`Unsupported backup version: ${String(record.version)}`);
     }
     if (!Array.isArray(record.accounts) || !Array.isArray(record.categories)) {
         throw new Error("Backup is missing accounts or categories.");
     }
+    if (!Array.isArray(record.goals)) {
+        throw new Error("Backup goals must be an array.");
+    }
     // Legacy omitted collections remain supported; present malformed collections fail closed.
-    for (const field of ["transactions", "budgets", "recurringRules", "goals"]) {
+    for (const field of ["transactions", "budgets", "recurringRules"]) {
         if (record[field] !== undefined && !Array.isArray(record[field])) {
             throw new Error(`Backup ${field} must be an array.`);
         }
@@ -191,9 +206,7 @@ export function parseBackup(raw) {
         transactions: Array.isArray(record.transactions) ? record.transactions : [],
         budgets: Array.isArray(record.budgets) ? record.budgets : [],
         recurringRules: Array.isArray(record.recurringRules) ? record.recurringRules : [],
-        // Optional for backward compatibility: v1 backups written before goals
-        // were included simply restore none rather than failing to parse.
-        goals: Array.isArray(record.goals) ? record.goals : [],
+        goals: record.goals,
     };
     validateBackup(backup);
     return backup;
@@ -228,7 +241,7 @@ function formatCsvDate(epochMillis) {
     return `${year}-${month}-${day}`;
 }
 export function buildTransactionsCsv(transactions, categoriesById, accountsById) {
-    const header = "date,type,amount,category,account,note";
+    const header = "date,type,amount,category,account,note,source_key";
     const lines = [...transactions]
         .sort((left, right) => left.dateEpochMillis - right.dateEpochMillis)
         .map((transaction) => {
@@ -236,6 +249,7 @@ export function buildTransactionsCsv(transactions, categoriesById, accountsById)
         const account = accountsById.get(transaction.accountId);
         const accountLabel = account?.name ?? "Cash";
         const note = transaction.note ?? "";
+        const sourceKey = transaction.sourceKey ?? `exported:${transaction.id}`;
         return [
             formatCsvDate(transaction.dateEpochMillis),
             transaction.type,
@@ -243,6 +257,7 @@ export function buildTransactionsCsv(transactions, categoriesById, accountsById)
             escapeCsv(category),
             escapeCsv(accountLabel),
             escapeCsv(note),
+            escapeCsv(sourceKey),
         ].join(",");
     });
     return `${[header, ...lines].join("\n")}\n`;
@@ -299,6 +314,7 @@ export function parsePastedTransactionsCsv(raw) {
     const categoryIndex = hasHeader ? indexOf("category", 3) : 3;
     const accountIndex = hasHeader ? indexOf("account", 4) : 4;
     const noteIndex = hasHeader ? indexOf("note", 5) : 5;
+    const sourceKeyIndex = hasHeader ? (indexOf("source_key", -1) >= 0 ? indexOf("source_key", -1) : indexOf("id", -1)) : -1;
     // Expose the positions actually used so callers can bind an idempotency key to the
     // real column layout instead of an assumed one.
     const mappings = {
@@ -344,6 +360,7 @@ export function parsePastedTransactionsCsv(raw) {
                 throw new Error("is missing an account.");
             }
             const noteRaw = String(cells[noteIndex] ?? "").trim();
+            const sourceKeyRaw = sourceKeyIndex >= 0 ? String(cells[sourceKeyIndex] ?? "").trim() : "";
             rows.push({
                 sourceRowNumber,
                 dateEpochMillis: parseCsvDate(String(cells[dateIndex] ?? "")),
@@ -354,6 +371,7 @@ export function parsePastedTransactionsCsv(raw) {
                 accountKey: importAccountKey(accountLabel),
                 accountType: parseImportAccountType(accountLabel),
                 note: noteRaw.length > 0 ? noteRaw : null,
+                sourceKey: sourceKeyRaw.length > 0 ? sourceKeyRaw : undefined,
             });
         }
         catch (error) {
@@ -410,12 +428,13 @@ export async function shareDocument(title, fileName, contents) {
         await FileSystem.writeAsStringAsync(uri, contents, {
             encoding: FileSystem.EncodingType?.UTF8 ?? "utf8",
         });
-        await Share.share({ title, url: uri, message: title });
+
+        // Do not pass message: title when sharing a file URL to avoid iOS sharing the title instead of the file
+        await Share.share({ title, url: uri });
         return "file";
     }
     catch (error) {
         if (!uri) {
-            // Intent-extra path: fine for small exports, the only option without expo-file-system.
             await Share.share({ title, message: contents });
             return "text";
         }
@@ -423,11 +442,7 @@ export async function shareDocument(title, fileName, contents) {
     }
     finally {
         if (uri && FileSystem?.deleteAsync) {
-            try {
-                await FileSystem.deleteAsync(uri, { idempotent: true });
-            } catch {
-                // Ignore cleanup error if already removed
-            }
+            await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
         }
     }
 }

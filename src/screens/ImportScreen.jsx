@@ -33,7 +33,13 @@ export function ImportScreen({ navigation }) {
   const currencySymbol = useUiStore((state) => state.currencySymbol);
   const importCsvRows = useFinanceStore((state) => state.importCsvRows);
   const accounts = useFinanceStore((state) => state.accounts);
+  const categories = useFinanceStore((state) => state.categories);
   const existingTransactions = useFinanceStore((state) => state.transactions);
+
+  const categoriesById = useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories],
+  );
 
   // Steps: PICK -> MAP -> RESOLVE -> REVIEW -> COMPLETE | FAILED | UNCERTAIN.
   const [step, setStep] = useState("PICK");
@@ -91,15 +97,25 @@ export function ImportScreen({ navigation }) {
       const targetAccountId = resolution?.kind === "existing" ? resolution.accountId : null;
 
       const matchedExisting = existingTransactions.find((tx) => {
+        if (row.sourceKey && tx.sourceKey === row.sourceKey) return true;
         if (tx.type !== row.type) return false;
         if (tx.amountMinor !== row.amountMinor) return false;
-        if (targetAccountId !== null && tx.accountId !== targetAccountId) return false;
-        return isSameDay(tx.dateEpochMillis, row.dateEpochMillis);
+        if (targetAccountId === null || tx.accountId !== targetAccountId) return false;
+        if (!isSameDay(tx.dateEpochMillis, row.dateEpochMillis)) return false;
+        const txCategory = categoriesById.get(tx.categoryId)?.name?.trim().toLowerCase();
+        const rowCategory = row.categoryName?.trim().toLowerCase();
+        if (txCategory && rowCategory && txCategory !== rowCategory) return false;
+        return true;
       });
       const matchedFileRow = earlierRows.find((candidate) => {
+        if (row.sourceKey && candidate.row.sourceKey === row.sourceKey) return true;
         if (candidate.row.type !== row.type || candidate.row.amountMinor !== row.amountMinor) return false;
         if (candidate.accountResolutionKey !== row.accountKey) return false;
-        return isSameDay(candidate.row.dateEpochMillis, row.dateEpochMillis);
+        if (!isSameDay(candidate.row.dateEpochMillis, row.dateEpochMillis)) return false;
+        const candCategory = candidate.row.categoryName?.trim().toLowerCase();
+        const rowCategory = row.categoryName?.trim().toLowerCase();
+        if (candCategory && rowCategory && candCategory !== rowCategory) return false;
+        return true;
       });
 
       if (matchedExisting || matchedFileRow) {
@@ -107,7 +123,7 @@ export function ImportScreen({ navigation }) {
           row,
           originalIndex: index,
           reason: matchedExisting
-            ? `Matches existing ${matchedExisting.type.toLowerCase()} of ${formatMinor(matchedExisting.amountMinor, currencySymbol)} on ${formatLocalDateISO(matchedExisting.dateEpochMillis)}`
+            ? `Matches existing ${matchedExisting.type.toLowerCase()} of ${formatMinor(matchedExisting.amountMinor, { currencySymbol })} on ${formatLocalDateISO(matchedExisting.dateEpochMillis)}`
             : `Matches another row in this file on ${formatLocalDateISO(row.dateEpochMillis)}`,
         });
       } else {
@@ -121,7 +137,7 @@ export function ImportScreen({ navigation }) {
       duplicateRows: duplicates,
       invalidRows: parsed.skipped ?? [],
     };
-  }, [parsed, accountResolutions, existingTransactions, currencySymbol]);
+  }, [parsed, accountResolutions, existingTransactions, currencySymbol, categoriesById]);
 
   // Reset duplicate selections when rows change
   useEffect(() => {
@@ -299,6 +315,7 @@ export function ImportScreen({ navigation }) {
             else if (step === "REVIEW") setStep("RESOLVE");
             else if (step === "COMPLETE") navigation.goBack();
             else if (step === "UNCERTAIN") setStep("REVIEW");
+            else if (step === "FAILED") setStep("REVIEW");
           }}
         >
           <Text style={{ color: theme.colors.text, fontSize: theme.typeScale.lockTitle }}>←</Text>
@@ -565,7 +582,7 @@ export function ImportScreen({ navigation }) {
               {duplicateRows.map((item, dIdx) => {
                 const isIncluded = selectedDuplicateIndices.has(item.originalIndex);
                 const dateStr = formatLocalDateISO(item.row.dateEpochMillis);
-                const amountFormatted = formatMinor(item.row.amountMinor, currencySymbol);
+                const amountFormatted = formatMinor(item.row.amountMinor, { currencySymbol });
 
                 return (
                   <SectionCard key={`dup-${dIdx}`} padding={theme.spacing.md} style={{ gap: theme.spacing.sm }}>
@@ -685,7 +702,7 @@ export function ImportScreen({ navigation }) {
               <SectionCard padding={theme.spacing.md} style={{ gap: theme.spacing.sm }}>
                 {readyRows.slice(0, 5).map((row, rIdx) => {
                   const dateStr = formatLocalDateISO(row.dateEpochMillis);
-                  const amountFormatted = formatMinor(row.amountMinor, currencySymbol);
+                  const amountFormatted = formatMinor(row.amountMinor, { currencySymbol });
                   return (
                     <View key={`ready-${rIdx}`} style={{ gap: theme.spacing.xs }}>
                       {rIdx > 0 ? <View style={{ backgroundColor: theme.colors.outline, height: 1 }} /> : null}

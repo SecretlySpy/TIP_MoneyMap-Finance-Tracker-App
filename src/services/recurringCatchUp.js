@@ -18,9 +18,10 @@ import { planRecurringCatchUp } from "../domain/services/recurringCatchUp";
 async function hasPostedRun(database, recurringRuleId, runEpochMillis) {
   const result = await database.execute(
     `SELECT id FROM transactions
-      WHERE recurring_rule_id = ? AND date_epoch_millis = ?
+      WHERE (recurring_rule_id = ? AND (scheduled_date_epoch_millis = ? OR date_epoch_millis = ?))
+         OR source_key = ?
       LIMIT 1`,
-    [recurringRuleId, runEpochMillis],
+    [recurringRuleId, runEpochMillis, runEpochMillis, `recurring:${recurringRuleId}:${runEpochMillis}`],
   );
   return (result.rows?.length ?? 0) > 0;
 }
@@ -48,8 +49,24 @@ export async function runRecurringCatchUp(database, options = {}) {
     const rules = await recurringRepo.list();
     for (const rule of rules) {
       if (!rule.isActive) {
+        // E-01: Inactive rules advance to future slot without posting
+        const plan = planRecurringCatchUp(rule, nowEpochMillis);
+        if (plan.nextRunEpochMillis !== rule.nextRunEpochMillis) {
+          await recurringRepo.update(rule.id, {
+            nextRunEpochMillis: plan.nextRunEpochMillis,
+            anchorDay: plan.anchorDay,
+          });
+        }
         continue;
       }
+
+      // E-03: If target account is archived, skip catch-up
+      const accountRes = await tx.execute("SELECT is_archived FROM accounts WHERE id = ? LIMIT 1", [rule.accountId]);
+      const accountRow = accountRes.rows?.[0];
+      if (accountRow && (accountRow.is_archived === 1 || accountRow.is_archived === true)) {
+        continue;
+      }
+
       rulesProcessed += 1;
       const plan = planRecurringCatchUp(rule, nowEpochMillis);
       if (plan.posts.length === 0) {
@@ -66,6 +83,8 @@ export async function runRecurringCatchUp(database, options = {}) {
             categoryId: rule.categoryId,
             accountId: rule.accountId,
             dateEpochMillis: post.runEpochMillis,
+            scheduledDateEpochMillis: post.runEpochMillis,
+            sourceKey: `recurring:${rule.id}:${post.runEpochMillis}`,
             note: rule.note,
             recurringRuleId: rule.id,
           });

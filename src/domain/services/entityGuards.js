@@ -57,7 +57,14 @@ export function canDeleteAccount(accountId, refs = {}) {
  * @returns {{ ok: true } | { ok: false, reason: string }}
  */
 export function canArchiveAccount(accountId, refs = {}) {
-  return canDeleteAccount(accountId, refs);
+  const active = (refs.accounts ?? []).filter((a) => !a.isArchived && a.id !== accountId);
+  if (active.length === 0) {
+    return {
+      ok: false,
+      reason: "Keep at least one active account.",
+    };
+  }
+  return { ok: true };
 }
 
 /**

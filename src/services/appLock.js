@@ -27,25 +27,33 @@ export function pinLockoutSeconds(failures) {
   return PIN_LOCKOUT_LADDER_SECONDS[step];
 }
 
+/**
+ * NOTE: App lock PIN is an in-app UI access gate, not the SQLite/SQLCipher encryption key.
+ * Ledger encryption is independently managed by databaseKey.js via device hardware keystore.
+ */
+let lastKnownAttemptState = { failures: 0, lockedUntilEpochMillis: 0 };
+
 async function readAttemptState() {
   try {
     const raw = await SecureStore.getItemAsync(PIN_ATTEMPTS_KEY);
     if (raw === null) {
-      return { failures: 0, lockedUntilEpochMillis: 0 };
+      return lastKnownAttemptState;
     }
     const parsed = JSON.parse(raw);
-    return {
-      failures: Number.isSafeInteger(parsed?.failures) && parsed.failures >= 0 ? parsed.failures : 0,
-      lockedUntilEpochMillis: Number.isSafeInteger(parsed?.lockedUntilEpochMillis)
-        ? parsed.lockedUntilEpochMillis
-        : 0,
-    };
+    const failures = Number.isSafeInteger(parsed?.failures) && parsed.failures >= 0 ? parsed.failures : lastKnownAttemptState.failures;
+    const lockedUntilEpochMillis = Number.isSafeInteger(parsed?.lockedUntilEpochMillis)
+      ? Math.max(parsed.lockedUntilEpochMillis, lastKnownAttemptState.lockedUntilEpochMillis)
+      : lastKnownAttemptState.lockedUntilEpochMillis;
+    lastKnownAttemptState = { failures, lockedUntilEpochMillis };
+    return lastKnownAttemptState;
   } catch {
-    return { failures: 0, lockedUntilEpochMillis: 0 };
+    // Fail closed: retain the highest known lockout rather than resetting to 0 failures
+    return lastKnownAttemptState;
   }
 }
 
 async function writeAttemptState(state) {
+  lastKnownAttemptState = state;
   try {
     await SecureStore.setItemAsync(PIN_ATTEMPTS_KEY, JSON.stringify(state));
   } catch {

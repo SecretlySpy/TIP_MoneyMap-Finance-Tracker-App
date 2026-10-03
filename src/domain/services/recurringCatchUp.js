@@ -66,9 +66,15 @@ export function planRecurringCatchUp(rule, nowEpochMillis) {
     ? rule.anchorDay
     : new Date(rule.nextRunEpochMillis).getDate();
   if (!rule.isActive) {
+    let nextRun = rule.nextRunEpochMillis;
+    let guard = 0;
+    while (nextRun <= nowEpochMillis && guard < MAX_CATCH_UP_POSTS_PER_RULE) {
+      nextRun = advanceNextRunEpochMillis(nextRun, rule.frequency, anchorDay);
+      guard += 1;
+    }
     return {
       posts: [],
-      nextRunEpochMillis: rule.nextRunEpochMillis,
+      nextRunEpochMillis: nextRun,
       anchorDay,
       skippedInactive: true,
     };

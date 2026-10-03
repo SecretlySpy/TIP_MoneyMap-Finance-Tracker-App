@@ -378,8 +378,10 @@ export function reverseMetroPort(adbPath, serial = null, port = 8081) {
 }
 
 // Launch the application using Expo development client deep link or MainActivity.
-export function launchApp(adbPath, serial = null, port = 8081) {
-  const deepLink = `exp+moneymap-finance-tracker://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A${port}`;
+export function launchApp(adbPath, serial = null, port = 8081, isReversed = true) {
+  const isEmulator = !serial || serial.startsWith("emulator-");
+  const host = isReversed ? "localhost" : isEmulator ? "10.0.2.2" : "localhost";
+  const deepLink = `exp+moneymap-finance-tracker://expo-development-client/?url=http%3A%2F%2F${host}%3A${port}`;
   const deepLinkArgs = serial
     ? ["-s", serial, "shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", deepLink]
     : ["shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", deepLink];
@@ -465,9 +467,10 @@ async function run() {
 
     const targetSerial = activeDevice?.serial ?? null;
 
+    let reversed = false;
     // Set up ADB reverse port forwarding so Metro connections always succeed.
     if (targetSerial) {
-      reverseMetroPort(adbPath, targetSerial, 8081);
+      reversed = reverseMetroPort(adbPath, targetSerial, 8081);
     }
 
     // Fast-path: clear state and launch existing build without Gradle rebuild.
@@ -477,7 +480,7 @@ async function run() {
         const cleared = clearAppData(adbPath, targetSerial);
         console.log(cleared ? "[MoneyMap] App state cleared (clean state)." : "[MoneyMap] App state reset.");
         console.log("[MoneyMap] Launching app...");
-        launchApp(adbPath, targetSerial, 8081);
+        launchApp(adbPath, targetSerial, 8081, reversed);
       } else {
         console.warn("[MoneyMap] No active Android device found to clean state.");
       }
