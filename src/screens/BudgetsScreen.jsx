@@ -228,7 +228,7 @@ export function BudgetsScreen({ navigation }) {
 
       {cards.length === 0 ? (
         <EmptyState
-          actionLabel="+ Add budget"
+          actionLabel="Add Budget"
           emoji="📊"
           message="Name a category, pick an icon, and set a monthly limit. Long-press a card to edit or delete."
           onAction={beginAddBudget}
@@ -255,7 +255,7 @@ export function BudgetsScreen({ navigation }) {
             Tip: press and hold a budget card to edit or delete.
           </Text>
           <PrimaryButton disabled={busy} onPress={beginAddBudget}>
-            {busy ? "Saving…" : "+ Add budget"}
+            {busy ? "Saving…" : "Add Budget"}
           </PrimaryButton>
         </>
       ) : null}

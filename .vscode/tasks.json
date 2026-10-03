@@ -18,6 +18,30 @@
       }
     },
     {
+      "label": "MoneyMap: Reset to clean state (Emulator)",
+      "type": "npm",
+      "script": "clean:state",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": true
+      }
+    },
+    {
+      "label": "MoneyMap: Run on Android (Preserve Data)",
+      "type": "npm",
+      "script": "android:preserve",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": true
+      }
+    },
+    {
       "label": "MoneyMap: Android preflight check",
       "type": "npm",
       "script": "android:check",

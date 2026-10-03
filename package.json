@@ -6,7 +6,10 @@
   "scripts": {
     "start": "expo start --dev-client",
     "android": "node scripts/run-android.mjs",
+    "android:clean": "node scripts/run-android.mjs --clean",
+    "android:preserve": "node scripts/run-android.mjs --preserve-data",
     "android:check": "node scripts/run-android.mjs --check",
+    "clean:state": "node scripts/run-android.mjs --clean-only",
     "asset:splash": "node scripts/render-splash-icon.mjs",
     "prebuild": "expo prebuild",
     "test": "jest --runInBand",
