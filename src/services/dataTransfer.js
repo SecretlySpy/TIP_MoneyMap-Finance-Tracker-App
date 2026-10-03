@@ -1,6 +1,16 @@
 import { Share } from "react-native";
-import { importAccountKey, normalizeImportAccountLabel, parseImportAccountType } from "../domain/services/importParser";
+import {
+    assertImportGridWithinLimits,
+    assertImportRowWithinLimits,
+    csvTextToGrid,
+    importAccountKey,
+    normalizeImportAccountLabel,
+    parseImportAccountType,
+    parseImportType,
+} from "../domain/services/importParser";
 import { parseDecimalToMinor } from "../domain/services/money";
+import { ACCOUNT_TYPES, RECURRING_FREQUENCIES, TRANSACTION_TYPES } from "../domain/types";
+import { assertMonthYear } from "../db/validation";
 export const BACKUP_FORMAT = "moneymap-backup";
 export const BACKUP_VERSION = 1;
 export function buildBackup(snapshot) {
@@ -22,12 +32,30 @@ export function serializeBackup(backup) {
 }
 export function validateBackup(backup) {
     // Validate identity and references before restore can replace any local data.
+    const requireText = (value, field) => {
+        if (typeof value !== "string" || value.trim().length === 0) {
+            throw new Error(`Backup contains an invalid ${field}.`);
+        }
+    };
+    const requireNote = (value, field) => {
+        if (value !== null && typeof value !== "string") {
+            throw new Error(`Backup contains an invalid ${field}.`);
+        }
+    };
     const collections = ["accounts", "categories", "transactions", "budgets", "recurringRules", "goals"];
     const integerFields = {
         accounts: ["startingBalanceMinor"], categories: [],
         transactions: ["amountMinor", "dateEpochMillis"], budgets: ["limitMinor"],
         recurringRules: ["amountMinor", "nextRunEpochMillis", "reminderLeadDays"],
         goals: ["targetMinor", "currentMinor", "createdEpochMillis"],
+    };
+    const booleanFields = {
+        accounts: ["isArchived"],
+        categories: ["isCustom"],
+        transactions: [],
+        budgets: [],
+        recurringRules: ["isActive", "reminderEnabled"],
+        goals: ["isArchived"],
     };
     const ids = new Map();
     for (const field of collections) {
@@ -47,13 +75,55 @@ export function validateBackup(backup) {
                     throw new Error(`Backup ${field} contains an unsafe ${integerField}.`);
                 }
             }
+            for (const booleanField of booleanFields[field]) {
+                if (typeof row[booleanField] !== "boolean") {
+                    throw new Error(`Backup ${field} contains an invalid ${booleanField} flag.`);
+                }
+            }
             if (field === "goals" && row.deadlineEpochMillis != null && !Number.isSafeInteger(row.deadlineEpochMillis)) {
                 throw new Error("Backup goals contains an unsafe deadline.");
+            }
+            if (field === "accounts") {
+                requireText(row.name, "account name");
+                if (!ACCOUNT_TYPES.includes(row.type)) throw new Error("Backup contains an invalid account type.");
+            }
+            if (field === "categories") {
+                requireText(row.name, "category name");
+                requireText(row.icon, "category icon");
+                if (!/^#[0-9A-Fa-f]{6}$/.test(row.colorHex)) throw new Error("Backup contains an invalid category color.");
+                if (!TRANSACTION_TYPES.includes(row.type)) throw new Error("Backup contains an invalid category type.");
+            }
+            if (field === "transactions") {
+                if (!TRANSACTION_TYPES.includes(row.type)) throw new Error("Backup contains an invalid transaction type.");
+                requireNote(row.note, "transaction note");
+            }
+            if (field === "recurringRules") {
+                if (!TRANSACTION_TYPES.includes(row.type)) throw new Error("Backup contains an invalid recurring type.");
+                if (!RECURRING_FREQUENCIES.includes(row.frequency)) throw new Error("Backup contains an invalid recurring frequency.");
+                if (row.reminderLeadDays < 0) throw new Error("Backup contains an invalid reminder lead time.");
+                if (row.anchorDay != null && (!Number.isSafeInteger(row.anchorDay) || row.anchorDay < 1 || row.anchorDay > 31)) {
+                    throw new Error("Backup contains an invalid recurring anchor day.");
+                }
+                if (row.icon != null && typeof row.icon !== "string") throw new Error("Backup contains an invalid recurring icon.");
+                requireNote(row.note, "recurring note");
+            }
+            if (field === "budgets") {
+                try {
+                    assertMonthYear(row.monthYear);
+                } catch {
+                    throw new Error("Backup contains an invalid budget month.");
+                }
+                if (row.limitMinor <= 0) throw new Error("Backup contains an invalid budget limit.");
+            }
+            if (field === "goals") {
+                requireText(row.name, "goal name");
+                if (row.targetMinor <= 0 || row.currentMinor < 0) throw new Error("Backup contains an invalid goal amount.");
             }
         }
         ids.set(field, seen);
     }
     const categories = new Map(backup.categories.map((row) => [row.id, row]));
+    const transactionSourceKeys = new Set();
     for (const field of ["transactions", "recurringRules"]) {
         for (const row of backup[field]) {
             if (!ids.get("accounts").has(row.accountId) || categories.get(row.categoryId)?.type !== row.type) {
@@ -64,6 +134,18 @@ export function validateBackup(backup) {
             }
             if (field === "transactions" && row.recurringRuleId != null && !ids.get("recurringRules").has(row.recurringRuleId)) {
                 throw new Error("Backup transactions contains an invalid recurring rule reference.");
+            }
+            if (field === "transactions" && row.scheduledDateEpochMillis != null && !Number.isSafeInteger(row.scheduledDateEpochMillis)) {
+                throw new Error("Backup transactions contains an unsafe scheduled date.");
+            }
+            if (field === "transactions" && row.sourceKey != null) {
+                if (typeof row.sourceKey !== "string" || row.sourceKey.trim().length === 0 || row.sourceKey.length > 256) {
+                    throw new Error("Backup transactions contains an invalid source key.");
+                }
+                if (transactionSourceKeys.has(row.sourceKey)) {
+                    throw new Error("Backup transactions contains duplicate source keys.");
+                }
+                transactionSourceKeys.add(row.sourceKey);
             }
         }
     }
@@ -165,68 +247,46 @@ export function buildTransactionsCsv(transactions, categoriesById, accountsById)
     });
     return `${[header, ...lines].join("\n")}\n`;
 }
-function splitCsvLine(line) {
-    const cells = [];
-    let current = "";
-    let inQuotes = false;
-    for (let index = 0; index < line.length; index += 1) {
-        const char = line[index];
-        if (inQuotes) {
-            if (char === '"') {
-                if (line[index + 1] === '"') {
-                    current += '"';
-                    index += 1;
-                }
-                else {
-                    inQuotes = false;
-                }
-            }
-            else {
-                current += char;
-            }
-            continue;
-        }
-        if (char === '"') {
-            inQuotes = true;
-            continue;
-        }
-        if (char === ",") {
-            cells.push(current);
-            current = "";
-            continue;
-        }
-        current += char;
-    }
-    cells.push(current);
-    return cells;
-}
 function parseCsvDate(value) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
     if (match === null) {
-        throw new Error(`Invalid CSV date "${value}". Use YYYY-MM-DD.`);
+        throw new Error(`invalid date "${value}". Use YYYY-MM-DD.`);
     }
     const year = Number(match[1]);
     const month = Number(match[2]);
     const day = Number(match[3]);
     const date = new Date(year, month - 1, day, 12, 0, 0, 0);
     if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
-        throw new Error(`Invalid CSV date "${value}".`);
+        throw new Error(`invalid date "${value}". Use YYYY-MM-DD.`);
     }
     return date.getTime();
 }
-export function parseTransactionsCsv(raw) {
-    const lines = raw
-        .replace(/^\uFEFF/, "")
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0);
-    if (lines.length === 0) {
+/**
+ * Parse pasted CSV into validated rows plus an explicit skip list.
+ *
+ * The paste path cannot reuse `parseImportGrid` directly: pasted text carries no
+ * trustworthy header row, so column positions are resolved here from the documented
+ * `date,type,amount,category,account,note` order. Everything else is deliberately
+ * aligned with the file pipeline — the same row/column/cell ceilings, the same
+ * strict type vocabulary, and row-level problems reported instead of thrown, so the
+ * caller can ask the user before committing a partial import.
+ *
+ * @param {string} raw
+ * @returns {{ rows: import('../domain/services/importParser').ImportTransactionRow[],
+ *   skipped: { rowNumber: number, reason: string }[],
+ *   dataRowCount: number,
+ *   mappings: import('../domain/services/importParser').ImportColumnMappings }}
+ */
+export function parsePastedTransactionsCsv(raw) {
+    const grid = csvTextToGrid(raw);
+    if (grid.length === 0) {
         throw new Error("CSV is empty.");
     }
-    const headerCells = splitCsvLine(lines[0]).map((cell) => cell.trim().toLowerCase());
+    assertImportGridWithinLimits(grid, "Pasted CSV");
+    const headerCells = grid[0].map((cell) => String(cell ?? "").trim().toLowerCase());
     const hasHeader = headerCells.includes("date") && headerCells.includes("amount");
-    const dataLines = hasHeader ? lines.slice(1) : lines;
-    if (dataLines.length === 0) {
+    const dataRows = hasHeader ? grid.slice(1) : grid;
+    if (dataRows.length === 0) {
         throw new Error("CSV has no transaction rows.");
     }
     const indexOf = (name, fallback) => {
@@ -234,40 +294,94 @@ export function parseTransactionsCsv(raw) {
         return index >= 0 ? index : fallback;
     };
     const dateIndex = hasHeader ? indexOf("date", 0) : 0;
-    const typeIndex = hasHeader ? indexOf("type", 1) : 1;
+    const typeIndex = hasHeader ? indexOf("type", -1) : 1;
     const amountIndex = hasHeader ? indexOf("amount", 2) : 2;
     const categoryIndex = hasHeader ? indexOf("category", 3) : 3;
     const accountIndex = hasHeader ? indexOf("account", 4) : 4;
     const noteIndex = hasHeader ? indexOf("note", 5) : 5;
-    return dataLines.map((line, rowIndex) => {
-        const cells = splitCsvLine(line);
-        const typeRaw = (cells[typeIndex] ?? "EXPENSE").trim().toUpperCase();
-        const type = typeRaw === "INCOME" ? "INCOME" : "EXPENSE";
-        const amountRaw = (cells[amountIndex] ?? "").trim();
-        if (amountRaw.length === 0) {
-            throw new Error(`Row ${rowIndex + 1} is missing an amount.`);
+    // Expose the positions actually used so callers can bind an idempotency key to the
+    // real column layout instead of an assumed one.
+    const mappings = {
+        Date: dateIndex,
+        Amount: amountIndex,
+        Type: typeIndex,
+        Category: categoryIndex,
+        Account: accountIndex,
+        Note: noteIndex,
+    };
+    /** @type {import('../domain/services/importParser').ImportTransactionRow[]} */
+    const rows = [];
+    /** @type {{ rowNumber: number, reason: string }[]} */
+    const skipped = [];
+    let dataRowCount = 0;
+    dataRows.forEach((rawCells, rowIndex) => {
+        const cells = Array.isArray(rawCells) ? rawCells : [];
+        if (cells.every((cell) => String(cell ?? "").trim().length === 0)) {
+            return;
         }
-        const amountMinor = parseDecimalToMinor(amountRaw.replace(/[₱$,]/g, ""));
-        if (amountMinor <= 0) {
-            throw new Error(`Row ${rowIndex + 1} amount must be positive.`);
+        dataRowCount += 1;
+        const sourceRowNumber = rowIndex + (hasHeader ? 2 : 1);
+        try {
+            assertImportRowWithinLimits(cells);
+            const typeRaw = typeIndex >= 0 ? String(cells[typeIndex] ?? "").trim() : "";
+            const explicitType = parseImportType(typeRaw);
+            if (typeRaw.length > 0 && explicitType === null) {
+                throw new Error(`invalid type "${typeRaw}". Use INCOME or EXPENSE.`);
+            }
+            const amountRaw = String(cells[amountIndex] ?? "").trim();
+            if (amountRaw.length === 0) {
+                throw new Error("is missing an amount.");
+            }
+            const cleanedAmount = amountRaw.replace(/[₱$,\s]/g, "");
+            const amountMinor = Math.abs(parseDecimalToMinor(cleanedAmount.replace(/^[-+]/, "")));
+            if (amountMinor <= 0) {
+                throw new Error("amount must be positive.");
+            }
+            const type = explicitType ?? (cleanedAmount.startsWith("+") ? "INCOME" : "EXPENSE");
+            const categoryName = String(cells[categoryIndex] ?? "Other").trim() || "Other";
+            const accountLabel = normalizeImportAccountLabel(cells[accountIndex]);
+            if (accountLabel.length === 0) {
+                throw new Error("is missing an account.");
+            }
+            const noteRaw = String(cells[noteIndex] ?? "").trim();
+            rows.push({
+                sourceRowNumber,
+                dateEpochMillis: parseCsvDate(String(cells[dateIndex] ?? "")),
+                type,
+                amountMinor,
+                categoryName,
+                accountLabel,
+                accountKey: importAccountKey(accountLabel),
+                accountType: parseImportAccountType(accountLabel),
+                note: noteRaw.length > 0 ? noteRaw : null,
+            });
         }
-        const categoryName = (cells[categoryIndex] ?? "Other").trim() || "Other";
-        const accountLabel = normalizeImportAccountLabel(cells[accountIndex]);
-        if (accountLabel.length === 0) {
-            throw new Error(`Row ${rowIndex + 1} is missing an account.`);
+        catch (error) {
+            // Reasons are written to read as "Row 4: <reason>" so the same text serves
+            // this skip list and the single-error message thrown below.
+            skipped.push({
+                rowNumber: sourceRowNumber,
+                reason: error instanceof Error ? error.message : "Invalid row.",
+            });
         }
-        const noteRaw = (cells[noteIndex] ?? "").trim();
-        return {
-            dateEpochMillis: parseCsvDate(cells[dateIndex] ?? ""),
-            type,
-            amountMinor,
-            categoryName,
-            accountLabel,
-            accountKey: importAccountKey(accountLabel),
-            accountType: parseImportAccountType(accountLabel),
-            note: noteRaw.length > 0 ? noteRaw : null,
-        };
     });
+    return { rows, skipped, dataRowCount, mappings };
+}
+/**
+ * Strict array-returning paste parser. Kept for callers that cannot present a
+ * per-row skip list: any invalid row rejects the whole paste rather than silently
+ * importing fewer transactions than the user pasted. Use `parsePastedTransactionsCsv`
+ * when the UI can confirm a partial import.
+ * @param {string} raw
+ * @returns {import('../domain/services/importParser').ImportTransactionRow[]}
+ */
+export function parseTransactionsCsv(raw) {
+    const { rows, skipped } = parsePastedTransactionsCsv(raw);
+    const first = skipped[0];
+    if (first !== undefined) {
+        throw new Error(`CSV row ${first.rowNumber}: ${first.reason}`);
+    }
+    return rows;
 }
 export async function shareText(title, message) {
     await Share.share({ title, message });

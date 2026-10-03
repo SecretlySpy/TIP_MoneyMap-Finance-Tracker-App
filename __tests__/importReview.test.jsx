@@ -11,6 +11,7 @@ import { TestSqliteDatabase } from "./support/testDatabase";
 jest.mock("../src/db/client", () => ({ initializeDatabase: jest.fn() }));
 jest.mock("../src/services/importFile", () => ({
   pickAndParseImportFile: jest.fn(),
+  buildImportSourceKey: jest.requireActual("../src/services/importFile").buildImportSourceKey,
   parseGridWithMappings: jest.requireActual("../src/services/importFile").parseGridWithMappings,
 }));
 jest.mock("../src/store/uiStore", () => ({
@@ -75,6 +76,7 @@ describe("Import review, duplicate detection, atomic commit, and rollback", () =
       format: "csv",
       headers: ["Date", "Amount", "Type", "Category", "Account", "Note"],
       mappings: { Date: 0, Amount: 1, Type: 2, Category: 3, Account: 4, Note: 5 },
+      contentFingerprint: "a".repeat(64),
       grid: [
         ["Date", "Amount", "Type", "Category", "Account", "Note"],
         // Row 1: Ready new row (₱250.00)
@@ -133,6 +135,51 @@ describe("Import review, duplicate detection, atomic commit, and rollback", () =
     await waitFor(() => expect(screen.getByRole("button", { name: "Import 1 transaction" })).toBeTruthy());
   });
 
+  it("keeps explicit duplicate inclusion attached to the original file row after account remapping", async () => {
+    const card = useFinanceStore.getState().accounts.find((account) => account.type === "CARD");
+    await repos.transactions.create({
+      amountMinor: 30_000,
+      type: "EXPENSE",
+      categoryId: 1,
+      accountId: card.id,
+      dateEpochMillis: new Date(2026, 8, 16, 12).getTime(),
+      note: "Existing card purchase",
+      recurringRuleId: null,
+    });
+    await useFinanceStore.getState().refresh();
+    pickAndParseImportFile.mockResolvedValue({
+      fileName: "two-accounts.csv",
+      format: "csv",
+      headers: ["Date", "Amount", "Type", "Category", "Account", "Note"],
+      mappings: { Date: 0, Amount: 1, Type: 2, Category: 3, Account: 4, Note: 5 },
+      contentFingerprint: "b".repeat(64),
+      grid: [
+        ["Date", "Amount", "Type", "Category", "Account", "Note"],
+        ["2026-09-15", "150.00", "EXPENSE", "Food", "Cash", "Cash candidate"],
+        ["2026-09-16", "300.00", "EXPENSE", "Food", "Card", "Card candidate"],
+      ],
+    });
+    const screen = await render(<ImportScreen navigation={navigation} />);
+    await fireEvent.press(screen.getByRole("button", { name: "Choose File" }));
+    await waitFor(() => screen.getByRole("button", { name: "Resolve accounts" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Resolve accounts" }));
+    await waitFor(() => screen.getByRole("button", { name: "Review import" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Review import" }));
+
+    const duplicateChoices = await screen.findAllByRole("checkbox", { name: "Include this duplicate row anyway" });
+    expect(duplicateChoices).toHaveLength(2);
+    await fireEvent.press(duplicateChoices[0]);
+    await waitFor(() => screen.getByRole("button", { name: "Import 1 transaction" }));
+
+    await fireEvent.press(screen.getByRole("button", { name: "Go back" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Existing: Cash" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Review import" }));
+
+    // The selected Cash row is now ready. The remaining Card duplicate must stay excluded.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Import 1 transaction" })).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Import 2 transactions" })).toBeNull();
+  });
+
   it("commits selected rows atomically and displays confirmed outcome stats", async () => {
     mockImportFileContent();
     const screen = await render(<ImportScreen navigation={navigation} />);
@@ -160,7 +207,7 @@ describe("Import review, duplicate detection, atomic commit, and rollback", () =
     expect(dbTransactions.some((t) => t.note === "Duplicate lunch")).toBe(false);
   });
 
-  it("rolls back atomically on failure and shows uncertain outcome state", async () => {
+  it("rolls back atomically on failure and reports a known failed outcome", async () => {
     mockImportFileContent();
     const screen = await render(<ImportScreen navigation={navigation} />);
 
@@ -182,9 +229,8 @@ describe("Import review, duplicate detection, atomic commit, and rollback", () =
     await waitFor(() => screen.getByRole("button", { name: "Import 1 transaction" }));
     await fireEvent.press(screen.getByRole("button", { name: "Import 1 transaction" }));
 
-    // Transitions to Step UNCERTAIN (Frame 19d)
-    await waitFor(() => expect(screen.getByText("Import needs attention")).toBeTruthy());
-    expect(screen.getByText(/The import encountered an issue and was rolled back/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("Import failed")).toBeTruthy());
+    expect(screen.getByText(/The import was rolled back/)).toBeTruthy();
     expect(screen.getByText(/simulated disk crash/)).toBeTruthy();
 
     // DB remains cleanly rolled back: only the 1 original transaction exists
@@ -195,5 +241,63 @@ describe("Import review, duplicate detection, atomic commit, and rollback", () =
     // "Return to review" button brings user back to REVIEW state
     await fireEvent.press(screen.getByRole("button", { name: "Return to review" }));
     await waitFor(() => expect(screen.getByText("Review Import")).toBeTruthy());
+  });
+
+  it("reports an edited imported row as retained instead of claiming it was imported again", async () => {
+    mockImportFileContent();
+    let screen = await render(<ImportScreen navigation={navigation} />);
+    await fireEvent.press(screen.getByRole("button", { name: "Choose File" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Resolve accounts" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Review import" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Import 1 transaction" }));
+    await waitFor(() => expect(screen.getByText("Import complete!")).toBeTruthy());
+    screen.unmount();
+
+    const imported = (await repos.transactions.list()).find(({ note }) => note === "Bus ride");
+    await useFinanceStore.getState().updateTransaction(imported.id, { amountMinor: 20_000 });
+    screen = await render(<ImportScreen navigation={navigation} />);
+    await fireEvent.press(screen.getByRole("button", { name: "Choose File" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Resolve accounts" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Review import" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Import 1 transaction" }));
+
+    await waitFor(() => expect(screen.getByText("No new transactions")).toBeTruthy());
+    expect(screen.getByText("Previously imported rows kept: 1")).toBeTruthy();
+    expect(screen.getByText(/Row 2: This imported transaction was edited after import/)).toBeTruthy();
+    expect((await repos.transactions.list()).find(({ id }) => id === imported.id)?.amountMinor).toBe(20_000);
+    screen.unmount();
+  });
+
+  it("retries an uncertain post-commit refresh without duplicating transactions", async () => {
+    mockImportFileContent();
+    const screen = await render(<ImportScreen navigation={navigation} />);
+
+    await fireEvent.press(screen.getByRole("button", { name: "Choose File" }));
+    await waitFor(() => screen.getByRole("button", { name: "Resolve accounts" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Resolve accounts" }));
+    await waitFor(() => screen.getByRole("button", { name: "Review import" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Review import" }));
+
+    const execute = database.execute.bind(database);
+    let accountListReads = 0;
+    jest.spyOn(database, "execute").mockImplementation(async (sql, params) => {
+      if (/^SELECT \* FROM accounts ORDER BY id ASC/.test(sql)) {
+        accountListReads += 1;
+        if (accountListReads === 2) {
+          throw new Error("synthetic refresh interruption");
+        }
+      }
+      return execute(sql, params);
+    });
+
+    await fireEvent.press(screen.getByRole("button", { name: "Import 1 transaction" }));
+    await waitFor(() => expect(screen.getByText("Import outcome pending")).toBeTruthy());
+    expect(await repos.transactions.list()).toHaveLength(2);
+
+    await fireEvent.press(screen.getByRole("button", { name: "Retry same import safely" }));
+    await waitFor(() => expect(screen.getByText("Import complete!")).toBeTruthy());
+    expect(screen.getByText("0 transaction(s)")).toBeTruthy();
+    expect(screen.getAllByText("1 transaction(s)").length).toBeGreaterThanOrEqual(1);
+    expect(await repos.transactions.list()).toHaveLength(2);
   });
 });

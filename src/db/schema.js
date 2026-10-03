@@ -1,6 +1,6 @@
 import { seedInitialData } from "./seed";
 import { DataIntegrityError, readInteger } from "./validation";
-export const LATEST_SCHEMA_VERSION = 4;
+export const LATEST_SCHEMA_VERSION = 7;
 const CREATE_SCHEMA_STATEMENTS = [
     `CREATE TABLE accounts (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,9 +47,24 @@ const CREATE_SCHEMA_STATEMENTS = [
      date_epoch_millis INTEGER NOT NULL,
      note TEXT,
      recurring_rule_id INTEGER,
+     scheduled_date_epoch_millis INTEGER,
+     source_key TEXT CHECK (
+       source_key IS NULL OR (
+         length(trim(source_key)) > 0 AND length(source_key) <= 256
+       )
+     ),
      FOREIGN KEY (category_id, type) REFERENCES categories (id, type) ON UPDATE RESTRICT ON DELETE RESTRICT,
      FOREIGN KEY (account_id) REFERENCES accounts (id) ON UPDATE RESTRICT ON DELETE RESTRICT,
      FOREIGN KEY (recurring_rule_id) REFERENCES recurring_rules (id) ON UPDATE RESTRICT ON DELETE SET NULL
+   ) STRICT`,
+    `CREATE TABLE restore_recovery_snapshot (
+     id INTEGER PRIMARY KEY CHECK (id = 1),
+     backup_json TEXT NOT NULL CHECK (length(backup_json) > 0),
+     created_epoch_millis INTEGER NOT NULL
+   ) STRICT`,
+    `CREATE TABLE app_metadata (
+     key TEXT PRIMARY KEY CHECK (length(trim(key)) > 0),
+     value TEXT NOT NULL
    ) STRICT`,
     `CREATE TABLE budgets (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,6 +82,7 @@ const CREATE_SCHEMA_STATEMENTS = [
     "CREATE INDEX idx_transactions_account_id ON transactions (account_id)",
     "CREATE INDEX idx_transactions_date_epoch_millis ON transactions (date_epoch_millis DESC)",
     "CREATE INDEX idx_transactions_recurring_rule_id ON transactions (recurring_rule_id)",
+    "CREATE UNIQUE INDEX idx_transactions_source_key ON transactions (source_key)",
     "CREATE INDEX idx_recurring_rules_category_id ON recurring_rules (category_id)",
     "CREATE INDEX idx_recurring_rules_account_id ON recurring_rules (account_id)",
     "CREATE INDEX idx_recurring_rules_next_run ON recurring_rules (is_active, next_run_epoch_millis)",
@@ -132,6 +148,58 @@ const MIGRATIONS = [
             // adopts the current run's day and persists it on first use instead.
         },
     },
+    {
+        version: 5,
+        name: "add transaction source keys for retry-safe financial mutations",
+        async apply(database) {
+            const columns = await database.execute("PRAGMA table_info(transactions)");
+            const hasSourceKey = (columns.rows ?? []).some((row) => row.name === "source_key");
+            if (!hasSourceKey) {
+                await database.execute(`ALTER TABLE transactions ADD COLUMN source_key TEXT CHECK (
+                  source_key IS NULL OR (
+                    length(trim(source_key)) > 0 AND length(source_key) <= 256
+                  )
+                )`);
+            }
+            // SQLite permits multiple NULL values while enforcing uniqueness for real keys.
+            await database.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_source_key ON transactions (source_key)");
+        },
+    },
+    {
+        version: 6,
+        name: "add encrypted restore recovery and one-time bootstrap metadata",
+        async apply(database, previousVersion) {
+            // Stored inside the SQLCipher database: one bounded snapshot supports undo without
+            // copying sensitive financial JSON to plaintext application storage.
+            await database.execute(`CREATE TABLE IF NOT EXISTS restore_recovery_snapshot (
+              id INTEGER PRIMARY KEY CHECK (id = 1),
+              backup_json TEXT NOT NULL CHECK (length(backup_json) > 0),
+              created_epoch_millis INTEGER NOT NULL
+            ) STRICT`);
+            await database.execute(`CREATE TABLE IF NOT EXISTS app_metadata (
+              key TEXT PRIMARY KEY CHECK (length(trim(key)) > 0),
+              value TEXT NOT NULL
+            ) STRICT`);
+            if (previousVersion > 0) {
+                // Upgrades have already had a chance to archive accounts or remove defaults.
+                await database.execute("INSERT OR IGNORE INTO app_metadata (key, value) VALUES (?, ?)", ["bootstrap-defaults-v1", "complete"]);
+            }
+        },
+    },
+    {
+        version: 7,
+        name: "preserve recurring occurrence scheduled dates after template deletion",
+        async apply(database) {
+            const columns = await database.execute("PRAGMA table_info(transactions)");
+            const hasScheduledDate = (columns.rows ?? []).some((row) => row.name === "scheduled_date_epoch_millis");
+            if (!hasScheduledDate) {
+                await database.execute("ALTER TABLE transactions ADD COLUMN scheduled_date_epoch_millis INTEGER");
+            }
+            await database.execute(`UPDATE transactions
+              SET scheduled_date_epoch_millis = date_epoch_millis
+              WHERE recurring_rule_id IS NOT NULL AND scheduled_date_epoch_millis IS NULL`);
+        },
+    },
 ];
 async function configureDatabase(database) {
     await database.execute("PRAGMA foreign_keys = ON");
@@ -158,7 +226,7 @@ export async function migrateDatabase(database) {
     const appliedVersions = [];
     for (const migration of pendingMigrations) {
         await database.transaction(async (transaction) => {
-            await migration.apply(transaction);
+            await migration.apply(transaction, previousVersion);
             await transaction.execute(`PRAGMA user_version = ${migration.version}`);
         });
         appliedVersions.push(migration.version);

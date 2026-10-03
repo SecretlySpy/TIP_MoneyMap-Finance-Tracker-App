@@ -88,7 +88,7 @@ export function TransactionDetailScreen({ navigation, route }) {
   const recurringRule = transaction.recurringRuleId !== null
     ? recurringRules.find((item) => item.id === transaction.recurringRuleId)
     : null;
-  const isRecurring = transaction.recurringRuleId !== null;
+  const isRecurring = transaction.recurringRuleId !== null || transaction.scheduledDateEpochMillis !== null;
 
   const categoryName = category?.name ?? "Other";
   const displayEmoji = category
@@ -290,7 +290,9 @@ export function TransactionDetailScreen({ navigation, route }) {
               fontSize: theme.typeScale.small,
             }}
           >
-            This occurrence was automatically created from your “{recurringRule?.note || "recurring bill"}”. Deleting or editing this entry will not affect your recurring rule schedule.
+            {recurringRule
+              ? `This occurrence was automatically created from your “${recurringRule.note || "recurring bill"}”. Deleting or editing this entry will not affect its recurring rule schedule.`
+              : "This occurrence came from a recurring rule that has since been deleted. Its original scheduled date remains fixed."}
           </Text>
         </View>
       ) : null}
@@ -428,7 +430,9 @@ export function TransactionDetailScreen({ navigation, route }) {
             }}
           >
             {isRecurring
-              ? "This will only delete this specific transaction occurrence. Your recurring bill schedule and future entries will not be affected."
+              ? recurringRule
+                ? "This will only delete this specific transaction occurrence. Your recurring bill schedule and future entries will not be affected."
+                : "This will delete only this historical occurrence. Its former recurring rule has already been removed."
               : "This will permanently remove this transaction from your history."}
           </Text>
 

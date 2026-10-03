@@ -1,6 +1,14 @@
-import { DEFAULT_PREFERENCES, normalizePreferences } from "../src/services/preferences";
+jest.mock("expo-secure-store", () => ({
+    getItemAsync: jest.fn(),
+    setItemAsync: jest.fn(),
+}));
+import * as SecureStore from "expo-secure-store";
+import { DEFAULT_PREFERENCES, loadPreferencesResult, normalizePreferences } from "../src/services/preferences";
 import { computeDueReminders, formatReminderMessage } from "../src/services/reminders";
 describe("preferences", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
     it("normalizes partial preference payloads", () => {
         expect(normalizePreferences(null)).toEqual(DEFAULT_PREFERENCES);
         expect(normalizePreferences({
@@ -18,6 +26,23 @@ describe("preferences", () => {
         });
         expect(normalizePreferences({ smartTipsEnabled: true }).smartTipsEnabled).toBe(true);
         expect(normalizePreferences({ smartTipsConsentAccepted: true }).smartTipsConsentAccepted).toBe(true);
+    });
+    it("distinguishes missing, malformed, and unreadable secure preferences", async () => {
+        SecureStore.getItemAsync.mockResolvedValueOnce(null);
+        await expect(loadPreferencesResult()).resolves.toEqual({
+            preferences: DEFAULT_PREFERENCES,
+            status: "missing",
+        });
+        SecureStore.getItemAsync.mockResolvedValueOnce("{not-json");
+        await expect(loadPreferencesResult()).resolves.toEqual({
+            preferences: DEFAULT_PREFERENCES,
+            status: "invalid",
+        });
+        SecureStore.getItemAsync.mockRejectedValueOnce(new Error("secure storage unavailable"));
+        await expect(loadPreferencesResult()).resolves.toEqual({
+            preferences: DEFAULT_PREFERENCES,
+            status: "unreadable",
+        });
     });
 });
 describe("reminders", () => {

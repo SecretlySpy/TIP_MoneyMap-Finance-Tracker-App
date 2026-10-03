@@ -3,9 +3,12 @@ import { AppState } from "react-native";
 import { create } from "zustand";
 import { clearPin, getPinLockoutStatus, hasStoredPin, setPin, tryLocalAuthentication, verifyPinWithLockout, } from "../services/appLock";
 import { getReminderPermissionStatus, syncBillReminderNotifications, } from "../services/notificationScheduler";
-import { DEFAULT_PREFERENCES, loadPreferences, savePreferences, } from "../services/preferences";
+import { clearOnboardingDraft, createOnboardingDraft, loadOnboardingDraftResult, saveOnboardingDraft, } from "../services/onboarding";
+import { DEFAULT_PREFERENCES, loadPreferencesResult, savePreferences, } from "../services/preferences";
 let preferencesPromise = null;
+let onboardingWriteQueue = Promise.resolve();
 let appStateSubscriptionAttached = false;
+const SPLASH_SEEN_KEY = "moneymap.splash.seen.v1";
 /** Optional finance snapshot supplier registered by financeStore to avoid a circular import. */
 let financeSnapshotProvider = null;
 export function registerFinanceSnapshotProvider(provider) {
@@ -23,6 +26,15 @@ function preferencesFromState(state) {
 }
 async function persist(state) {
     await savePreferences(preferencesFromState(state));
+}
+export function shouldFailClosedPreferenceLoad(preferenceStatus, pinExists) {
+    return pinExists && preferenceStatus !== "loaded";
+}
+// Serialize draft writes so rapid form edits cannot finish out of order and revive stale input.
+function queueOnboardingWrite(operation) {
+    const pending = onboardingWriteQueue.catch(() => undefined).then(operation);
+    onboardingWriteQueue = pending;
+    return pending;
 }
 /**
  * Rebuild OS local notifications from the current finance + preference snapshot.
@@ -51,6 +63,11 @@ export const useUiStore = create((set, get) => ({
     hasPin: false,
     hasSeenSplash: false,
     isLocked: false,
+    onboardingDraft: null,
+    onboardingLoadError: null,
+    onboardingDraftInvalid: false,
+    splashReadError: null,
+    preferenceLoadError: null,
     preferencesReady: false,
     notificationPermissionDenied: false,
     notificationHint: null,
@@ -63,14 +80,46 @@ export const useUiStore = create((set, get) => ({
             return;
         }
         preferencesPromise = (async () => {
-            const preferences = await loadPreferences();
-            const pinExists = await hasStoredPin();
-            const splashSeen = await SecureStore.getItemAsync("moneymap.splash.seen.v1").catch(() => null);
+            const [preferenceResult, pinResult, splashResult, onboardingResult] = await Promise.all([
+                loadPreferencesResult(),
+                hasStoredPin()
+                    .then((exists) => ({ exists, status: "loaded" }))
+                    .catch(() => ({ exists: false, status: "unreadable" })),
+                SecureStore.getItemAsync(SPLASH_SEEN_KEY)
+                    .then((value) => ({ value, status: "loaded" }))
+                    .catch(() => ({ value: null, status: "unreadable" })),
+                loadOnboardingDraftResult(),
+            ]);
+            const preferences = preferenceResult.preferences;
+            const pinStateUnreadable = pinResult.status === "unreadable";
+            const failClosedForPinState = pinStateUnreadable
+                && (preferences.appLockEnabled || preferenceResult.status !== "loaded");
+            const pinExists = pinResult.exists || failClosedForPinState;
+            const failClosed = shouldFailClosedPreferenceLoad(preferenceResult.status, pinExists)
+                || failClosedForPinState;
+            const firstRun = splashResult.value !== "true";
             set({
                 ...preferences,
                 hasPin: pinExists,
-                hasSeenSplash: splashSeen === "true",
-                isLocked: preferences.appLockEnabled && pinExists,
+                hasSeenSplash: splashResult.value === "true",
+                isLocked: (preferences.appLockEnabled && pinExists) || failClosed,
+                onboardingDraft: firstRun && onboardingResult.status === "loaded"
+                    ? onboardingResult.draft
+                    : null,
+                onboardingLoadError: firstRun && onboardingResult.status === "unreadable"
+                    ? "Saved setup progress could not be read. Try again before starting so it is not overwritten."
+                    : firstRun && onboardingResult.status === "invalid"
+                        ? "Saved setup progress is damaged or from a newer version. It has not been deleted."
+                        : null,
+                onboardingDraftInvalid: firstRun && onboardingResult.status === "invalid",
+                splashReadError: splashResult.status === "unreadable"
+                    ? "Saved app start state could not be read. Retry before starting setup."
+                    : null,
+                preferenceLoadError: pinStateUnreadable && failClosed
+                    ? "Secure app-lock data could not be read. Retry when device secure storage is available."
+                    : failClosed
+                        ? "App preferences could not be verified. Unlock with your stored PIN to restore secure defaults."
+                        : null,
                 preferencesReady: true,
             });
             if (preferences.remindersEnabled) {
@@ -113,12 +162,73 @@ export const useUiStore = create((set, get) => ({
         }
     },
     setHasSeenSplash: async (seen) => {
-        set({ hasSeenSplash: seen });
-        try {
-            await SecureStore.setItemAsync("moneymap.splash.seen.v1", seen ? "true" : "false");
-        } catch {
-            // no-op
+        await SecureStore.setItemAsync(SPLASH_SEEN_KEY, seen ? "true" : "false");
+        set({ hasSeenSplash: seen, splashReadError: null });
+    },
+    beginOnboarding: async () => {
+        if (get().splashReadError !== null) {
+            let seen;
+            try {
+                seen = await SecureStore.getItemAsync(SPLASH_SEEN_KEY);
+            }
+            catch {
+                throw new Error("Saved app start state is still unavailable. No setup draft was written.");
+            }
+            if (seen === "true") {
+                set({ hasSeenSplash: true, splashReadError: null });
+                return null;
+            }
+            set({ splashReadError: null });
         }
+        const existing = get().onboardingDraft;
+        if (existing !== null) {
+            return existing;
+        }
+        if (get().onboardingLoadError !== null) {
+            const result = await loadOnboardingDraftResult();
+            if (result.status === "unreadable" || result.status === "invalid") {
+                throw new Error(result.status === "invalid"
+                    ? "Saved setup progress cannot be resumed. Discard it explicitly before starting again."
+                    : "Saved setup progress is still unavailable. No new draft was written.");
+            }
+            if (result.status === "loaded" && result.draft !== null) {
+                set({ onboardingDraft: result.draft, onboardingLoadError: null, onboardingDraftInvalid: false });
+                return result.draft;
+            }
+            set({ onboardingLoadError: null, onboardingDraftInvalid: false });
+        }
+        const draft = createOnboardingDraft();
+        const saved = await queueOnboardingWrite(() => saveOnboardingDraft(draft));
+        set({ onboardingDraft: saved, onboardingLoadError: null, onboardingDraftInvalid: false });
+        return saved;
+    },
+    discardInvalidOnboardingDraft: async () => {
+        await queueOnboardingWrite(async () => {
+            const result = await loadOnboardingDraftResult();
+            if (result.status === "unreadable") {
+                throw new Error("Saved setup progress is still unavailable. Nothing was deleted.");
+            }
+            if (result.status === "loaded" && result.draft !== null) {
+                set({ onboardingDraft: result.draft, onboardingLoadError: null, onboardingDraftInvalid: false });
+                return;
+            }
+            if (result.status === "invalid") {
+                await clearOnboardingDraft();
+            }
+            set({ onboardingLoadError: null, onboardingDraftInvalid: false });
+        });
+    },
+    saveOnboardingProgress: async (draft) => {
+        const saved = await queueOnboardingWrite(() => saveOnboardingDraft(draft));
+        set({ onboardingDraft: saved });
+        return saved;
+    },
+    completeOnboarding: async () => {
+        await onboardingWriteQueue;
+        await SecureStore.setItemAsync(SPLASH_SEEN_KEY, "true");
+        set({ hasSeenSplash: true, onboardingDraft: null, onboardingLoadError: null, onboardingDraftInvalid: false, splashReadError: null });
+        // The completion marker is authoritative; a failed cleanup cannot roll it back.
+        await queueOnboardingWrite(() => clearOnboardingDraft()).catch(() => undefined);
     },
     setAppLockEnabled: async (enabled) => {
         if (enabled) {
@@ -178,7 +288,19 @@ export const useUiStore = create((set, get) => ({
     unlockWithPin: async (pin) => {
         const result = await verifyPinWithLockout(pin);
         if (result.ok) {
-            set({ isLocked: false });
+            const recoveringPreferences = get().preferenceLoadError !== null;
+            set({
+                appLockEnabled: recoveringPreferences ? true : get().appLockEnabled,
+                isLocked: false,
+                preferenceLoadError: null,
+            });
+            if (recoveringPreferences) {
+                // Unlock the current session even if SecureStore is still unavailable; the
+                // app remains configured to re-lock on background and on the next cold start.
+                await persist(get()).catch(() => {
+                    set({ preferenceLoadError: "Secure app-lock preferences could not be rewritten. The next launch will require your PIN again." });
+                });
+            }
         }
         return result;
     },
@@ -186,7 +308,19 @@ export const useUiStore = create((set, get) => ({
     unlockWithBiometrics: async () => {
         const result = await tryLocalAuthentication();
         if (result === "success") {
-            set({ isLocked: false });
+            const recoveringPreferences = get().preferenceLoadError !== null;
+            set({
+                appLockEnabled: recoveringPreferences ? true : get().appLockEnabled,
+                isLocked: false,
+                preferenceLoadError: null,
+            });
+            if (recoveringPreferences) {
+                // A verified biometric unlock restores the same fail-closed defaults as PIN
+                // recovery, including background relocking for the current session.
+                await persist(get()).catch(() => {
+                    set({ preferenceLoadError: "Secure app-lock preferences could not be rewritten. The next launch will require authentication again." });
+                });
+            }
         }
         return result;
     },

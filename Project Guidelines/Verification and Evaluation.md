@@ -1,8 +1,32 @@
 # Verification and Evaluation
 
-## Current QA evidence (2026-09-28)
+## Current implementation evidence (2026-10-03)
 
-See [QA Verification Report 2026-09-28](./QA%20Verification%20Report%202026-09-28.md) for the current evidence: **32 suites / 199 tests pass without exclusions**, Expo Doctor **18/18**, Android JS export passes, and **1,829 local stress operations have zero errors**. The workload starts with 10,000 rows, 100 budgets/rules, and reaches 32 actual SQLite writers. Final dashboard p95 is **15.19 ms**; writer p99 at concurrency 32 is **2,517.33 ms**. These are desktop SQLite observations, not native SQLCipher/device acceptance.
+Executed on Windows with Node `v24.16.0` (the documented baseline is Node 22 LTS), npm `11.13.0`,
+JDK 21, and the local desktop SQLite test driver:
+
+| Check | Observation | Limit |
+|---|---|---|
+| `npm test -- --watch=false --runInBand` | **45/45 suites, 307/307 tests pass**; includes v4-to-v7 upgrades, archived-account preservation, onboard expense correction, source-key import reconciliation after edit, truthful file/paste outcomes, paste invalid/partial paths, restore one-shot undo and injected mid-transaction rollback | Native providers mocked; Jest is not device verification |
+| `npx expo export --platform android --output-dir .expo/export-android-2026-10-03-final` | PASS; 1 Hermes Android bundle (5.69 MB), 20 asset entries | No Gradle APK or installed-device smoke test |
+| `npm run android:check` and `npx expo-doctor` | PASS; local SDK/JDK 21 present, Expo Doctor 18/18; launcher warns Node 24 vs Node 22 baseline | Native build and device runtime unverified |
+| `npm run test:stress -- docs/qa/2026-10-03/stress-final.json` | PASS; 1,829 operations/zero errors, 10,000 transactions, 100 budgets/rules, dashboard p95 **8.43 ms**, 32-writer p99 **2,621.75 ms**, integrity `ok` | File-backed desktop SQLite, not native SQLCipher or UI latency; full data in [stress-final.json](../docs/qa/2026-10-03/stress-final.json) |
+| `npm audit --omit=dev` | **FAIL**; latest run reported 48 production-graph advisories (33 high, 15 moderate); an earlier run in the same session reported 46 | Advisory feed changes; `xlsx@0.20.3` is installed from an integrity-pinned vendor URL not comprehensively assessed by npm audit. No forced upgrades applied |
+| `npm run emulator` | No connected ADB device or configured AVD on this workstation | Real phone/tablet, SQLCipher open/reopen, biometrics, notifications, accessibility and visual parity remain UNVERIFIED |
+| `kilo mcp list` | Remote Figma requires authentication; desktop Figma endpoint is unavailable | Supplied 52-state-per-device inventory used as a group map, not independent per-frame inspection |
+
+Requirement-to-check coverage: FR-09/10 use `monthChipCalendar.test.jsx`, `transactionEdit.test.js`,
+`qaStoreFlows.test.jsx`; FR-11 uses `onboarding.test.js`, `onboardingScreen.test.jsx`,
+`uiStoreOnboarding.test.js`, `splashOnboarding.test.jsx`, `rootNavigationMode.test.js`; FR-12 and
+NFR-06 use `schema.test.js`, `repositories.test.js`, `importParser.test.js`, `importReview.test.jsx`,
+`pasteImport.test.jsx`, `dataTransfer.test.js`, `qaPersistence.test.js`, and `qaStoreFlows.test.jsx`.
+FR-13/NFR-07 have group-level source/static/component coverage in [Design Prototype](./Design%20Prototype.md),
+not 104 verified frame comparisons. Production dependency remediation is a separate reviewed release gate;
+do not use `npm audit fix --force` to downgrade Expo or arbitrarily replace the native stack.
+
+## Historical QA evidence (2026-09-28)
+
+See [QA Verification Report 2026-09-28](./QA%20Verification%20Report%202026-09-28.md) for evidence from that run: **32 suites / 199 tests passed without exclusions**, Expo Doctor **18/18**, Android JS export passed, and **1,829 local stress operations had zero errors**. The workload started with 10,000 rows, 100 budgets/rules, and reached 32 actual SQLite writers. Dashboard p95 was **15.19 ms**; writer p99 at concurrency 32 was **2,517.33 ms**. These were desktop SQLite observations, not native SQLCipher/device acceptance.
 
 Native build/device E2E remains **UNVERIFIED** after Kotlin daemon failures and an isolated emulator system ANR. The production audit remains **24 advisories (18 moderate, 6 high)**. Older counts and parity assertions below are historical evidence and must not be used as current device acceptance. Machine-readable evidence is in [`docs/qa/2026-09-28/`](../docs/qa/2026-09-28/).
 

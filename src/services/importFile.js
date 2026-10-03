@@ -1,8 +1,11 @@
 import * as DocumentPicker from "expo-document-picker";
+import * as Crypto from "expo-crypto";
 import {
   csvTextToGrid,
   detectImportFormat,
   detectImportMappings,
+  IMPORT_FIELDS,
+  MAX_IMPORT_FILE_BYTES,
   parseImportGrid,
   xlsxToGrid,
 } from "../domain/services/importParser";
@@ -16,6 +19,24 @@ const PICKER_TYPES = [
   "application/octet-stream",
   "*/*",
 ];
+
+export async function fingerprintImportContent(content) {
+  return Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    String(content ?? ""),
+  );
+}
+
+export function buildImportSourceKey(contentFingerprint, mappings, sourceRowNumber) {
+  if (typeof contentFingerprint !== "string" || !/^[0-9a-f]{64}$/i.test(contentFingerprint)) {
+    throw new TypeError("Import content fingerprint is invalid.");
+  }
+  if (!Number.isSafeInteger(sourceRowNumber) || sourceRowNumber <= 0) {
+    throw new TypeError("Import source row number is invalid.");
+  }
+  const mappingSignature = IMPORT_FIELDS.map((field) => mappings[field] ?? -1).join(".");
+  return `import:v1:${contentFingerprint}:${mappingSignature}:${sourceRowNumber}`;
+}
 
 /**
  * @param {string} uri
@@ -94,6 +115,9 @@ export async function pickAndParseImportFile() {
   }
 
   const asset = result.assets[0];
+  if (Number.isFinite(asset.size) && asset.size > MAX_IMPORT_FILE_BYTES) {
+    throw new Error("The selected import file exceeds the supported size of 5 MB.");
+  }
   const fileName = asset.name || "import.csv";
   let format = detectImportFormat(fileName);
   if (format === "unknown") {
@@ -106,6 +130,7 @@ export async function pickAndParseImportFile() {
   }
 
   const loaded = await readUriAsImportContent(asset.uri, format);
+  const contentFingerprint = await fingerprintImportContent(loaded.content);
   const grid = loaded.kind === "xlsx"
     ? xlsxToGrid(loaded.content, "base64")
     : csvTextToGrid(loaded.content);
@@ -125,6 +150,7 @@ export async function pickAndParseImportFile() {
     grid,
     mappings,
     preview,
+    contentFingerprint,
   };
 }
 

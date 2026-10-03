@@ -8,7 +8,8 @@ import { buildAutomaticAccountResolutions, listImportAccountSources, unresolvedI
 import { importAccountKey } from "../domain/services/importParser";
 import { ACCOUNT_TYPES } from "../domain/types";
 import { runRecurringCatchUp } from "../services/recurringCatchUp";
-import { validateBackup } from "../services/dataTransfer";
+import { buildBackup, parseBackup, serializeBackup, validateBackup } from "../services/dataTransfer";
+import { ONBOARDING_FIRST_TRANSACTION_SOURCE_KEY } from "../services/onboarding";
 import { registerFinanceSnapshotProvider, syncRemindersFromStores } from "./uiStore";
 const DEFAULT_ACCOUNTS = [
     { name: "Cash", type: "CASH" },
@@ -45,7 +46,7 @@ function repositories(database) {
 async function ensureDefaultAccounts(accountRepo) {
     const existing = await accountRepo.list();
     for (const defaults of DEFAULT_ACCOUNTS) {
-        const found = existing.find((account) => account.type === defaults.type && !account.isArchived);
+        const found = existing.find((account) => account.type === defaults.type);
         if (!found) {
             await accountRepo.create({
                 name: defaults.name,
@@ -71,10 +72,24 @@ async function ensureEntryCategories(categoryRepo) {
         }
     }
 }
+async function ensureBootstrapDefaults(database) {
+    const marker = await database.execute("SELECT value FROM app_metadata WHERE key = ?", ["bootstrap-defaults-v1"]);
+    if (marker.rows[0]?.value === "complete") {
+        return;
+    }
+    await database.transaction(async (transaction) => {
+        const repos = repositories(transaction);
+        await ensureDefaultAccounts(repos.accounts);
+        await ensureEntryCategories(repos.categories);
+        await transaction.execute(`INSERT INTO app_metadata (key, value) VALUES (?, ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value`, ["bootstrap-defaults-v1", "complete"]);
+    });
+}
 async function loadSnapshot(database) {
     const repos = repositories(database);
-    await ensureDefaultAccounts(repos.accounts);
-    await ensureEntryCategories(repos.categories);
+    // Defaults are a one-time bootstrap, not a repair loop. User archive/delete choices
+    // and exact backup restores must survive every subsequent refresh.
+    await ensureBootstrapDefaults(database);
     const [accounts, categories, transactions, budgets, recurringRules, goals] = await Promise.all([
         repos.accounts.list(),
         repos.categories.list(),
@@ -176,18 +191,51 @@ export const useFinanceStore = create((set, get) => ({
         const account = input.accountId === undefined
             ? findAccount(accounts, input.accountType)
             : findActiveAccountById(accounts, input.accountId);
+        const transactionRepo = new TransactionRepository(database);
+        const existingSourceTransaction = input.sourceKey
+            ? await transactionRepo.getBySourceKey(input.sourceKey)
+            : null;
+        // A retry after commit may omit the original default date. Reuse the durable
+        // timestamp only in that case; an explicitly changed date still fails collision checks.
+        const dateEpochMillis = input.dateEpochMillis
+            ?? existingSourceTransaction?.dateEpochMillis
+            ?? Date.now();
+        if (!Number.isSafeInteger(dateEpochMillis)) {
+            throw new Error("Invalid transaction date.");
+        }
         const payload = {
             amountMinor: input.amountMinor,
             type: input.type,
             categoryId: category.id,
             accountId: account.id,
-            dateEpochMillis: Date.now(),
+            dateEpochMillis,
             note: input.note?.trim() ? input.note.trim() : null,
             recurringRuleId: null,
+            scheduledDateEpochMillis: null,
+            sourceKey: input.sourceKey ?? null,
         };
-        const created = await new TransactionRepository(database).create(payload);
+        const created = await transactionRepo.create(payload);
         await get().refresh();
         return created;
+    },
+    saveOnboardingExpense: async (input) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const existing = await new TransactionRepository(database).getBySourceKey(ONBOARDING_FIRST_TRANSACTION_SOURCE_KEY);
+        if (existing !== null) {
+            // A user can go back from the lock step or retry after a committed-but-unconfirmed write.
+            return get().updateTransaction(existing.id, {
+                accountId: input.accountId,
+                amountMinor: input.amountMinor,
+                categoryName: input.categoryName,
+                note: input.note,
+                type: "EXPENSE",
+            });
+        }
+        return get().addTransaction({ ...input, sourceKey: ONBOARDING_FIRST_TRANSACTION_SOURCE_KEY, type: "EXPENSE" });
     },
     updateTransaction: async (id, patch) => {
         await get().ensureHydrated();
@@ -201,7 +249,7 @@ export const useFinanceStore = create((set, get) => ({
         if (!existing) {
             throw new Error("Transaction not found.");
         }
-        if (existing.recurringRuleId !== null) {
+        if (existing.scheduledDateEpochMillis !== null || existing.recurringRuleId !== null) {
             if (patch.dateEpochMillis !== undefined && patch.dateEpochMillis !== existing.dateEpochMillis) {
                 throw new Error("Cannot change the scheduled date of a recurring transaction occurrence.");
             }
@@ -430,7 +478,25 @@ export const useFinanceStore = create((set, get) => ({
         if (name.length === 0) {
             throw new Error("Account name is required.");
         }
-        const created = await new AccountRepository(database).create({
+        const accountRepo = new AccountRepository(database);
+        if (input.reuseExistingType === true) {
+            const durableAccounts = await accountRepo.list();
+            const existing = durableAccounts.find((account) => account.type === input.type && !account.isArchived)
+                ?? durableAccounts.find((account) => account.type === input.type);
+            if (existing !== undefined) {
+                const reconciled = await accountRepo.update(existing.id, {
+                    isArchived: false,
+                    name,
+                    startingBalanceMinor: input.startingBalanceMinor ?? 0,
+                });
+                if (reconciled === null) {
+                    throw new Error("Account could not be reconciled.");
+                }
+                await get().refresh();
+                return reconciled;
+            }
+        }
+        const created = await accountRepo.create({
             name,
             type: input.type,
             startingBalanceMinor: input.startingBalanceMinor ?? 0,
@@ -546,7 +612,7 @@ export const useFinanceStore = create((set, get) => ({
      * Bulk-insert already-validated import rows inside one transaction.
      * Auto-creates missing categories after every source account is explicitly resolved.
      * (or a number for older callers that only read the created count).
-     * @param {Array<{ dateEpochMillis: number, type: string, amountMinor: number, categoryName: string, accountLabel: string, accountKey?: string, accountType: string|null, note: string|null }>} rows
+     * @param {Array<{ dateEpochMillis: number, type: string, amountMinor: number, categoryName: string, accountLabel: string, accountKey?: string, accountType: string|null, note: string|null, sourceKey?: string }>} rows
      * @param {{ skipped?: Array<{ rowNumber: number, reason: string }>, accountResolutions?: Record<string, { kind: 'existing', accountId: number }|{ kind: 'create', name: string, type: string }> }} [meta]
      */
     importCsvRows: async (rows, meta = {}) => {
@@ -555,18 +621,21 @@ export const useFinanceStore = create((set, get) => ({
         if (database === null) {
             throw new Error("Database is not ready.");
         }
-        const skipped = Array.isArray(meta.skipped) ? meta.skipped : [];
+        const skipped = Array.isArray(meta.skipped) ? [...meta.skipped] : [];
         if (rows.length === 0) {
-            return { created: 0, skipped: skipped.length, skippedRows: skipped };
+            return { created: 0, reconciled: 0, skipped: skipped.length, skippedRows: skipped };
         }
 
+        // Read durable state instead of relying on a possibly stale UI snapshot after an interrupted refresh.
+        const currentAccounts = await new AccountRepository(database).list();
+        const currentCategories = await new CategoryRepository(database).list();
         const accountResolutions = meta.accountResolutions
-            ?? buildAutomaticAccountResolutions(rows, get().accounts);
+            ?? buildAutomaticAccountResolutions(rows, currentAccounts);
         const unresolved = unresolvedImportAccountSources(rows, accountResolutions);
         if (unresolved.length > 0) {
             throw new Error(`Resolve imported account "${unresolved[0].label}" before confirming the import.`);
         }
-        const activeAccounts = get().accounts.filter((account) => !account.isArchived);
+        const activeAccounts = currentAccounts.filter((account) => !account.isArchived);
         for (const source of listImportAccountSources(rows)) {
             const resolution = accountResolutions[source.key];
             if (resolution.kind === "existing") {
@@ -581,11 +650,15 @@ export const useFinanceStore = create((set, get) => ({
             }
         }
 
+        let createdCount = 0;
+        let reconciledCount = 0;
         await database.transaction(async (tx) => {
             const categoryCache = new Map(
-                get().categories.map((category) => [`${category.type}:${category.name.toLowerCase()}`, category]),
+                currentCategories.map((category) => [`${category.type}:${category.name.toLowerCase()}`, category]),
             );
             const accountCache = new Map();
+            const transactionRepo = new TransactionRepository(tx);
+            const seenSourceKeys = new Set();
 
             const insertReturningId = async (statement, parameters) => {
                 const result = await tx.execute(statement, parameters);
@@ -601,6 +674,35 @@ export const useFinanceStore = create((set, get) => ({
             };
 
             for (const row of rows) {
+                if (row.sourceKey) {
+                    if (seenSourceKeys.has(row.sourceKey)) {
+                        skipped.push({ rowNumber: row.sourceRowNumber ?? 0, reason: "This import contains the same source row more than once." });
+                        continue;
+                    }
+                    seenSourceKeys.add(row.sourceKey);
+                    const previous = await transactionRepo.getBySourceKey(row.sourceKey);
+                    if (previous !== null) {
+                        const category = currentCategories.find((item) => item.id === previous.categoryId);
+                        const account = currentAccounts.find((item) => item.id === previous.accountId);
+                        const resolution = accountResolutions[row.accountKey || importAccountKey(row.accountLabel)];
+                        const sameAccount = resolution.kind === "existing"
+                            ? resolution.accountId === previous.accountId
+                            : account?.name.toLocaleLowerCase() === resolution.name.trim().toLocaleLowerCase()
+                                && account?.type === resolution.type;
+                        const unchanged = sameAccount && previous.type === row.type
+                            && previous.amountMinor === row.amountMinor
+                            && previous.dateEpochMillis === row.dateEpochMillis
+                            && previous.note === (row.note ?? null)
+                            && category?.name.toLocaleLowerCase() === row.categoryName.toLocaleLowerCase();
+                        if (unchanged) {
+                            reconciledCount += 1;
+                        }
+                        else {
+                            skipped.push({ rowNumber: row.sourceRowNumber ?? 0, reason: "This imported transaction was edited after import; the existing version was kept." });
+                        }
+                        continue;
+                    }
+                }
                 const categoryKey = `${row.type}:${row.categoryName.toLowerCase()}`;
                 let category = categoryCache.get(categoryKey);
                 if (category === undefined) {
@@ -635,45 +737,65 @@ export const useFinanceStore = create((set, get) => ({
                     }
                     else {
                         const accountName = resolution.name.trim();
-                        const accountId = await insertReturningId(
-                            `INSERT INTO accounts (name, type, starting_balance_minor, is_archived)
-               VALUES (?, ?, ?, 0)`,
-                            [accountName, resolution.type, 0],
-                        );
-                        account = {
-                            id: accountId,
-                            name: accountName,
-                            type: resolution.type,
-                            startingBalanceMinor: 0,
-                            isArchived: false,
-                        };
+                        // A post-commit refresh failure can leave Zustand stale. Reuse the durable
+                        // account created by the prior attempt before creating another one.
+                        account = activeAccounts.find((candidate) => candidate.type === resolution.type
+                            && candidate.name.toLocaleLowerCase() === accountName.toLocaleLowerCase());
+                        if (account === undefined) {
+                            const accountId = await insertReturningId(
+                                `INSERT INTO accounts (name, type, starting_balance_minor, is_archived)
+                 VALUES (?, ?, ?, 0)`,
+                                [accountName, resolution.type, 0],
+                            );
+                            account = {
+                                id: accountId,
+                                name: accountName,
+                                type: resolution.type,
+                                startingBalanceMinor: 0,
+                                isArchived: false,
+                            };
+                            activeAccounts.push(account);
+                        }
                     }
                     accountCache.set(accountKey, account);
                 }
 
-                await tx.execute(
-                    `INSERT INTO transactions (
-              amount_minor, type, category_id, account_id, date_epoch_millis, note, recurring_rule_id
-            ) VALUES (?, ?, ?, ?, ?, ?, NULL)`,
-                    [
-                        row.amountMinor,
-                        row.type,
-                        category.id,
-                        account.id,
-                        row.dateEpochMillis,
-                        row.note,
-                    ],
-                );
+                await transactionRepo.create({
+                    amountMinor: row.amountMinor,
+                    type: row.type,
+                    categoryId: category.id,
+                    accountId: account.id,
+                    dateEpochMillis: row.dateEpochMillis,
+                    note: row.note,
+                    recurringRuleId: null,
+                    scheduledDateEpochMillis: null,
+                    sourceKey: row.sourceKey ?? null,
+                });
+                createdCount += 1;
             }
         });
 
-        await get().refresh();
-        const summary = { created: rows.length, skipped: skipped.length, skippedRows: skipped };
+        const summary = {
+            created: createdCount,
+            reconciled: reconciledCount,
+            skipped: skipped.length,
+            skippedRows: skipped,
+        };
+        try {
+            await get().refresh();
+        }
+        catch (error) {
+            const refreshError = new Error("The import was committed, but the refreshed ledger could not be displayed. Retrying this same import will reconcile the committed rows safely.");
+            refreshError.code = "IMPORT_COMMITTED_REFRESH_FAILED";
+            refreshError.cause = error;
+            refreshError.summary = summary;
+            throw refreshError;
+        }
         // Number-like for callers that only display the created count.
-        summary.valueOf = () => rows.length;
+        summary.valueOf = () => createdCount;
         return summary;
     },
-    restoreBackup: async (backup) => {
+    restoreBackup: async (backup, { recordRecovery = true } = {}) => {
         // Reject corrupt links/duplicate identities before the replacement transaction starts.
         validateBackup(backup);
         await get().ensureHydrated();
@@ -696,6 +818,29 @@ export const useFinanceStore = create((set, get) => ({
             return id;
         };
         await database.transaction(async (tx) => {
+            if (recordRecovery) {
+                const currentRepos = repositories(tx);
+                const recoveryBackup = buildBackup({
+                    accounts: await currentRepos.accounts.list(),
+                    categories: await currentRepos.categories.list(),
+                    transactions: await currentRepos.transactions.list(),
+                    budgets: await currentRepos.budgets.list(),
+                    recurringRules: await currentRepos.recurring.list(),
+                    goals: await currentRepos.goals.list(),
+                });
+                await tx.execute(`INSERT INTO restore_recovery_snapshot (id, backup_json, created_epoch_millis)
+              VALUES (1, ?, ?)
+              ON CONFLICT(id) DO UPDATE SET
+                backup_json = excluded.backup_json,
+                created_epoch_millis = excluded.created_epoch_millis`, [
+                    serializeBackup(recoveryBackup),
+                    Date.now(),
+                ]);
+            }
+            else {
+                // Consume the undo slot inside the replacement transaction, so a second undo cannot redo it.
+                await tx.execute("DELETE FROM restore_recovery_snapshot WHERE id = 1");
+            }
             await tx.execute("DELETE FROM transactions");
             await tx.execute("DELETE FROM budgets");
             await tx.execute("DELETE FROM recurring_rules");
@@ -756,8 +901,9 @@ export const useFinanceStore = create((set, get) => ({
                     ? null
                     : (recurringIdMap.get(transaction.recurringRuleId) ?? null);
                 await tx.execute(`INSERT INTO transactions (
-             amount_minor, type, category_id, account_id, date_epoch_millis, note, recurring_rule_id
-           ) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
+             amount_minor, type, category_id, account_id, date_epoch_millis, note, recurring_rule_id,
+             scheduled_date_epoch_millis, source_key
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
                     transaction.amountMinor,
                     transaction.type,
                     categoryId,
@@ -765,6 +911,9 @@ export const useFinanceStore = create((set, get) => ({
                     transaction.dateEpochMillis,
                     transaction.note,
                     recurringRuleId,
+                    transaction.scheduledDateEpochMillis
+                        ?? (recurringRuleId === null ? null : transaction.dateEpochMillis),
+                    transaction.sourceKey ?? null,
                 ]);
             }
             for (const budget of backup.budgets) {
@@ -789,7 +938,28 @@ export const useFinanceStore = create((set, get) => ({
                 ]);
             }
         });
-        await get().refresh();
+        try {
+            await get().refresh();
+        }
+        catch (error) {
+            const refreshError = new Error("The backup was restored, but the refreshed ledger could not be displayed. Retry the ledger refresh or undo this restore; do not apply the backup again.");
+            refreshError.code = "RESTORE_COMMITTED_REFRESH_FAILED";
+            refreshError.cause = error;
+            throw refreshError;
+        }
+    },
+    undoLastRestore: async () => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const result = await database.execute("SELECT backup_json FROM restore_recovery_snapshot WHERE id = 1");
+        const serialized = result.rows[0]?.backup_json;
+        if (typeof serialized !== "string") {
+            throw new Error("No restore recovery snapshot is available.");
+        }
+        await get().restoreBackup(parseBackup(serialized), { recordRecovery: false });
     },
     deleteBudgetByCategoryName: async (categoryName, monthYear) => {
         await get().ensureHydrated();

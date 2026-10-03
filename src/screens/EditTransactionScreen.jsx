@@ -3,6 +3,7 @@ import { Alert, Pressable, ScrollView, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { BottomSheet } from "../components/BottomSheet";
 import { PrimaryButton } from "../components/Buttons";
+import { CalendarPickerSheet } from "../components/CalendarPickerSheet";
 import { Chip } from "../components/Chip";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
@@ -12,12 +13,6 @@ import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import { listAccountChips, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
-
-const DAYS_OF_WEEK = ["S", "M", "T", "W", "T", "F", "S"];
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
 
 export function EditTransactionScreen({ navigation, route }) {
   const theme = useTheme(useUiStore((state) => state.themePreference));
@@ -76,7 +71,7 @@ export function EditTransactionScreen({ navigation, route }) {
     );
   }
 
-  const isRecurring = transaction.recurringRuleId !== null;
+  const isRecurring = transaction.recurringRuleId !== null || transaction.scheduledDateEpochMillis !== null;
 
   // Form State
   const [type, setType] = useState(transaction.type);
@@ -94,12 +89,6 @@ export function EditTransactionScreen({ navigation, route }) {
   const [accountPickerVisible, setAccountPickerVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
-
-  // Calendar State for Date Picker Sheet (Frame 18c)
-  const initialDate = new Date(dateEpochMillis);
-  const [calYear, setCalYear] = useState(initialDate.getFullYear());
-  const [calMonth, setCalMonth] = useState(initialDate.getMonth());
-  const [tempSelectedDate, setTempSelectedDate] = useState(dateEpochMillis);
 
   const typeCategories = useMemo(
     () => categoriesForType(categories, type),
@@ -122,49 +111,6 @@ export function EditTransactionScreen({ navigation, route }) {
     day: "numeric",
     year: "numeric",
   });
-
-  // Calendar days calculation
-  const calendarDays = useMemo(() => {
-    const firstDay = new Date(calYear, calMonth, 1).getDay();
-    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-    const days = [];
-    for (let i = 0; i < firstDay; i++) {
-      days.push(null);
-    }
-    for (let d = 1; d <= daysInMonth; d++) {
-      days.push(d);
-    }
-    return days;
-  }, [calYear, calMonth]);
-
-  const handlePrevMonth = () => {
-    if (calMonth === 0) {
-      setCalYear((y) => y - 1);
-      setCalMonth(11);
-    } else {
-      setCalMonth((m) => m - 1);
-    }
-  };
-
-  const handleNextMonth = () => {
-    if (calMonth === 11) {
-      setCalYear((y) => y + 1);
-      setCalMonth(0);
-    } else {
-      setCalMonth((m) => m + 1);
-    }
-  };
-
-  const handleSelectDay = (day) => {
-    if (!day) return;
-    const newDate = new Date(calYear, calMonth, day, 12, 0, 0, 0);
-    setTempSelectedDate(newDate.getTime());
-  };
-
-  const handleConfirmDate = () => {
-    setDateEpochMillis(tempSelectedDate);
-    setDatePickerVisible(false);
-  };
 
   const handleSave = async () => {
     const cleaned = amountStr.trim().replace(/[₱$,\s]/g, "");
@@ -450,12 +396,7 @@ export function EditTransactionScreen({ navigation, route }) {
           <Pressable
             accessibilityLabel={`Change date, currently ${formattedDate}`}
             accessibilityRole="button"
-            onPress={() => {
-              setCalYear(new Date(dateEpochMillis).getFullYear());
-              setCalMonth(new Date(dateEpochMillis).getMonth());
-              setTempSelectedDate(dateEpochMillis);
-              setDatePickerVisible(true);
-            }}
+            onPress={() => setDatePickerVisible(true)}
             style={{
               alignItems: "center",
               flexDirection: "row",
@@ -588,126 +529,17 @@ export function EditTransactionScreen({ navigation, route }) {
         {isSaving ? "Saving changes…" : "Save Changes"}
       </PrimaryButton>
 
-      {/* Frame 18c: Date Picker BottomSheet */}
-      <BottomSheet
+      <CalendarPickerSheet
         onClose={() => setDatePickerVisible(false)}
+        onConfirm={(epochMillis) => {
+          setDateEpochMillis(epochMillis);
+          setDatePickerVisible(false);
+        }}
+        selectedDateEpochMillis={dateEpochMillis}
         testID="date-picker-sheet"
         title="Select Date"
         visible={datePickerVisible}
-      >
-        <View style={{ gap: theme.spacing.md, paddingVertical: theme.spacing.sm }}>
-          {/* Calendar Header with Navigation */}
-          <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
-            <Pressable
-              accessibilityLabel="Previous month"
-              accessibilityRole="button"
-              hitSlop={theme.spacing.md}
-              onPress={handlePrevMonth}
-              style={{
-                alignItems: "center",
-                backgroundColor: theme.colors.avatarBg,
-                borderRadius: theme.radii.round,
-                height: 36,
-                justifyContent: "center",
-                width: 36,
-              }}
-            >
-              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: 16 }}>‹</Text>
-            </Pressable>
-            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.cardHeader }}>
-              {MONTH_NAMES[calMonth]} {calYear}
-            </Text>
-            <Pressable
-              accessibilityLabel="Next month"
-              accessibilityRole="button"
-              hitSlop={theme.spacing.md}
-              onPress={handleNextMonth}
-              style={{
-                alignItems: "center",
-                backgroundColor: theme.colors.avatarBg,
-                borderRadius: theme.radii.round,
-                height: 36,
-                justifyContent: "center",
-                width: 36,
-              }}
-            >
-              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: 16 }}>›</Text>
-            </Pressable>
-          </View>
-
-          {/* Weekday Labels */}
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            {DAYS_OF_WEEK.map((day, idx) => (
-              <View key={idx} style={{ alignItems: "center", width: 40 }}>
-                <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
-                  {day}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Day Grid */}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start" }}>
-            {calendarDays.map((day, idx) => {
-              if (day === null) {
-                return <View key={idx} style={{ height: 40, width: "14.28%" }} />;
-              }
-              const dayDate = new Date(calYear, calMonth, day, 12, 0, 0, 0).getTime();
-              const isSelected =
-                new Date(tempSelectedDate).getFullYear() === calYear &&
-                new Date(tempSelectedDate).getMonth() === calMonth &&
-                new Date(tempSelectedDate).getDate() === day;
-
-              return (
-                <Pressable
-                  key={idx}
-                  accessibilityLabel={`${MONTH_NAMES[calMonth]} ${day}, ${calYear}`}
-                  accessibilityRole="button"
-                  onPress={() => handleSelectDay(day)}
-                  style={{
-                    alignItems: "center",
-                    height: 40,
-                    justifyContent: "center",
-                    width: "14.28%",
-                  }}
-                >
-                  <View
-                    style={{
-                      alignItems: "center",
-                      backgroundColor: isSelected ? theme.colors.primary : "transparent",
-                      borderRadius: theme.radii.round,
-                      height: 34,
-                      justifyContent: "center",
-                      width: 34,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: isSelected
-                          ? theme.mode === "dark" ? theme.colors.onAccent : theme.colors.onPrimary
-                          : theme.colors.text,
-                        fontFamily: isSelected ? theme.fonts.bold : theme.fonts.regular,
-                        fontSize: theme.typeScale.body,
-                      }}
-                    >
-                      {day}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* Bottom Action Button */}
-          <PrimaryButton
-            accessibilityLabel={`Use ${new Date(tempSelectedDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
-            onPress={handleConfirmDate}
-            style={{ marginTop: theme.spacing.sm }}
-          >
-            {`Use ${new Date(tempSelectedDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
-          </PrimaryButton>
-        </View>
-      </BottomSheet>
+      />
 
       {/* Category Picker BottomSheet */}
       <BottomSheet

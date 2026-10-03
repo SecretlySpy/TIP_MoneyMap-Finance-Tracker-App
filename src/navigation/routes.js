@@ -1,4 +1,21 @@
 /**
+ * Resolve the root shell from persisted state. Keeping this decision pure makes
+ * lock and first-run routing testable without mounting native navigators.
+ */
+export function selectRootNavigationMode({ preferencesReady, hasSeenSplash, onboardingDraft, splashReadError, isLocked }) {
+  if (!preferencesReady) {
+    return "loading";
+  }
+  if (isLocked) {
+    return "locked";
+  }
+  if (!hasSeenSplash) {
+    return splashReadError || onboardingDraft === null ? "first-run-splash" : "first-run-onboarding";
+  }
+  return "main";
+}
+
+/**
  * Route param list shapes for React Navigation (JSDoc only — runtime is untyped).
  *
  * @typedef {Object} HomeStackParamList
@@ -34,6 +51,8 @@
  * @typedef {Object} RootStackParamList
  * @property {import('@react-navigation/native').NavigatorScreenParams<MainTabParamList> | undefined} Main
  * @property {undefined} AppLock
+ * @property {undefined} Onboarding
+ * @property {undefined} Splash
  */
 
 export {};

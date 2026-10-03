@@ -21,9 +21,9 @@
 | Key generation/storage | Expo Crypto / SecureStore | `~15.0.9` / `~15.0.8` | Generate a 256-bit key and protect it with Android Keystore |
 | Background / reminders | expo-background-task / expo-notifications / expo-task-manager | Expo 54-compatible | Recurring catch-up + local bill reminders |
 | App lock | expo-local-authentication | Expo 54-compatible | Biometrics with PIN fallback |
-| Import | papaparse / xlsx / expo-document-picker / expo-file-system | Locked via package.json | CSV + Excel migration import |
+| Import | papaparse / xlsx / expo-document-picker / expo-file-system | `xlsx@0.20.3` from integrity-pinned SheetJS CDN tarball; other versions in `package.json` | CSV + Excel migration import; vendor-CDN dependency is not comprehensively assessed by npm audit |
 | Optional HTTPS | `src/remote/smartTipsClient.js`, `placesClient.js`, `eatsTipsClient.js` | Key via `app.config.js` / EAS for Gemini paths | Offline finance tips always remain available; Student Eats searches online around fixed TIP QC |
-| Tests | Jest Expo / RNTL / better-sqlite3 | `~54.0.17` / `^14.0.1` / `^12.11.1` | 165 tests at the 2026-09-27 reconciliation (27 suites): SQL, money, tips, import, lock, store, UI, and e2e integration |
+| Tests | Jest Expo / RNTL / better-sqlite3 | `~54.0.18` / `^14.0.1` / `^12.11.1` | 45 suites / 307 tests on 2026-10-03: SQL, money, tips, import, lock, store, UI, and integration |
 | Package manager | npm | 10 or newer (verified `10.9.8`) | Dependency installation and scripts |
 | Android tooling | Android SDK cmdline-tools / Studio, JDK | SDK platform 35, build-tools 35, NDK 27.1, Emulator, JDK 21 | API 26+ emulator/device builds; Java 25+ is unsupported by this Gradle stack |
 
@@ -50,7 +50,7 @@ flowchart TD
 ## Development-build flow
 
 ```text
-TypeScript + semantic tokens + SVG assets
+JavaScript/JSX + semantic tokens + SVG assets
           |
           v
   Babel / Metro / NativeWind
@@ -90,7 +90,7 @@ sequenceDiagram
 4. Copy `.env.example` to `.env`. Optional `GEMINI_API_KEY` enables online Smart Tips after in-app consent; offline tips work without it.
 5. Run `npm ci` (preferred with lockfile) or `npm install`.
 6. Run `npm run asset:splash` only after changing the source Home SVG or launch color; identical input produces an identical PNG hash.
-7. Run `npm test` (37 suites / 232 tests verified on 2026-10-01).
+7. Run `npm test` (45 suites / 307 tests verified on 2026-10-03).
 8. Run `npx expo-doctor` and optionally `npx expo export --platform android --clear`.
 9. Start an emulator or connect an Android device with USB debugging, then run `npm run android` (first run performs a native dev-client build).
 

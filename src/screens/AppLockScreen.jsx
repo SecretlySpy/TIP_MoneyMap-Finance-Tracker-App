@@ -36,6 +36,7 @@ export function AppLockScreen({ navigation }) {
     const unlockWithPin = useUiStore((state) => state.unlockWithPin);
     const unlockWithBiometrics = useUiStore((state) => state.unlockWithBiometrics);
     const setAppLockEnabled = useUiStore((state) => state.setAppLockEnabled);
+    const preferenceLoadError = useUiStore((state) => state.preferenceLoadError);
     const [mode, setMode] = useState(hasPin ? "unlock" : "create");
     const [pin, setPin] = useState("");
     const [pendingPin, setPendingPin] = useState("");
@@ -231,6 +232,9 @@ export function AppLockScreen({ navigation }) {
         <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small, textAlign: "center" }}>
           The PIN protects app access. Database encryption uses a separate key stored on this device.
         </Text>
+        {preferenceLoadError !== null ? (<Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small, textAlign: "center" }}>
+            {preferenceLoadError}
+          </Text>) : null}
         {error !== null ? (<Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
             {error}
           </Text>) : null}
