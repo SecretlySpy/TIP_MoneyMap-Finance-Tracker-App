@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Starts Expo's native Android workflow with project-local, cross-platform setup.
  *
