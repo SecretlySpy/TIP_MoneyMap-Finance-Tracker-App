@@ -12,7 +12,7 @@ export const palettes = {
         text: "#1A1C1B",
         sub: "#6B7572",
         income: "#1E9E6A",
-        expense: "#D64545",
+        expense: "#C43636",
         warning: "#E8A13D",
         tint: "#D7F2EA",
         outline: "#E2E8E5",
@@ -21,7 +21,7 @@ export const palettes = {
         chartBlue: "#4A90D9",
         chartGray: "#C9D4CF",
         amberBg: "#FEF1DB",
-        amberText: "#C88A28",
+        amberText: "#945E00",
         heroSubtext: "rgba(255,255,255,0.75)",
         heroMeta: "rgba(255,255,255,0.85)",
         heroPill: "rgba(255,255,255,0.12)",
@@ -90,6 +90,10 @@ export const sizes = {
     designWidth: 412,
     designHeight: 892,
     maxContentWidth: 540,
+    maxTabletContentWidth: 760,
+    maxSheetWidth: 640,
+    tabletBreakpoint: 600,
+    minTouchTarget: 44,
     avatar: 42,
     compactAvatar: 40,
     donut: 124,
@@ -106,7 +110,7 @@ export const sizes = {
     categoryCell: 64,
     accountChip: 33,
     entryKey: 53,
-    primaryButton: 51,
+    primaryButton: 56,
     secondaryButton: 44,
     filterChip: 30,
     billCard: 110,
@@ -125,6 +129,16 @@ export const sizes = {
     fabClearance: 96,
     lockKey: 62,
 };
+
+/**
+ * Keep the phone composition compact while allowing one bounded tablet layout.
+ * Wider windows intentionally reuse the tablet cap instead of creating a desktop fork.
+ */
+export function contentMaxWidthForViewport(viewportWidth, sizeTokens = sizes) {
+    return viewportWidth >= sizeTokens.tabletBreakpoint
+        ? sizeTokens.maxTabletContentWidth
+        : sizeTokens.maxContentWidth;
+}
 // Registered Expo font names make weight selection deterministic on Android.
 export const fonts = {
     regular: "Roboto_400Regular",

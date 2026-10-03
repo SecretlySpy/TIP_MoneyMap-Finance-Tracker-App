@@ -8,7 +8,7 @@ This file retains the historical module notes relocated from the repository root
 | Persistence and imports | `src/db/`, `src/services/dataTransfer.js` | [Database Structure](./Database%20Structure.md), [Backend Functionalities](./Backend%20Functionalities.md) |
 | Screens and UI | `src/screens/`, `src/components/` | [Design Prototype](./Design%20Prototype.md) |
 | Setup and checks | `package.json`, `__tests__/` | [Tech Stack Setup Guide](./Tech%20Stack%20Setup%20Guide.md), [Verification and Evaluation](./Verification%20and%20Evaluation.md) |
-| QA defects, stress and native limits | `scripts/qa-stress.cjs`, `__tests__/qa*`, `docs/qa/2026-09-28/` | [QA Verification Report 2026-09-28](./QA%20Verification%20Report%202026-09-28.md) |
+| QA defects, stress and native limits | `scripts/qa-stress.cjs`, `__tests__/qa*`, `docs/qa/2026-10-03/`, `docs/native-mobile-test-suite.md` | [Current Verification and Evaluation](./Verification%20and%20Evaluation.md); [native validation suite](../docs/native-mobile-test-suite.md); [historical QA report](./QA%20Verification%20Report%202026-09-28.md) |
 | Decisions and cleanup history | `Project Guidelines/` | [Decisions and Handover](./Decisions%20and%20Handover.md), [Architecture and Operations](./Architecture%20and%20Operations.md#repository-layout-and-cleanup) |
 
 ## Historical module notes
@@ -2261,4 +2261,3 @@ This section updates the prototype parity and test verification status:
 - Automated test coverage: 27 test suites passed, 165 total tests passed (including comprehensive `e2eVerification.test.js` validating all backend algorithmic pipelines, money precision, and database schemas).
 - Static UI fidelity verified: Zero hexadecimal color literals across all 37 UI components and screen files (enforcing strict `theme.colors.*` token consumption).
 - Continuity source: [Decisions and Handover](./Decisions%20and%20Handover.md).
-

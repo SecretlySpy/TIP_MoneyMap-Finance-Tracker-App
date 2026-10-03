@@ -103,19 +103,20 @@ The Pages site is the polished setup guide: root <a href="https://github.com/Sec
 <p>
 <strong>v0.1.0</strong> — Core complete + Student Eats + Goals / Safe-to-Spend.
 </p>
-<h3>Known gaps (reconciled 2026-09-27)</h3>
+<h3>Current limits (reviewed 2026-10-03)</h3>
 <p>
 The current verification matrix is in <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/Project%20Guidelines/Verification%20and%20Evaluation.md">Verification and Evaluation.md</a>.
-&quot;Done&quot; above means the feature ships, not that it matches every expectation of a mainstream
-expense tracker. Still missing:
+&quot;Done&quot; above describes implemented code, not a verified native release. Transaction backdating,
+edit/delete, History search, and retry-safe imports are now implemented and covered by Jest/desktop
+SQLite; live Figma and Android device acceptance remain separate.
 </p>
 <p>
 | Gap | Impact |
 |---|---|
-| Transactions cannot be <strong>backdated</strong> (always <code>Date.now()</code>) or <strong>edited</strong> after saving | High — the biggest deviation from standard trackers |
-| No transaction <strong>search</strong>; History supports explicit category and account filters | Medium |
-| <code>xlsx@0.18.5</code> has two unpatched high-severity advisories and parses user files | <strong>Security — action required</strong> |
-| No account transfers, budget rollover, import de-duplication, or &quot;delete all data&quot; reset | Low–medium; the import screen warns before confirmation |
+| Native SQLCipher key/storage, PIN/biometric and notification lifecycles, phone/tablet layout and accessibility | No connected device or configured AVD on this workstation; native acceptance is <strong>UNVERIFIED</strong> |
+| Current 52 mobile + 52 tablet state frames | Figma connector requires authentication; six feature groups are mapped to code, individual visual parity is <strong>UNVERIFIED</strong> |
+| Dependency advisories | <code>npm audit --omit=dev</code> reported 48 advisories (33 high, 15 moderate) on its latest run. <code>xlsx@0.20.3</code> is integrity-pinned from the vendor CDN; audit coverage of this tarball is incomplete. Review compatible updates before release |
+| Account transfers, budget rollover, and &quot;delete all data&quot; reset | Still outside the current product scope; imported rows edited since an earlier import are reported as skipped rather than overwritten |
 </p>
 <p>
 The Jest suite covers domain, data-transfer, store, component, and static UI contracts. Native
@@ -126,7 +127,7 @@ device behavior still requires the Android verification path below.
 <li>Install <strong>Node.js 22 LTS</strong>, <strong>JDK 21</strong>, Android SDK (API 35 recommended).</li>
 <li><code>npm ci</code></li>
 <li>Copy <code>.env.example</code> → <code>.env</code> (optional <code>GEMINI_API_KEY</code> for online tips).</li>
-<li><code>npm test</code> (37 suites, 232 tests verified on 2026-10-01)</li>
+<li><code>npm test</code> (45 suites, 307 tests verified on 2026-10-03)</li>
 <li>Start an emulator/device, then <code>npm run android</code> (dev client required — <strong>Expo Go unsupported</strong> because of SQLCipher).</li>
 </ol>
 <h3>Android Studio run button</h3>

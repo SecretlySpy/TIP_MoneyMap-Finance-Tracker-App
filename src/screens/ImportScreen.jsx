@@ -12,7 +12,7 @@ import {
 } from "../domain/services/importAccounts";
 import { IMPORT_FIELDS, emptyImportMappings } from "../domain/services/importParser";
 import { formatMinor } from "../domain/services/money";
-import { parseGridWithMappings, pickAndParseImportFile } from "../services/importFile";
+import { buildImportSourceKey, parseGridWithMappings, pickAndParseImportFile } from "../services/importFile";
 import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -35,19 +35,21 @@ export function ImportScreen({ navigation }) {
   const accounts = useFinanceStore((state) => state.accounts);
   const existingTransactions = useFinanceStore((state) => state.transactions);
 
-  // Steps: PICK -> MAP (16) -> RESOLVE (16b) -> REVIEW (19/19b) -> COMPLETE (19c) | UNCERTAIN (19d)
+  // Steps: PICK -> MAP -> RESOLVE -> REVIEW -> COMPLETE | FAILED | UNCERTAIN.
   const [step, setStep] = useState("PICK");
   const [fileName, setFileName] = useState("");
   const [format, setFormat] = useState("csv");
   const [grid, setGrid] = useState([]);
   const [headers, setHeaders] = useState([]);
+  const [contentFingerprint, setContentFingerprint] = useState("");
   const [mappings, setMappings] = useState(emptyImportMappings());
   const [isInserting, setIsInserting] = useState(false);
   const [accountResolutions, setAccountResolutions] = useState({});
 
   // Review step state
+  // Store original file-row indices, not positions in the changing duplicate list.
   const [selectedDuplicateIndices, setSelectedDuplicateIndices] = useState(new Set());
-  const [outcome, setOutcome] = useState({ created: 0, duplicatesSkipped: 0, invalidSkipped: 0 });
+  const [outcome, setOutcome] = useState({ created: 0, reconciled: 0, duplicatesSkipped: 0, invalidSkipped: 0, retainedRows: [] });
   const [outcomeError, setOutcomeError] = useState(null);
 
   const parsed = useMemo(
@@ -82,6 +84,7 @@ export function ImportScreen({ navigation }) {
 
     const ready = [];
     const duplicates = [];
+    const earlierRows = [];
 
     parsed.rows.forEach((row, index) => {
       const resolution = accountResolutions[row.accountKey];
@@ -93,16 +96,24 @@ export function ImportScreen({ navigation }) {
         if (targetAccountId !== null && tx.accountId !== targetAccountId) return false;
         return isSameDay(tx.dateEpochMillis, row.dateEpochMillis);
       });
+      const matchedFileRow = earlierRows.find((candidate) => {
+        if (candidate.row.type !== row.type || candidate.row.amountMinor !== row.amountMinor) return false;
+        if (candidate.accountResolutionKey !== row.accountKey) return false;
+        return isSameDay(candidate.row.dateEpochMillis, row.dateEpochMillis);
+      });
 
-      if (matchedExisting) {
+      if (matchedExisting || matchedFileRow) {
         duplicates.push({
           row,
           originalIndex: index,
-          reason: `Matches existing ${matchedExisting.type.toLowerCase()} of ${formatMinor(matchedExisting.amountMinor, currencySymbol)} on ${formatLocalDateISO(matchedExisting.dateEpochMillis)}`,
+          reason: matchedExisting
+            ? `Matches existing ${matchedExisting.type.toLowerCase()} of ${formatMinor(matchedExisting.amountMinor, currencySymbol)} on ${formatLocalDateISO(matchedExisting.dateEpochMillis)}`
+            : `Matches another row in this file on ${formatLocalDateISO(row.dateEpochMillis)}`,
         });
       } else {
         ready.push(row);
       }
+      earlierRows.push({ row, accountResolutionKey: row.accountKey });
     });
 
     return {
@@ -140,6 +151,7 @@ export function ImportScreen({ navigation }) {
       setGrid(picked.grid);
       setHeaders(picked.headers);
       setMappings(picked.mappings);
+      setContentFingerprint(picked.contentFingerprint);
       setStep("MAP");
     } catch (error) {
       Alert.alert("Error", error instanceof Error ? error.message : "Failed to pick file.");
@@ -201,12 +213,13 @@ export function ImportScreen({ navigation }) {
     if (!parsed) return;
 
     // Ready rows + explicitly selected duplicate rows
-    const rowsToImport = [
+    const selectedDuplicateRows = duplicateRows.filter((item) => selectedDuplicateIndices.has(item.originalIndex));
+    const selectedRows = [
       ...readyRows,
-      ...duplicateRows.filter((_, idx) => selectedDuplicateIndices.has(idx)).map((d) => d.row),
+      ...selectedDuplicateRows.map((item) => item.row),
     ];
 
-    if (rowsToImport.length === 0) {
+    if (selectedRows.length === 0) {
       Alert.alert("Nothing to import", "Please select at least one transaction to import.");
       return;
     }
@@ -214,24 +227,34 @@ export function ImportScreen({ navigation }) {
     setIsInserting(true);
     setOutcomeError(null);
     try {
+      const rowsToImport = selectedRows.map((row) => ({
+        ...row,
+        sourceKey: buildImportSourceKey(contentFingerprint, mappings, row.sourceRowNumber),
+      }));
       const summary = await importCsvRows(rowsToImport, {
         skipped: parsed.skipped,
         accountResolutions,
       });
 
       const created = typeof summary === "object" && summary !== null ? summary.created : Number(summary);
-      const duplicatesSkipped = duplicateRows.length - selectedDuplicateIndices.size;
+      const reconciled = typeof summary === "object" && summary !== null ? (summary.reconciled ?? 0) : 0;
+      const duplicatesSkipped = duplicateRows.length - selectedDuplicateRows.length;
       const invalidSkipped = invalidRows.length;
+      const retainedRows = typeof summary === "object" && Array.isArray(summary?.skippedRows)
+        ? summary.skippedRows.slice(parsed.skipped.length)
+        : [];
 
       setOutcome({
         created,
+        reconciled,
         duplicatesSkipped,
         invalidSkipped,
+        retainedRows,
       });
       setStep("COMPLETE");
     } catch (error) {
       setOutcomeError(error instanceof Error ? error.message : "Import failed unexpectedly.");
-      setStep("UNCERTAIN");
+      setStep(error?.code === "IMPORT_COMMITTED_REFRESH_FAILED" ? "UNCERTAIN" : "FAILED");
     } finally {
       setIsInserting(false);
     }
@@ -259,7 +282,8 @@ export function ImportScreen({ navigation }) {
     ];
   }, [grid, mappings, parsed]);
 
-  const selectedCount = readyRows.length + selectedDuplicateIndices.size;
+  const selectedDuplicateCount = duplicateRows.filter((item) => selectedDuplicateIndices.has(item.originalIndex)).length;
+  const selectedCount = readyRows.length + selectedDuplicateCount;
 
   return (
     <ScreenContainer contentContainerStyle={{ gap: theme.spacing.xl }} testID="import-screen">
@@ -539,7 +563,7 @@ export function ImportScreen({ navigation }) {
 
               {/* Possible duplicate rows */}
               {duplicateRows.map((item, dIdx) => {
-                const isIncluded = selectedDuplicateIndices.has(dIdx);
+                const isIncluded = selectedDuplicateIndices.has(item.originalIndex);
                 const dateStr = formatLocalDateISO(item.row.dateEpochMillis);
                 const amountFormatted = formatMinor(item.row.amountMinor, currencySymbol);
 
@@ -592,7 +616,7 @@ export function ImportScreen({ navigation }) {
                       accessibilityLabel="Include this duplicate row anyway"
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: isIncluded }}
-                      onPress={() => toggleDuplicateSelection(dIdx)}
+                       onPress={() => toggleDuplicateSelection(item.originalIndex)}
                       style={{
                         alignItems: "center",
                         flexDirection: "row",
@@ -727,11 +751,13 @@ export function ImportScreen({ navigation }) {
           </View>
 
           <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.screenTitle, textAlign: "center" }}>
-            Import complete!
+            {outcome.created + outcome.reconciled > 0 ? "Import complete!" : "No new transactions"}
           </Text>
 
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body, textAlign: "center" }}>
-            Your transactions were successfully imported into your ledger.
+            {outcome.created + outcome.reconciled > 0
+              ? "Review the imported and retained transactions below."
+              : "Existing transactions were kept. Review the skipped rows below."}
           </Text>
 
           {/* Stat card */}
@@ -742,6 +768,17 @@ export function ImportScreen({ navigation }) {
               </Text>
               <Text style={{ color: theme.colors.income, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
                 {outcome.created} transaction(s)
+              </Text>
+            </View>
+
+            <View style={{ backgroundColor: theme.colors.outline, height: 1 }} />
+
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+                Already committed
+              </Text>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                {outcome.reconciled} transaction(s)
               </Text>
             </View>
 
@@ -766,6 +803,17 @@ export function ImportScreen({ navigation }) {
                 {outcome.invalidSkipped} row(s)
               </Text>
             </View>
+            {outcome.retainedRows.length > 0 ? (
+              <>
+                <View style={{ backgroundColor: theme.colors.outline, height: 1 }} />
+                <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+                  Previously imported rows kept: {outcome.retainedRows.length}
+                </Text>
+                <Text accessibilityRole="alert" style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
+                  {outcome.retainedRows.slice(0, 4).map(({ rowNumber, reason }) => `Row ${rowNumber}: ${reason}`).join("\n")}
+                </Text>
+              </>
+            ) : null}
           </SectionCard>
 
           <PrimaryButton
@@ -778,8 +826,8 @@ export function ImportScreen({ navigation }) {
         </View>
       ) : null}
 
-      {/* Step 6: UNCERTAIN (Frame 19d) */}
-      {step === "UNCERTAIN" ? (
+      {/* Failed writes are known rolled back; only a post-commit refresh failure is uncertain. */}
+      {step === "FAILED" || step === "UNCERTAIN" ? (
         <View style={{ alignItems: "center", flex: 1, gap: theme.spacing.lg, justifyContent: "center", paddingVertical: theme.spacing.xl }}>
           <View
             style={{
@@ -795,11 +843,13 @@ export function ImportScreen({ navigation }) {
           </View>
 
           <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.screenTitle, textAlign: "center" }}>
-            Import needs attention
+            {step === "UNCERTAIN" ? "Import outcome pending" : "Import failed"}
           </Text>
 
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body, maxWidth: 320, textAlign: "center" }}>
-            The import encountered an issue and was rolled back to keep your database consistent. No duplicate or partial transactions were written.
+            {step === "UNCERTAIN"
+              ? "The rows may already be committed, but the ledger refresh failed. Retry the same import to reconcile them without duplicating financial effects."
+              : "The import was rolled back, so no rows from this attempt were written. Review the error and try again."}
           </Text>
 
           {outcomeError ? (
@@ -812,10 +862,16 @@ export function ImportScreen({ navigation }) {
 
           <View style={{ gap: theme.spacing.sm, width: "100%" }}>
             <PrimaryButton
-              accessibilityLabel="Return to review"
-              onPress={() => setStep("REVIEW")}
+              accessibilityLabel={step === "UNCERTAIN" ? "Retry same import safely" : "Return to review"}
+              onPress={() => {
+                if (step === "UNCERTAIN") {
+                  void handleCommitImport();
+                  return;
+                }
+                setStep("REVIEW");
+              }}
             >
-              Return to review
+              {step === "UNCERTAIN" ? "Retry same import safely" : "Return to review"}
             </PrimaryButton>
 
             <Pressable

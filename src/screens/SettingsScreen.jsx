@@ -28,7 +28,7 @@ function SettingsRow({ emoji, label, onPress, subtitle, trailing }) {
             alignItems: "center",
             flexDirection: "row",
             gap: theme.spacing.md,
-            minHeight: theme.sizes.avatar,
+            minHeight: theme.sizes.minTouchTarget,
         }}>
       <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body, width: theme.typeScale.emptyTitle }}>
         {emoji}

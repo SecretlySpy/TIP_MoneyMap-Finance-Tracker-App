@@ -17,6 +17,7 @@ import { TransactionDetailScreen } from "../screens/TransactionDetailScreen";
 import { EditTransactionScreen } from "../screens/EditTransactionScreen";
 import { ManageAccountsScreen } from "../screens/ManageAccountsScreen";
 import { ManageCategoriesScreen } from "../screens/ManageCategoriesScreen";
+import { OnboardingScreen } from "../screens/OnboardingScreen";
 import { PasteImportScreen } from "../screens/PasteImportScreen";
 import { ImportScreen } from "../screens/ImportScreen";
 import { RecurringScreen } from "../screens/RecurringScreen";
@@ -27,6 +28,7 @@ import { SplashScreen } from "../screens/SplashScreen";
 import { StudentEatsScreen } from "../screens/StudentEatsScreen";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
+import { selectRootNavigationMode } from "./routes";
 
 // Give each feature area its own stack so screens can push details or editors
 // without resetting the other bottom tabs' navigation history.
@@ -137,10 +139,19 @@ export function RootNavigator() {
     // Subscribe only to the UI state required to select the initial root route.
     const isLocked = useUiStore((state) => state.isLocked);
     const hasSeenSplash = useUiStore((state) => state.hasSeenSplash);
+    const onboardingDraft = useUiStore((state) => state.onboardingDraft);
+    const splashReadError = useUiStore((state) => state.splashReadError);
     const preferencesReady = useUiStore((state) => state.preferencesReady);
     const ensurePreferencesLoaded = useUiStore((state) => state.ensurePreferencesLoaded);
     const themePreference = useUiStore((state) => state.themePreference);
     const theme = useTheme(themePreference);
+    const rootMode = selectRootNavigationMode({
+        hasSeenSplash,
+        isLocked,
+        onboardingDraft,
+        splashReadError,
+        preferencesReady,
+    });
 
     // Restore persisted preferences once when the store action becomes available.
     useEffect(() => {
@@ -148,7 +159,7 @@ export function RootNavigator() {
     }, [ensurePreferencesLoaded]);
 
     // Keep navigation hidden until persisted lock, splash, and theme state is ready.
-    if (!preferencesReady) {
+    if (rootMode === "loading") {
         return (
           <View
             accessibilityLabel="Loading preferences"
@@ -171,30 +182,34 @@ export function RootNavigator() {
 
     // First-time users see Splash before Main; AppLock remains registered so the
     // application can enable or enter its security flow without rebuilding the root.
-    if (!hasSeenSplash) {
+    if (rootMode === "first-run-splash" || rootMode === "first-run-onboarding") {
         return (
-          <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          <RootStack.Navigator
+            initialRouteName={rootMode === "first-run-onboarding" ? "Onboarding" : "Splash"}
+            key="root-first-run"
+            screenOptions={{ headerShown: false }}
+          >
             <RootStack.Screen name="Splash" component={SplashScreen} />
+            <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
             <RootStack.Screen name="Main" component={MainTabs} />
             <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
           </RootStack.Navigator>
         );
     }
 
-    // Put the active initial screen first while keeping both Main and AppLock
-    // registered for later navigation during the same application session.
-    return (<RootStack.Navigator screenOptions={{ headerShown: false }}>
-      {isLocked ? (
-        <>
+    // A locked root registers only AppLock. Changing the key destroys any
+    // previously mounted Main stack, so background locking cannot reveal it.
+    if (rootMode === "locked") {
+        return (<RootStack.Navigator key="root-locked" screenOptions={{ headerShown: false }}>
           <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
-          <RootStack.Screen name="Main" component={MainTabs} />
-        </>
-      ) : (
-        <>
-          <RootStack.Screen name="Main" component={MainTabs} />
-          <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
-        </>
-      )}
+        </RootStack.Navigator>);
+    }
+
+    // The unlocked shell may open AppLock for Settings setup and Splash as a
+    // replayable preview; neither route restarts first-run onboarding.
+    return (<RootStack.Navigator key="root-main" screenOptions={{ headerShown: false }}>
+      <RootStack.Screen name="Main" component={MainTabs} />
+      <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
       <RootStack.Screen name="Splash" component={SplashScreen} />
     </RootStack.Navigator>);
 }

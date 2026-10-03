@@ -105,7 +105,7 @@ describe("QA persistence and concurrent-operation contracts", () => {
     await database.execute("ALTER TABLE recurring_rules DROP COLUMN icon");
     await database.execute("ALTER TABLE recurring_rules DROP COLUMN anchor_day");
     await database.execute("PRAGMA user_version = 2");
-    expect((await migrateDatabase(database)).appliedVersions).toEqual([3, 4]);
+    expect((await migrateDatabase(database)).appliedVersions).toEqual([3, 4, 5, 6, 7]);
     const columns = (await database.execute("PRAGMA table_info(recurring_rules)")).rows.map((row) => row.name);
     expect(columns).toEqual(expect.arrayContaining(["icon", "anchor_day"]));
     expect((await migrateDatabase(database)).appliedVersions).toEqual([]);

@@ -33,6 +33,7 @@ const uiFiles = [
   "src/screens/ImportScreen.jsx",
   "src/screens/ManageAccountsScreen.jsx",
   "src/screens/ManageCategoriesScreen.jsx",
+  "src/screens/OnboardingScreen.jsx",
   "src/screens/PasteImportScreen.jsx",
   "src/screens/RecurringScreen.jsx",
   "src/screens/SettingsScreen.jsx",

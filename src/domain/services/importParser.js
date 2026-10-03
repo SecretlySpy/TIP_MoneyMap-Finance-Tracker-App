@@ -5,7 +5,7 @@ import { parseDecimalToMinor } from "./money";
 /**
  * @typedef {'Date'|'Amount'|'Category'|'Account'|'Note'|'Type'} ImportField
  * @typedef {Record<ImportField, number>} ImportColumnMappings
- * @typedef {{ dateEpochMillis: number, type: 'EXPENSE'|'INCOME', amountMinor: number, categoryName: string, accountLabel: string, accountKey: string, accountType: 'CASH'|'CARD'|'EWALLET'|null, note: string|null }} ImportTransactionRow
+ * @typedef {{ sourceRowNumber: number, dateEpochMillis: number, type: 'EXPENSE'|'INCOME', amountMinor: number, categoryName: string, accountLabel: string, accountKey: string, accountType: 'CASH'|'CARD'|'EWALLET'|null, note: string|null }} ImportTransactionRow
  * @typedef {{ rowNumber: number, reason: string }} ImportSkip
  * @typedef {{ rows: ImportTransactionRow[], skipped: ImportSkip[], headers: string[], dataRowCount: number }} ImportParseResult
  */
@@ -19,6 +19,38 @@ export const MAX_IMPORT_YEAR = 2100;
 
 /** @type {ImportField[]} */
 export const IMPORT_FIELDS = ["Date", "Amount", "Type", "Category", "Account", "Note"];
+
+/**
+ * Whole-file ceilings. Exceeding either means the input is not the file the user
+ * believes it is, so it is rejected outright instead of being partially imported.
+ * Cell length is enforced per row so one oversized note cannot mask the rest.
+ * @param {unknown[][]} grid
+ * @param {string} [label] source name used in the error message
+ */
+export function assertImportGridWithinLimits(grid, label = "Import") {
+  if (grid.length > MAX_IMPORT_ROWS) {
+    throw new Error(`${label} exceeds maximum allowed rows (${MAX_IMPORT_ROWS.toLocaleString()}).`);
+  }
+  if ((grid[0] ?? []).length > MAX_IMPORT_COLUMNS) {
+    throw new Error(`${label} exceeds maximum allowed columns (${MAX_IMPORT_COLUMNS}).`);
+  }
+}
+
+/**
+ * Row-level ceilings. Callers catch these and report the row as skipped so a single
+ * malformed line never blocks the rest of a file.
+ * @param {unknown[]} cells
+ */
+export function assertImportRowWithinLimits(cells) {
+  if (cells.length > MAX_IMPORT_COLUMNS) {
+    throw new Error(`Row exceeds maximum allowed columns (${MAX_IMPORT_COLUMNS}).`);
+  }
+  for (const cell of cells) {
+    if (String(cell ?? "").length > MAX_CELL_LENGTH) {
+      throw new Error(`Cell content exceeds maximum length of ${MAX_CELL_LENGTH} characters.`);
+    }
+  }
+}
 
 /**
  * @returns {ImportColumnMappings}
@@ -168,18 +200,42 @@ export function importAccountKey(value) {
 }
 
 /**
+ * Explicit type vocabulary. A label only qualifies when it already states which side
+ * of the ledger it belongs to, so no direction has to be guessed. Direction-ambiguous
+ * bank words (TRANSFER, REFUND, REVERSAL, a bare ADJUSTMENT) are deliberately absent:
+ * they must surface as rejected rows rather than be booked to the wrong side, which
+ * would silently overstate spending or income.
+ */
+const INCOME_TYPE_TOKENS = [
+  "INCOME",
+  "IN",
+  "INC",
+  "+",
+  "CREDIT",
+  "INTEREST EARNED",
+  "INCOME ADJUSTMENT",
+];
+const EXPENSE_TYPE_TOKENS = [
+  "EXPENSE",
+  "EXP",
+  "-",
+  "DEBIT",
+  "FEE",
+];
+
+/**
  * @param {string} value
  * @returns {'EXPENSE'|'INCOME'|null}
  */
 export function parseImportType(value) {
-  const normalized = String(value ?? "").trim().toUpperCase();
+  const normalized = String(value ?? "").trim().toUpperCase().replace(/\s+/g, " ");
   if (normalized.length === 0) {
     return null;
   }
-  if (normalized.startsWith("IN") || normalized === "+" || normalized === "CREDIT") {
+  if (INCOME_TYPE_TOKENS.includes(normalized)) {
     return "INCOME";
   }
-  if (normalized.startsWith("EX") || normalized === "-" || normalized === "DEBIT") {
+  if (EXPENSE_TYPE_TOKENS.includes(normalized)) {
     return "EXPENSE";
   }
   return null;
@@ -197,14 +253,9 @@ export function parseImportGrid(grid, mappings) {
   if (!Array.isArray(grid) || grid.length === 0) {
     return { rows: [], skipped: [{ rowNumber: 0, reason: "File has no rows." }], headers: [], dataRowCount: 0 };
   }
-  if (grid.length > MAX_IMPORT_ROWS) {
-    throw new Error(`Import exceeds maximum allowed rows (${MAX_IMPORT_ROWS.toLocaleString()}).`);
-  }
-  const firstRow = grid[0] ?? [];
-  if (firstRow.length > MAX_IMPORT_COLUMNS) {
-    throw new Error(`Import exceeds maximum allowed columns (${MAX_IMPORT_COLUMNS}).`);
-  }
+  assertImportGridWithinLimits(grid);
 
+  const firstRow = grid[0] ?? [];
   const headerCells = firstRow.map((cell) => String(cell ?? "").trim());
   const looksLikeHeader = headerCells.some((cell) => {
     const lower = cell.toLowerCase();
@@ -228,14 +279,7 @@ export function parseImportGrid(grid, mappings) {
     }
 
     try {
-      if (cells.length > MAX_IMPORT_COLUMNS) {
-        throw new Error(`Row exceeds maximum allowed columns (${MAX_IMPORT_COLUMNS}).`);
-      }
-      for (const cell of cells) {
-        if (String(cell ?? "").length > MAX_CELL_LENGTH) {
-          throw new Error(`Cell content exceeds maximum length of ${MAX_CELL_LENGTH} characters.`);
-        }
-      }
+      assertImportRowWithinLimits(cells);
 
       if (resolvedMappings.Amount < 0) {
         throw new Error("Amount column is unmapped.");
@@ -247,13 +291,19 @@ export function parseImportGrid(grid, mappings) {
       const cleanedAmount = amountRaw.replace(/[₱$,\s]/g, "");
       const unsignedAmount = cleanedAmount.replace(/^[-+]/, "");
       let amountMinor = parseDecimalToMinor(unsignedAmount);
-      const explicitType = resolvedMappings.Type >= 0
-        ? parseImportType(String(cells[resolvedMappings.Type] ?? ""))
-        : null;
+      const typeRaw = resolvedMappings.Type >= 0
+        ? String(cells[resolvedMappings.Type] ?? "").trim()
+        : "";
+      const explicitType = parseImportType(typeRaw);
+      if (typeRaw.length > 0 && explicitType === null) {
+        throw new Error(`Type "${typeRaw}" is invalid. Use INCOME or EXPENSE.`);
+      }
       /** @type {'EXPENSE'|'INCOME'} */
       let type;
       if (explicitType !== null) {
         type = explicitType;
+      } else if (cleanedAmount.startsWith("+")) {
+        type = "INCOME";
       } else if (cleanedAmount.startsWith("-")) {
         type = "EXPENSE";
       } else {
@@ -290,6 +340,7 @@ export function parseImportGrid(grid, mappings) {
         : "";
 
       rows.push({
+        sourceRowNumber: rowNumber,
         dateEpochMillis,
         type,
         amountMinor,
@@ -316,6 +367,23 @@ export function parseImportGrid(grid, mappings) {
 }
 
 /**
+ * PapaParse recovers from quoting problems and still returns rows, but the cell
+ * boundaries in those rows are unreliable: an unterminated quote swallows the
+ * following lines, so an amount can land in the note column and book as a different
+ * financial effect. Any reported error therefore fails the whole read and names the
+ * offending row plus the fix, instead of importing misaligned data.
+ * @param {{ code?: string, row?: number, message?: string }[]} errors
+ */
+function csvParseFailure(errors) {
+  const first = errors[0];
+  const row = Number.isSafeInteger(first?.row) && first.row >= 0 ? ` at row ${first.row + 1}` : "";
+  const reason = String(first?.message ?? "CSV parse failed").trim();
+  return new Error(
+    `Could not read the CSV${row}: ${reason}. Wrap every field containing a comma or a double quote in double quotes, then try again.`,
+  );
+}
+
+/**
  * @param {string} text
  * @returns {unknown[][]}
  */
@@ -327,8 +395,9 @@ export function csvTextToGrid(text) {
     header: false,
     skipEmptyLines: "greedy",
   });
-  if (parsed.errors?.length > 0 && (!parsed.data || parsed.data.length === 0)) {
-    throw new Error(parsed.errors[0]?.message || "CSV parse failed.");
+  const errors = parsed.errors ?? [];
+  if (errors.length > 0) {
+    throw csvParseFailure(errors);
   }
   return (parsed.data ?? []).map((row) => (Array.isArray(row) ? row : []));
 }

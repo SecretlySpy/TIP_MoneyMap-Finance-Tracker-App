@@ -1,5 +1,5 @@
 import { TRANSACTION_TYPES, } from "../../domain/types";
-import { assertOneOf, assertPositiveInteger, assertSafeInteger, readEnum, readInteger, readNullableString, } from "../validation";
+import { assertNonBlank, assertOneOf, assertPositiveInteger, assertSafeInteger, readEnum, readInteger, readNullableString, } from "../validation";
 import { deleteRow, findRowById, insertRow, listRows, requireCreatedEntity, updateRow, } from "./shared";
 function mapTransaction(row) {
     const recurringRuleIdValue = row.recurring_rule_id;
@@ -12,6 +12,10 @@ function mapTransaction(row) {
         dateEpochMillis: readInteger(row, "date_epoch_millis"),
         note: readNullableString(row, "note"),
         recurringRuleId: recurringRuleIdValue === null ? null : readInteger(row, "recurring_rule_id"),
+        scheduledDateEpochMillis: row.scheduled_date_epoch_millis === null
+            ? null
+            : readInteger(row, "scheduled_date_epoch_millis"),
+        sourceKey: readNullableString(row, "source_key"),
     };
 }
 function validateTransaction(transaction) {
@@ -23,6 +27,29 @@ function validateTransaction(transaction) {
     if (transaction.recurringRuleId !== null) {
         assertPositiveInteger(transaction.recurringRuleId, "recurringRuleId");
     }
+    if (transaction.scheduledDateEpochMillis !== null && transaction.scheduledDateEpochMillis !== undefined) {
+        assertSafeInteger(transaction.scheduledDateEpochMillis, "scheduledDateEpochMillis");
+    }
+    if (transaction.sourceKey !== null && transaction.sourceKey !== undefined) {
+        if (typeof transaction.sourceKey !== "string") {
+            throw new TypeError("sourceKey must be text or null.");
+        }
+        assertNonBlank(transaction.sourceKey, "sourceKey");
+        if (transaction.sourceKey.length > 256) {
+            throw new TypeError("sourceKey must be at most 256 characters.");
+        }
+    }
+}
+
+function isSameFinancialEffect(existing, transaction) {
+    return existing.amountMinor === transaction.amountMinor
+        && existing.type === transaction.type
+        && existing.categoryId === transaction.categoryId
+        && existing.accountId === transaction.accountId
+        && existing.dateEpochMillis === transaction.dateEpochMillis
+        && existing.note === transaction.note
+        && existing.recurringRuleId === transaction.recurringRuleId
+        && existing.scheduledDateEpochMillis === transaction.scheduledDateEpochMillis;
 }
 async function assertCategoryMatchesType(database, categoryId, type) {
     const result = await database.execute("SELECT type FROM categories WHERE id = ?", [categoryId]);
@@ -39,24 +66,59 @@ export class TransactionRepository {
         this.database = database;
     }
     async create(transaction) {
-        validateTransaction(transaction);
-        await assertCategoryMatchesType(this.database, transaction.categoryId, transaction.type);
-        const id = await insertRow(this.database, `INSERT INTO transactions (
-          amount_minor, type, category_id, account_id, date_epoch_millis, note, recurring_rule_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
-            transaction.amountMinor,
-            transaction.type,
-            transaction.categoryId,
-            transaction.accountId,
-            transaction.dateEpochMillis,
-            transaction.note,
-            transaction.recurringRuleId,
-        ]);
+        const recurringRuleId = transaction.recurringRuleId ?? null;
+        const normalized = {
+            ...transaction,
+            note: transaction.note ?? null,
+            scheduledDateEpochMillis: transaction.scheduledDateEpochMillis
+                ?? (recurringRuleId === null ? null : transaction.dateEpochMillis),
+            recurringRuleId,
+            sourceKey: transaction.sourceKey ?? null,
+        };
+        validateTransaction(normalized);
+        await assertCategoryMatchesType(this.database, normalized.categoryId, normalized.type);
+        const sourceKey = normalized.sourceKey;
+        const statement = `INSERT INTO transactions (
+          amount_minor, type, category_id, account_id, date_epoch_millis, note, recurring_rule_id,
+          scheduled_date_epoch_millis, source_key
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const parameters = [
+            normalized.amountMinor,
+            normalized.type,
+            normalized.categoryId,
+            normalized.accountId,
+            normalized.dateEpochMillis,
+            normalized.note,
+            normalized.recurringRuleId,
+            normalized.scheduledDateEpochMillis,
+            sourceKey,
+        ];
+        if (sourceKey !== null) {
+            const result = await this.database.execute(`${statement} ON CONFLICT(source_key) DO NOTHING`, parameters);
+            if (result.rowsAffected === 0) {
+                const existing = await this.getBySourceKey(sourceKey);
+                if (existing === null || !isSameFinancialEffect(existing, normalized)) {
+                    throw new Error("The transaction source key is already assigned to a different financial effect.");
+                }
+                return existing;
+            }
+            return requireCreatedEntity(await this.getBySourceKey(sourceKey), "Transaction");
+        }
+        const id = await insertRow(this.database, statement, parameters);
         return requireCreatedEntity(await this.getById(id), "Transaction");
     }
     async getById(id) {
         const row = await findRowById(this.database, "transactions", id);
         return row === null ? null : mapTransaction(row);
+    }
+    async getBySourceKey(sourceKey) {
+        if (typeof sourceKey !== "string") {
+            throw new TypeError("sourceKey must be text.");
+        }
+        assertNonBlank(sourceKey, "sourceKey");
+        const result = await this.database.execute("SELECT * FROM transactions WHERE source_key = ?", [sourceKey]);
+        const row = result.rows[0];
+        return row === undefined ? null : mapTransaction(row);
     }
     async list() {
         return (await listRows(this.database, "transactions")).map(mapTransaction);

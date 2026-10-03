@@ -150,6 +150,16 @@ describe("transaction editing and recurring guards", () => {
     const ruleInDb = await repos.recurring.getById(rule.id);
     expect(ruleInDb.nextRunEpochMillis).toBe(originalNextRun);
     expect(ruleInDb.amountMinor).toBe(100_000);
+
+    // Template deletion must not erase occurrence provenance or unlock its date.
+    await repos.recurring.delete(rule.id);
+    await store.refresh();
+    expect(await repos.transactions.getById(occurrence.id)).toMatchObject({
+      recurringRuleId: null,
+      scheduledDateEpochMillis: scheduledDate,
+    });
+    await expect(store.updateTransaction(occurrence.id, { dateEpochMillis: differentDate }))
+      .rejects.toThrow("Cannot change the scheduled date");
   });
 
   it("deleting a recurring transaction occurrence leaves the recurring rule schedule untouched", async () => {

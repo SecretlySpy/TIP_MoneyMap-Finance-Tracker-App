@@ -1,6 +1,6 @@
 # Architecture and Operations
 
-Updated: 2026-09-27
+Updated: 2026-10-03
 
 ## Runtime context
 
@@ -11,7 +11,9 @@ flowchart LR
   S --> D[Domain services]
   S --> R[Repositories]
   R --> DB[(SQLCipher SQLite)]
-  K[SecureStore key] --> DB
+  SS[SecureStore] --> K[SQLCipher key]
+  K --> DB
+  SS --> O[Onboarding / preferences / PIN]
   UI --> N[Local notifications]
   UI -. optional HTTPS .-> G[Gemini]
   UI -. Student Eats search .-> P[Overpass / Nominatim]
@@ -22,6 +24,15 @@ flowchart LR
 - Finance values are integer minor units. Domain calculations stay pure where practical.
 - Screens depend on store actions and view models; repositories own validation and SQL.
 - SQLCipher encryption and optional App Lock solve different problems and use separate key material.
+- The app is local-only: it owns no application server, remote user account, server database, or sync API.
+- First-run onboarding persists a bounded, versioned SecureStore draft; SQLCipher remains authoritative for
+  accounts and transactions. Root navigation chooses one mutually exclusive shell: loading, first-run,
+  locked, or main.
+- Retry-safe mutations use nullable transaction source keys. Imports derive deterministic keys from local
+  content/mapping/row identity; a user-edited prior import is reported as skipped while new rows commit,
+  not overwritten or double-posted. Direct conflicting repository mutations fail.
+- Recurring occurrence provenance lives on the transaction as a scheduled timestamp, so deleting a template
+  does not make a historical occurrence appear manual.
 - Student Eats uses a deterministic campus origin. Removing GPS reduces permissions and prevents the UI
   from implying user-relative results.
 - Import account resolution is explicit and atomic. It does not silently coerce unknown labels to Cash.
@@ -36,10 +47,13 @@ flowchart LR
 
 ## Reliability and observability
 
-QA update (2026-09-28): recurring duplicate checks/posts/schedule advancement share one transaction; goal increments are atomic SQL updates. Budget spending and posted recurring occurrences are indexed once in memory instead of repeatedly scanning the ledger. Restore validates identities/references and safe integer values before replacing rows. The schema remains version 4. `npm run test:stress` runs an isolated synthetic file-backed SQLite workload with resource/latency metrics; it sends no remote traffic. See [QA Verification Report](./QA%20Verification%20Report%202026-09-28.md) for actual measurements and native limits.
+QA update (2026-10-03): the schema is version 7. Recurring duplicate checks/posts/schedule advancement share one transaction; goal increments are atomic SQL updates. Budget spending and posted recurring occurrences are indexed once in memory instead of repeatedly scanning the ledger. Restore validates backup fields before replacement, then records the previous state in one single-use recovery slot. Import source keys make retries after a committed-but-unrefreshed result reconcilable. `npm run test:stress -- docs/qa/2026-10-03/stress-final.json` ran an isolated synthetic file-backed SQLite workload: 1,829 operations/zero errors, dashboard p95 8.43 ms and 32-writer p99 2,621.75 ms. This sends no remote traffic and is not HTTP RPS, native SQLCipher, or real concurrent-user evidence. See [Verification and Evaluation](./Verification%20and%20Evaluation.md) for current checks.
 
 - Database migrations and imports run transactionally; foreign keys and a five-second busy timeout are on.
 - Recurring catch-up is idempotent for a rule/scheduled timestamp and preserves the monthly anchor day.
+- Restore and undo use the same validated transactional replacement path. One recovery snapshot is kept and consumed by undo.
+- If an existing PIN is found while its preferences are missing, invalid, or unreadable, startup fails closed
+  to the lock shell; PIN unlock restores an enabled lock preference when SecureStore permits.
 - UI errors stay in context; success navigation happens only after the store action resolves.
 - The app currently relies on local error UI and development logs; there is no remote telemetry service.
   Do not add finance values or secrets to logs.
@@ -48,8 +62,13 @@ QA update (2026-09-28): recurring duplicate checks/posts/schedule advancement sh
 
 Use `npm ci`, `npm test`, `npx expo-doctor`, Expo export, then a Node 22/JDK 21 native debug build and device
 smoke test. Release remains gated by the checklist in [`docs/release-checklist.md`](../docs/release-checklist.md).
-This reconciliation is locally reversible and adds no database migration. A production rollout was not
-performed.
+Schema migrations 5–7 are additive and have no automated downgrade. Do not release an older build against a
+database already upgraded to v7. A production rollout was not performed.
+
+Static/Jest/desktop-SQLite evidence does not establish native acceptance. Android development-build startup,
+SQLCipher migration/open/reopen, SecureStore failure recovery, PIN/biometric background locking, notification
+delivery, file-picker import, restore/undo, tablet layout, and live Gemini/Overpass/Nominatim behavior remain
+**UNVERIFIED** until run on supported devices and providers. Expo Go is not a valid substitute for these checks.
 
 ## Repository layout and cleanup
 

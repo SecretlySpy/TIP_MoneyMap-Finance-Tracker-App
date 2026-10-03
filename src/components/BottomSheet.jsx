@@ -1,4 +1,12 @@
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../theme/tokens";
 import { AppText as Text } from "./AppText";
@@ -25,7 +33,10 @@ export function BottomSheet({
       transparent
       visible={visible}
     >
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.overlay}
+      >
         <Pressable
           accessibilityLabel="Dismiss sheet"
           accessibilityRole="button"
@@ -34,11 +45,13 @@ export function BottomSheet({
         />
         <View
           style={{
+            alignSelf: "center",
             backgroundColor: theme.colors.surface,
             borderTopLeftRadius: theme.radii.balance,
             borderTopRightRadius: theme.radii.balance,
             gap: theme.spacing.md,
-            paddingBottom: Math.max(insets.bottom, theme.spacing.xl),
+            maxHeight: "90%",
+            maxWidth: theme.sizes.maxSheetWidth,
             paddingHorizontal: theme.spacing.screen,
             paddingTop: theme.spacing.md,
             width: "100%",
@@ -68,9 +81,22 @@ export function BottomSheet({
             </Text>
           ) : null}
 
-          {children}
+          <ScrollView
+            automaticallyAdjustKeyboardInsets
+            contentContainerStyle={{
+              gap: theme.spacing.md,
+              paddingBottom: Math.max(insets.bottom, theme.spacing.xl),
+            }}
+            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+            style={{ flexShrink: 1 }}
+          >
+            {children}
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

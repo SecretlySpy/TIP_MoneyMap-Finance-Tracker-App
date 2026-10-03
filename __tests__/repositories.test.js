@@ -90,6 +90,30 @@ describe("five-table repository CRUD contracts", () => {
             recurringRuleId: null,
         })).rejects.toThrow();
     });
+    test("reconciles a repeated transaction source key without duplicating its effect", async () => {
+        const cash = (await accounts.list())[0];
+        const food = (await categories.list()).find(({ name, type }) => name === "Food" && type === "EXPENSE");
+        const payload = {
+            amountMinor: 2_500,
+            type: "EXPENSE",
+            categoryId: food.id,
+            accountId: cash.id,
+            dateEpochMillis: 1_785_542_400_000,
+            note: "Retry-safe lunch",
+            recurringRuleId: null,
+            sourceKey: "manual:v1:test-retry",
+        };
+        const first = await transactions.create(payload);
+        const repeated = await transactions.create(payload);
+        expect(repeated.id).toBe(first.id);
+        expect(await transactions.list()).toHaveLength(1);
+        await expect(transactions.create({ ...payload, amountMinor: 2_600 })).rejects.toThrow("different financial effect");
+
+        const withoutNote = { ...payload, sourceKey: "manual:v1:no-note" };
+        delete withoutNote.note;
+        const firstWithoutNote = await transactions.create(withoutNote);
+        await expect(transactions.create(withoutNote)).resolves.toMatchObject({ id: firstWithoutNote.id, note: null });
+    });
     test("creates, reads, updates, lists, and deletes a unique expense budget", async () => {
         const food = (await categories.list()).find(({ name, type }) => name === "Food" && type === "EXPENSE");
         const created = await budgets.create({
@@ -165,7 +189,10 @@ describe("five-table repository CRUD contracts", () => {
             recurringRuleId: rule.id,
         });
         expect(await recurringRules.delete(rule.id)).toBe(true);
-        expect(await transactions.getById(transaction.id)).toMatchObject({ recurringRuleId: null });
+        expect(await transactions.getById(transaction.id)).toMatchObject({
+            recurringRuleId: null,
+            scheduledDateEpochMillis: transaction.dateEpochMillis,
+        });
     });
     test("rejects unsafe money integers and undefined-only update patches", async () => {
         await expect(accounts.create({

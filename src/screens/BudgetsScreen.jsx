@@ -3,7 +3,7 @@ import { Alert, Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { BottomSheet } from "../components/BottomSheet";
 import { BudgetCard } from "../components/BudgetCard";
-import { DashedButton } from "../components/Buttons";
+import { PrimaryButton } from "../components/Buttons";
 import { EmojiGrid } from "../components/EmojiGrid";
 import { EmptyState } from "../components/EmptyState";
 import { MonthChip } from "../components/MonthChip";
@@ -228,7 +228,7 @@ export function BudgetsScreen({ navigation }) {
 
       {cards.length === 0 ? (
         <EmptyState
-          actionLabel="+ Add budget"
+          actionLabel="Add Budget"
           emoji="📊"
           message="Name a category, pick an icon, and set a monthly limit. Long-press a card to edit or delete."
           onAction={beginAddBudget}
@@ -254,9 +254,9 @@ export function BudgetsScreen({ navigation }) {
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
             Tip: press and hold a budget card to edit or delete.
           </Text>
-          <DashedButton disabled={busy} onPress={beginAddBudget}>
-            {busy ? "Saving…" : "+ Add budget"}
-          </DashedButton>
+          <PrimaryButton disabled={busy} onPress={beginAddBudget}>
+            {busy ? "Saving…" : "Add Budget"}
+          </PrimaryButton>
         </>
       ) : null}
 
@@ -287,9 +287,9 @@ export function BudgetsScreen({ navigation }) {
           Icon
         </Text>
         <EmojiGrid onChange={setPendingEmoji} value={pendingEmoji} />
-        <DashedButton onPress={handleNameStepNext}>
+        <PrimaryButton onPress={handleNameStepNext}>
           Next: set limit
-        </DashedButton>
+        </PrimaryButton>
         <Pressable
           accessibilityRole="button"
           onPress={closeSheet}
@@ -327,9 +327,9 @@ export function BudgetsScreen({ navigation }) {
           {`${pendingCategoryName || editingLimitName || "Budget"} · ${formatMonthChip(selectedMonthYear)}`}
         </Text>
         <EmojiGrid onChange={setPendingEmoji} value={pendingEmoji} />
-        <DashedButton disabled={busy} onPress={() => void handleLimitConfirm(pendingLimitInput)}>
+        <PrimaryButton disabled={busy} onPress={() => void handleLimitConfirm(pendingLimitInput)}>
           {busy ? "Saving…" : "Save budget"}
-        </DashedButton>
+        </PrimaryButton>
         <Pressable
           accessibilityRole="button"
           onPress={closeSheet}

@@ -8,6 +8,7 @@ import {
   androidSdkCandidates,
   decodeGradleProperty,
   javaHomeCandidates,
+  parseLauncherOptions,
 } from "./run-android.mjs";
 
 // Gradle escapes Windows drive separators and backslashes in local.properties.
@@ -69,5 +70,21 @@ test("Java candidates cover Android Studio on every desktop platform", () => {
   );
   assert.ok(macOS.includes("/Applications/Android Studio.app/Contents/jbr/Contents/Home"));
   assert.ok(linux.includes("/opt/android-studio/jbr"));
+});
+
+test("parseLauncherOptions defaults to clean state unless preserve-data is specified", () => {
+  const defaultRun = parseLauncherOptions([]);
+  assert.equal(defaultRun.preserveData, false);
+  assert.equal(defaultRun.cleanOnly, false);
+  assert.equal(defaultRun.checkOnly, false);
+  assert.deepEqual(defaultRun.expoForwardedArgs, []);
+
+  const preserveRun = parseLauncherOptions(["--preserve-data"]);
+  assert.equal(preserveRun.preserveData, true);
+  assert.deepEqual(preserveRun.expoForwardedArgs, []);
+
+  const cleanOnlyRun = parseLauncherOptions(["--clean-only", "-d", "emulator-5554"]);
+  assert.equal(cleanOnlyRun.cleanOnly, true);
+  assert.deepEqual(cleanOnlyRun.expoForwardedArgs, ["-d", "emulator-5554"]);
 });
 

@@ -5,8 +5,10 @@ describe("approved Figma theme tokens", () => {
         expect(theme.colors.bg).toBe("#F7F9F8");
         expect(theme.colors.primary).toBe("#0F6E5C");
         expect(theme.colors.text).toBe("#1A1C1B");
-        expect(theme.colors.expense).toBe("#D64545");
+        expect(theme.colors.expense).toBe("#C43636");
+        expect(theme.colors.amberText).toBe("#945E00");
         expect(theme.sizes.designWidth).toBe(412);
+        expect(theme.sizes.primaryButton).toBe(56);
     });
     it("uses the approved dark surfaces and brighter accent", () => {
         const theme = getTheme("dark");

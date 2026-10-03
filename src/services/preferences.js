@@ -30,17 +30,29 @@ export function normalizePreferences(raw) {
             : DEFAULT_PREFERENCES.themePreference,
     };
 }
-export async function loadPreferences() {
+export async function loadPreferencesResult() {
     try {
         const stored = await SecureStore.getItemAsync(PREFERENCES_KEY);
         if (stored === null) {
-            return DEFAULT_PREFERENCES;
+            return { preferences: DEFAULT_PREFERENCES, status: "missing" };
         }
-        return normalizePreferences(JSON.parse(stored));
+        try {
+            const parsed = JSON.parse(stored);
+            if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+                return { preferences: DEFAULT_PREFERENCES, status: "invalid" };
+            }
+            return { preferences: normalizePreferences(parsed), status: "loaded" };
+        }
+        catch {
+            return { preferences: DEFAULT_PREFERENCES, status: "invalid" };
+        }
     }
     catch {
-        return DEFAULT_PREFERENCES;
+        return { preferences: DEFAULT_PREFERENCES, status: "unreadable" };
     }
+}
+export async function loadPreferences() {
+    return (await loadPreferencesResult()).preferences;
 }
 export async function savePreferences(preferences) {
     const normalized = normalizePreferences(preferences);

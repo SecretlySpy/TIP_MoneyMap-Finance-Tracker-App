@@ -38,7 +38,7 @@ describe("database schema and seed", () => {
         expect(migration).toEqual({
             previousVersion: 0,
             currentVersion: LATEST_SCHEMA_VERSION,
-            appliedVersions: [1, 2, 3, 4],
+            appliedVersions: [1, 2, 3, 4, 5, 6, 7],
         });
         expect(tables.rows.map(({ name }) => name)).toEqual([
             "accounts",
@@ -72,6 +72,30 @@ describe("database schema and seed", () => {
         expect(secondMigration.appliedVersions).toEqual([]);
         expect(accounts.rows[0]?.count).toBe(1);
         expect(categories.rows[0]?.count).toBe(12);
+    });
+    test("upgrades a version-four transaction table without changing existing rows", async () => {
+        await database.execute(`CREATE TABLE transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          amount_minor INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          category_id INTEGER NOT NULL,
+          account_id INTEGER NOT NULL,
+          date_epoch_millis INTEGER NOT NULL,
+          note TEXT,
+          recurring_rule_id INTEGER
+        ) STRICT`);
+        await database.execute(`INSERT INTO transactions (
+          amount_minor, type, category_id, account_id, date_epoch_millis, note, recurring_rule_id
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL)`, [1250, "EXPENSE", 7, 3, 1785542400000, "Existing row"]);
+        await database.execute("PRAGMA user_version = 4");
+        const migration = await migrateDatabase(database);
+        const rows = await database.execute("SELECT amount_minor, note, source_key FROM transactions");
+        const recoveryTable = await database.execute("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'restore_recovery_snapshot'");
+        const bootstrap = await database.execute("SELECT value FROM app_metadata WHERE key = ?", ["bootstrap-defaults-v1"]);
+        expect(migration.appliedVersions).toEqual([5, 6, 7]);
+        expect(rows.rows).toEqual([{ amount_minor: 1250, note: "Existing row", source_key: null }]);
+        expect(recoveryTable.rows).toEqual([{ name: "restore_recovery_snapshot" }]);
+        expect(bootstrap.rows).toEqual([{ value: "complete" }]);
     });
     test("rejects a database created by a newer application version", async () => {
         await database.execute("PRAGMA user_version = 99");

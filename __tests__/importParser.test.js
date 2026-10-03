@@ -1,11 +1,15 @@
 import * as XLSX from "xlsx";
 import {
+  assertImportGridWithinLimits,
   csvTextToGrid,
   detectImportFormat,
   detectImportMappings,
+  MAX_CELL_LENGTH,
+  MAX_IMPORT_ROWS,
   parseImportFile,
   parseImportGrid,
   parseImportAccountType,
+  parseImportType,
   xlsxToGrid,
 } from "../src/domain/services/importParser";
 import { AccountRepository, CategoryRepository, TransactionRepository } from "../src/db/repositories";
@@ -55,6 +59,90 @@ describe("importParser CSV grid", () => {
     });
     expect(result.skipped.length).toBeGreaterThanOrEqual(2);
     expect(result.skipped.some((item) => item.reason.toLowerCase().includes("amount"))).toBe(true);
+  });
+});
+
+describe("importParser type vocabulary", () => {
+  it("accepts labels that already state which side of the ledger they belong to", () => {
+    for (const label of ["INCOME", "in", "INC", "+", "CREDIT", "INTEREST EARNED", "Interest  Earned", "income adjustment"]) {
+      expect(parseImportType(label)).toBe("INCOME");
+    }
+    for (const label of ["EXPENSE", "exp", "-", "DEBIT", "fee"]) {
+      expect(parseImportType(label)).toBe("EXPENSE");
+    }
+  });
+
+  it("refuses direction-ambiguous labels rather than guessing a direction", () => {
+    // Booking these either way would silently overstate spending or income.
+    for (const label of ["TRANSFER", "Transfer In", "Transfer Sent", "REFUND", "REVERSAL", "ADJUSTMENT", "CASHBACK", "PAYMENT", "WITHDRAWAL", "INTEREST", "PENDING", ""]) {
+      expect(parseImportType(label)).toBeNull();
+    }
+  });
+
+  it("reports an unknown type as a skipped row instead of a silent default", () => {
+    const result = parseImportGrid([
+      ["Date", "Amount", "Type", "Category", "Account"],
+      ["2026-08-01", "100", "TRANSFER", "Other", "Cash"],
+      ["2026-08-02", "250", "EXPENSE", "Food", "Cash"],
+    ]);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({ amountMinor: 25_000, type: "EXPENSE" });
+    expect(result.skipped).toEqual([{ rowNumber: 2, reason: 'Type "TRANSFER" is invalid. Use INCOME or EXPENSE.' }]);
+  });
+
+  it("books the accepted vocabulary to the matching transaction type", () => {
+    const result = parseImportGrid([
+      ["Date", "Amount", "Type", "Category", "Account"],
+      ["2026-08-01", "100", "Interest Earned", "Allowance", "Cash"],
+      ["2026-08-02", "40", "Fee", "Other", "Cash"],
+    ]);
+
+    expect(result.skipped).toEqual([]);
+    expect(result.rows.map(({ type }) => type)).toEqual(["INCOME", "EXPENSE"]);
+  });
+});
+
+describe("importParser malformed CSV handling", () => {
+  it("fails closed on an unterminated quote and names the row to fix", () => {
+    const csv = [
+      "date,type,amount,category,account,note",
+      "2026-08-01,EXPENSE,150.00,Food,Cash,Lunch",
+      '2026-08-02,EXPENSE,20.00,Food,Cash,"never closed',
+      "2026-08-03,EXPENSE,30.00,Food,Cash,Coffee",
+    ].join("\n");
+
+    expect(() => csvTextToGrid(csv)).toThrow(/Could not read the CSV at row 3/);
+    expect(() => csvTextToGrid(csv)).toThrow(/double quotes/);
+  });
+
+  it("fails closed on a malformed trailing quote instead of importing misaligned cells", () => {
+    // PapaParse still returns rows here, so trusting them would shift values between columns.
+    const csv = ["date,type,amount,category,account,note", '2026-08-01,EXPENSE,150.00,Food,Cash,"x"y"'].join("\n");
+
+    expect(() => csvTextToGrid(csv)).toThrow(/Could not read the CSV/);
+  });
+
+  it("rejects a whole grid that exceeds the row or column ceilings", () => {
+    expect(() => assertImportGridWithinLimits(
+      new Array(MAX_IMPORT_ROWS + 1).fill(["2026-08-01", "EXPENSE", "10", "Food", "Cash"]),
+      "Pasted CSV",
+    )).toThrow("Pasted CSV exceeds maximum allowed rows (10,000).");
+    expect(() => assertImportGridWithinLimits([new Array(101).fill("x")], "Pasted CSV"))
+      .toThrow("Pasted CSV exceeds maximum allowed columns (100).");
+  });
+
+  it("skips an oversized cell as one row instead of failing the file", () => {
+    const result = parseImportGrid([
+      ["Date", "Amount", "Type", "Category", "Account", "Note"],
+      ["2026-08-01", "150.00", "EXPENSE", "Food", "Cash", "x".repeat(MAX_CELL_LENGTH + 1)],
+      ["2026-08-02", "20.00", "EXPENSE", "Food", "Cash", "ok"],
+    ]);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]?.amountMinor).toBe(2_000);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]?.reason).toMatch(new RegExp(`Cell content exceeds maximum length of ${MAX_CELL_LENGTH} characters`));
   });
 });
 

@@ -40,7 +40,7 @@ export function EmojiGrid({
               borderColor: selected ? theme.colors.primary : theme.colors.outline,
               borderRadius: theme.radii.small,
               borderWidth: selected ? 1.5 : theme.spacing.hairline,
-              height: 43,
+              height: theme.sizes.minTouchTarget,
               justifyContent: "center",
               width: "14.5%",
             }}

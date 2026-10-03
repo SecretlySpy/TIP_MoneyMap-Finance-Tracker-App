@@ -28,18 +28,19 @@ The Pages site is the polished setup guide: root [`index.html`](./index.html) (s
 
 **v0.1.0** — Core complete + Student Eats + Goals / Safe-to-Spend.
 
-### Known gaps (reconciled 2026-09-27)
+### Current limits (reviewed 2026-10-03)
 
 The current verification matrix is in [Verification and Evaluation.md](./Project%20Guidelines/Verification%20and%20Evaluation.md).
-"Done" above means the feature ships, not that it matches every expectation of a mainstream
-expense tracker. Still missing:
+"Done" above describes implemented code, not a verified native release. Transaction backdating,
+edit/delete, History search, and retry-safe imports are now implemented and covered by Jest/desktop
+SQLite; live Figma and Android device acceptance remain separate.
 
 | Gap | Impact |
 |---|---|
-| Transactions cannot be **backdated** (always `Date.now()`) or **edited** after saving | High — the biggest deviation from standard trackers |
-| No transaction **search**; History supports explicit category and account filters | Medium |
-| `xlsx@0.18.5` has two unpatched high-severity advisories and parses user files | **Security — action required** |
-| No account transfers, budget rollover, import de-duplication, or "delete all data" reset | Low–medium; the import screen warns before confirmation |
+| Native SQLCipher key/storage, PIN/biometric and notification lifecycles, phone/tablet layout and accessibility | No connected device or configured AVD on this workstation; native acceptance is **UNVERIFIED** |
+| Current 52 mobile + 52 tablet state frames | Figma connector requires authentication; six feature groups are mapped to code, individual visual parity is **UNVERIFIED** |
+| Dependency advisories | `npm audit --omit=dev` reported 48 advisories (33 high, 15 moderate) on its latest run. `xlsx@0.20.3` is integrity-pinned from the vendor CDN; audit coverage of this tarball is incomplete. Review compatible updates before release |
+| Account transfers, budget rollover, and "delete all data" reset | Still outside the current product scope; imported rows edited since an earlier import are reported as skipped rather than overwritten |
 
 The Jest suite covers domain, data-transfer, store, component, and static UI contracts. Native
 device behavior still requires the Android verification path below.
@@ -49,7 +50,7 @@ device behavior still requires the Android verification path below.
 1. Install **Node.js 22 LTS**, **JDK 21**, Android SDK (API 35 recommended).
 2. `npm ci`
 3. Copy `.env.example` → `.env` (optional `GEMINI_API_KEY` for online tips).
-4. `npm test` (37 suites, 232 tests verified on 2026-10-01)
+4. `npm test` (45 suites, 307 tests verified on 2026-10-03)
 5. Start an emulator/device, then `npm run android` (dev client required — **Expo Go unsupported** because of SQLCipher).
 
 ### Android Studio run button

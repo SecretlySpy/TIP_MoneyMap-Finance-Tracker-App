@@ -33,6 +33,8 @@
  * @property {number} dateEpochMillis
  * @property {string | null} note
  * @property {number | null} recurringRuleId
+ * @property {number | null} scheduledDateEpochMillis
+ * @property {string | null} sourceKey
  *
  * @typedef {Omit<Transaction, 'id'>} NewTransaction
  * @typedef {Partial<NewTransaction>} TransactionUpdate

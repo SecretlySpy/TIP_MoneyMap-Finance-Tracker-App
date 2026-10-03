@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as Crypto from "expo-crypto";
 import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
+import { CalendarPickerSheet } from "../components/CalendarPickerSheet";
 import { Chip } from "../components/Chip";
 import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
@@ -18,8 +20,27 @@ const keypadRows = [
     ["7", "8", "9"],
     [".", "0", "⌫"],
 ];
-function todayLabel(now = new Date()) {
-    return `Today, ${MONTH_SHORT[now.getMonth()]} ${now.getDate()}`;
+function localNoonToday(now = new Date()) {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0).getTime();
+}
+function dateLabel(epochMillis, now = new Date()) {
+    const selected = new Date(epochMillis);
+    const isToday = selected.getFullYear() === now.getFullYear()
+        && selected.getMonth() === now.getMonth()
+        && selected.getDate() === now.getDate();
+    return `${isToday ? "Today, " : ""}${MONTH_SHORT[selected.getMonth()]} ${selected.getDate()}, ${selected.getFullYear()}`;
+}
+function createManualSourceKey() {
+    try {
+        const uuid = Crypto.randomUUID();
+        if (typeof uuid === "string" && uuid.length > 0) {
+            return `manual:v1:${uuid}`;
+        }
+    }
+    catch {
+        // Jest and older native runtimes can lack randomUUID; this fallback is local-only.
+    }
+    return `manual:v1:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 }
 // The entry screen keeps the Figma three-step flow while all money stays integer minor units.
 export function EntryScreen({ navigation }) {
@@ -39,6 +60,9 @@ export function EntryScreen({ navigation }) {
     const [showNewCategory, setShowNewCategory] = useState(false);
     const [note, setNote] = useState("");
     const [showNotePrompt, setShowNotePrompt] = useState(false);
+    const [datePickerVisible, setDatePickerVisible] = useState(false);
+    const [selectedDateEpochMillis, setSelectedDateEpochMillis] = useState(() => localNoonToday());
+    const sourceKeyRef = useRef(createManualSourceKey());
     const transactions = useFinanceStore((state) => state.transactions);
     const accountChips = useMemo(() => listAccountChips(accounts), [accounts]);
     const typeCategories = useMemo(() => categoriesForType(categories, transactionType), [categories, transactionType]);
@@ -140,8 +164,13 @@ export function EntryScreen({ navigation }) {
                 categoryName: selectedCategory,
                 note: note.trim() ? note.trim() : null,
                 type: transactionType,
+                dateEpochMillis: selectedDateEpochMillis,
+                sourceKey: sourceKeyRef.current,
             });
-            setSelectedMonthYear(toMonthYear());
+            // A mounted Entry route may be revisited after switching tabs. Retire the
+            // completed mutation key while preserving it across any failed/uncertain retry.
+            sourceKeyRef.current = createManualSourceKey();
+            setSelectedMonthYear(toMonthYear(new Date(selectedDateEpochMillis)));
             tabNavigation?.navigate("History", { screen: "HistoryList" });
         }
         catch (error) {
@@ -198,9 +227,17 @@ export function EntryScreen({ navigation }) {
         <Text style={{ color: amountColor, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.entryAmount }}>
           {formatMinor(amountMinor, { currencySymbol })}
         </Text>
-        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
-          {selectedAccountLabel} · {todayLabel()}
-        </Text>
+        <Pressable
+          accessibilityHint="Opens the transaction date calendar"
+          accessibilityLabel={`Transaction date ${dateLabel(selectedDateEpochMillis)}`}
+          accessibilityRole="button"
+          onPress={() => setDatePickerVisible(true)}
+          style={{ alignItems: "center", justifyContent: "center", minHeight: 44, paddingHorizontal: theme.spacing.md }}
+        >
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
+            {selectedAccountLabel} · {dateLabel(selectedDateEpochMillis)} ▾
+          </Text>
+        </Pressable>
       </View>
 
       {recentCategoryChips.length > 0 ? (
@@ -327,6 +364,17 @@ export function EntryScreen({ navigation }) {
       <PrimaryButton disabled={!canSave} onPress={() => void handleSave()}>
         {saving ? "Saving…" : "Save Transaction"}
       </PrimaryButton>
+      <CalendarPickerSheet
+        onClose={() => setDatePickerVisible(false)}
+        onConfirm={(epochMillis) => {
+            setSelectedDateEpochMillis(epochMillis);
+            setDatePickerVisible(false);
+        }}
+        selectedDateEpochMillis={selectedDateEpochMillis}
+        testID="entry-date-picker-sheet"
+        title="Transaction date"
+        visible={datePickerVisible}
+      />
       <TextPromptModal confirmLabel="Add" message="Creates a custom category on this device." onCancel={() => setShowNewCategory(false)} onConfirm={(value) => {
             void (async () => {
                 try {

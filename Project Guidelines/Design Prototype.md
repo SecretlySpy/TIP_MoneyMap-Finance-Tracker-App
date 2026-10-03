@@ -1,109 +1,75 @@
 # Design Prototype
 
-Updated: 2026-09-27
+Updated: 2026-10-03
 
-## Source of truth
+## Source of truth and evidence boundary
 
 [MoneyMap Figma — Update 092726, page `75:172`](https://www.figma.com/design/JeEeOG1jZ0B72pA8gf7fMk/MoneyMap---Finance-Tracker?node-id=75-172)
 
-The implementation strictly uses Roboto and semantic values from [`src/theme/tokens.js`](../src/theme/tokens.js).
-Figma prototype page `MoneyMap — Update 092726` contains 22 screen frames (16 core screens + 4 task states + Documentation Board + Design System). All 20 interactive screens and states are implemented in the app codebase with 100% visual and layout parity.
+The supplied development plan records **52 mobile screens/states and 52 matching tablet screens/states**. These are state references, not 104 separate route components. The older 22-frame inventory remains useful as route-oriented historical context, but it is not the current design count.
+
+Live Figma access required reauthentication during the 2026-10-03 implementation pass. Therefore, the current frame contents and visual diffs were not independently inspected. The mappings in this document are grounded in the supplied 52-state inventory, current source files, and automated tests. They demonstrate implementation traceability; they do **not** establish per-frame pixel parity.
+
+Native phone and tablet visual/device acceptance is **UNVERIFIED**. In particular, safe-area behavior, keyboard overlap, focus appearance, font rendering, rotation, and device-specific biometric behavior still require checks on representative native runtimes.
 
 ## Primary journeys
 
 ```text
-Splash ──> Dashboard ──> Entry ──save──> History
-              ├──────> History / Budgets / Recurring
-              ├──────> Savings Goals
-              ├──────> Smart Tips (offline; online optional)
-              └──────> Student Eats (fixed TIP QC; network search)
+Splash ──> Onboarding ──> Dashboard ──> Entry ──save──> History
+              │               ├──────> History / Budgets / Recurring
+              │               ├──────> Savings Goals
+              │               ├──────> Smart Tips (offline; online optional)
+              │               └──────> Student Eats (fixed TIP QC; network search)
+              └──resume/back/skip──> persisted first-run progress
 
 Budgets ──> Add Budget Sheet (Step 1: Category) ──> Set Limit Sheet (Step 2: Limit)
 Recurring ──> Add Recurring Bill Sheet (EmojiGrid + interval + lead time chips)
 Savings Goals ──> Add Savings Goal Sheet (EmojiGrid + target + deadline)
-Settings ──> Import ──map columns (Figma 16)──> Resolve Accounts (Figma 16b) ──confirm──> History
+Settings ──> Import ──map columns──> Resolve Accounts ──confirm──> History
+         ├─> Restore backup ──> Undo last restore
          ├─> App Lock (optional setup with 4-digit PIN + cancel)
          └─> Replay Splash
 ```
 
-## Reconciled states & complete screen parity
+## Current 52-state traceability
 
-1. **`01 Splash` (`SplashScreen.jsx`)**:
-   - Header with brand circle 💰, "MoneyMap", and subtitle "Student-friendly personal finance tracker".
-   - 56px primary "Get started" button with touch target compliance.
-   - Security footnote: "100% offline-first · Local encrypted database · No sign-up required".
-   - First-launch persistence via `SecureStore` key `moneymap.splash.seen.v1` and replay affordance in Settings.
+This matrix traces each feature group from the supplied plan to current implementation and automated behavioral evidence. It is a six-group mapping, not an individual 104-frame inventory: exact node IDs, interactions, and matching screenshots were inaccessible without Figma authentication. A group marked “mapped” has code and tests representing its behavior, not independently verified Figma parity.
 
-2. **`02 App Lock` (`AppLockScreen.jsx`)**:
-   - Brand title "MoneyMap".
-   - Subtitle: "Optional app lock — create a 4-digit PIN" / "Enter your PIN to unlock".
-   - Keypad with digits 0-9, biometric affordance key, and delete key.
-   - PIN indicator dots showing progress.
-   - "Cancel setup" footer affordance in creation mode.
+| Feature group | States per device | Current screens/components | Automated evidence | Status and remaining visual evidence |
+| --- | ---: | --- | --- | --- |
+| Onboarding/recovery | 18 | `OnboardingScreen`, `PasteImportScreen`; `ScreenContainer`; `src/services/onboarding.js`; persisted onboarding state in `uiStore` | `onboarding.test.js`, `onboardingScreen.test.jsx`, `uiStoreOnboarding.test.js`, `splashOnboarding.test.jsx`, `dataTransfer.test.js` | Behavior mapped for draft resume, back/skip, account reuse, failed-write retention, stable first-expense provenance, restore, and undo. Native focus/loading/error/success layouts on phone/tablet are **UNVERIFIED**. |
+| Daily finance/history | 14 | `DashboardScreen`, `EntryScreen`, `HistoryScreen`, `TransactionDetailScreen`, `EditTransactionScreen`; `CalendarPickerSheet`, `MonthChip`, `TransactionRow`, `SafeToSpendCard` | `dashboardNavigation.test.jsx`, `historySearch.test.jsx`, `transactionEdit.test.js`, `financeView.test.js`, `monthChipCalendar.test.jsx`, `repositories.test.js`, `storeIntegration.test.js` | Real-data CRUD, search/filter behavior, explicit calendar selection, and recurring-origin date protection are mapped. Long-list, keyboard, and tablet visual comparisons are **UNVERIFIED**. |
+| Budgets/bills/goals | 7 | `BudgetsScreen`, `RecurringScreen`, `GoalsScreen`; `BudgetCard`, `GoalCard`, `BottomSheet`, `CalendarPickerSheet`, `EmojiGrid` | `goals.test.js`, `recurringCatchUp.test.js`, `remindersScheduling.test.js`, `emojiAndDueDate.test.js`, `monthChipCalendar.test.jsx`, `qaStoreFlows.test.jsx` | Monthly data behavior, recurrence, reminders, goals, and calendar navigation are mapped. Bottom-sheet and card parity on native phone/tablet is **UNVERIFIED**. |
+| Accounts/import | 7 | `ManageAccountsScreen`, `ImportScreen`, `PasteImportScreen`; import parser/review and account-resolution services | `importParser.test.js`, `importAccounts.test.js`, `importReview.test.jsx`, `pasteImport.test.jsx`, `dataTransfer.test.js`, `repositories.test.js`, `releaseBlockers.test.js` | Account lifecycle plus preview, mapping, invalid-row confirmation, edited-row skip, atomic failure, and retry outcomes are mapped. Native file-picker and wide-tablet preview acceptance are **UNVERIFIED**. |
+| Tips/settings/categories | 4 | `SmartTipsScreen`, `StudentEatsScreen`, `SettingsScreen`, `ManageCategoriesScreen`; `SectionCard`, `Toggle`, `EmojiGrid` | `tips.test.js`, `smartTipsClient.test.js`, `eatsRanking.test.js`, `placesClient.test.js`, `preferences.test.js`, `responsiveAccessibility.test.jsx` | Offline tips, optional remote clients, persisted preferences, settings rows, and category management are mapped. Provider-backed and native tablet visual acceptance is **UNVERIFIED**. |
+| Splash/app lock | 2 | `SplashScreen`, `AppLockScreen`; root-shell selection in `RootNavigator` and `routes.js` | `appLock.test.js`, `splashOnboarding.test.jsx`, `rootNavigationMode.test.js`, `preferences.test.js` | Splash, fail-closed preference loading, mutually exclusive locked/unlocked shells, PIN flow, and supported biometric fallback paths are mapped. Native biometric/device acceptance is **UNVERIFIED**. |
+| **Total** | **52** | Six grouped implementation surfaces for each form factor | Group-level behavioral and static tests | **Six groups accounted for; individual mobile/tablet frames and per-frame parity remain UNVERIFIED.** |
 
-3. **`03 Dashboard` (`DashboardScreen.jsx`)**:
-   - Safe-to-Spend card with daily target, status badge, and shortfall feedback.
-   - Quick action grid: History, Budgets, Recurring, Savings Goals, Smart Tips, Student Eats.
-   - Month summary bar and recent transactions list.
-   - Floating Action Button (+ Expense / + Income).
+## Route-oriented implementation inventory
 
-4. **`04 Add Transaction — Expense` & `05 Add Transaction — Income` (`EntryScreen.jsx`)**:
-   - Full category grid with theme icons and name labels.
-   - Source account selector row.
-   - Decimal keypad and note input.
-   - Primary save button routing directly to History upon completion.
+The following compact inventory supersedes the older “complete screen parity” claim. It identifies reusable routes and stateful surfaces currently present in code:
 
-5. **`06 History` (`HistoryScreen.jsx`)**:
-   - Month selector chips, search input, and category/account filter modal.
-   - Aggregated monthly Income vs Expense metrics card.
-   - Grouped transaction list with category icons and formatted amounts.
+1. `SplashScreen` and `OnboardingScreen`: first-run entry, resumable setup, back/skip, account creation or reuse, optional first expense, and optional lock setup.
+2. `AppLockScreen`: four-digit PIN setup/unlock, cancel during setup, biometric affordance, and failure messaging.
+3. `DashboardScreen`: safe-to-spend summary, quick actions, month summary, recent transactions, and expense/income entry actions.
+4. `EntryScreen`: expense/income selection, category and account selection, decimal amount, note, explicit transaction date, and save-to-history behavior.
+5. `HistoryScreen`, `TransactionDetailScreen`, and `EditTransactionScreen`: month/calendar selection, search and filters, detail, edit, delete, and recurring-origin date rules.
+6. `BudgetsScreen`: monthly overview, budget cards, recurring navigation, and the category/limit sheet flow.
+7. `RecurringScreen`: persisted recurring rules, reminders, frequency and lead-time controls, and add/edit flows.
+8. `GoalsScreen`: goal progress, contributions, targets, optional deadlines, and goal-management sheets.
+9. `SmartTipsScreen` and `StudentEatsScreen`: offline-first insights plus explicitly optional network-backed results.
+10. `SettingsScreen`, `ManageCategoriesScreen`, and `ManageAccountsScreen`: persisted preferences, security and data tools, categories, account archive/revival, and balance-bearing account records.
+11. `ImportScreen` and `PasteImportScreen`: CSV/XLSX preview and mapping, account resolution, durable duplicate reconciliation, backup restore, and one-step restore undo.
 
-6. **`07 Budgets` (`BudgetsScreen.jsx`)**:
-   - Month selector chip and overall budget progress bar.
-   - Recurring bills link row ("Bills ›").
-   - Category budget cards showing percentage spent, progress tracks, and over-budget status.
-   - "+ Add budget" button launching task flow.
+## Responsive and accessibility primitives
 
-7. **`08 Add Budget` & `08b Add Budget — Set Limit` (`BudgetsScreen.jsx`)**:
-   - Bottom sheet with rounded corners, grabber bar, and dark scrim.
-   - Step 1 (`08`): Category name input + 18-icon `EmojiGrid` + "Next: set limit".
-   - Step 2 (`08b`): Limit amount input + category/month subtitle + 18-icon `EmojiGrid` + "Save budget".
+- [`ScreenContainer.jsx`](../src/components/ScreenContainer.jsx) uses safe-area edges, a single phone/tablet breakpoint, bounded content width, and scroll behavior. Phone content is capped at 540 units; tablet content is capped at 760 units. Wider windows reuse the tablet rule rather than introducing a desktop layout.
+- [`BottomSheet.jsx`](../src/components/BottomSheet.jsx) caps sheets at 640 units and 90% height, uses keyboard avoidance, provides scrollable content, respects the bottom safe-area inset, and exposes an accessible dismiss action.
+- [`tokens.js`](../src/theme/tokens.js) keeps primary controls at 56 units and establishes a 44-unit minimum touch-target token for other interactive controls.
+- `EmojiGrid` choices and Settings rows use the minimum touch-target token. Static coverage is in `responsiveAccessibility.test.jsx`.
+- Corrected light-theme amber text and expense colors are checked at WCAG AA text contrast thresholds by `responsiveAccessibility.test.jsx`. This is a token-level calculation, not a native screenshot audit.
+- Roboto remains the shared screen font, while semantic palette, spacing, radius, typography, and sizing tokens prevent individual screens from creating divergent visual constants.
 
-8. **`09 Recurring & Reminders` & `09b Add Recurring Bill` (`RecurringScreen.jsx`)**:
-   - Active reminder preview card (e.g. "Internet plan bill due in 14 days").
-   - Upcoming bills list with repeat and reminder lead time chips.
-   - Bottom sheet (`09b`): Bill name, amount, due date, repeat frequency chips (Daily/Weekly/Monthly), reminder lead chips (0, 1, 3, 7, 14 days), 18-icon `EmojiGrid`, "Save bill" primary button, and "Cancel".
+## Visual acceptance still required
 
-9. **`10 Savings Goals` & `10b Add Savings Goal` (`GoalsScreen.jsx`)**:
-   - Goal progress cards with funded percentage, target amount, and contribute action.
-   - Bottom sheet (`10b`): Goal name, target amount, optional deadline date, 18-icon `EmojiGrid`, "Save goal" primary button, and "Cancel".
-
-10. **`11 Smart Tips` (`SmartTipsScreen.jsx`)**:
-    - Offline heuristic cards (budget pace, repeat small expenses, daily allowance).
-    - Opt-in online Google Gemini personalization with explicit privacy consent dialog.
-
-11. **`12 Student Eats` (`StudentEatsScreen.jsx`)**:
-    - Budget-friendly food places near TIP Quezon City campus.
-    - Price filter chips (₱, ₱₱, ₱₱₱), distance tags, and student ranking score.
-    - Explicit notice that no device GPS permission is requested.
-
-12. **`13 Settings` (`SettingsScreen.jsx`)**:
-    - Security section (App lock toggle, Encrypted database status).
-    - Data section (Export CSV, Backup data, Restore backup, Import data).
-    - Preferences section (Currency symbol chips, Theme selector, Category/Account management, Splash replay).
-    - Smart Features section (Gemini tips consent toggle, Recurring bill reminders toggle).
-    - Subtle hairline divider lines between card rows matching Figma.
-
-13. **`14 Manage Categories` & `15 Manage Accounts`**:
-    - Category management with Expense/Income tabs and custom icon assignment.
-    - Account management with Cash, Card, and E-wallet classifications and balance tracking.
-
-14. **`16 Import Data` & `16b Import Data — Resolve Accounts` (`ImportScreen.jsx`)**:
-    - File picker supporting CSV and Excel (.xlsx).
-    - Screen `16`: PreviewTable (Date, Amount, Type), "Tap a field to cycle through the mapped column", MappingCard with clickable cycling pills, ReadyBanner ("Ready to import"), and "Resolve accounts" button.
-    - Screen `16b`: PreviewTable, "Resolve every source account before import", MappingCard with interactive resolution pills (`Existing: <name>` / `New: <type>`), ReadyBanner ("All accounts resolved"), and "Confirm & Import" atomic transaction button.
-
-## Component & token discipline
-
-- Reusable components: [`BottomSheet.jsx`](../src/components/BottomSheet.jsx), [`EmojiGrid.jsx`](../src/components/EmojiGrid.jsx), [`PrimaryButton`](../src/components/Buttons.jsx), [`SectionCard`](../src/components/SectionCard.jsx), [`ScreenContainer`](../src/components/ScreenContainer.jsx).
-- Color enforcement: Zero hardcoded hex values in UI files; 100% token adherence verified by static tests.
+Before claiming mobile/tablet parity, reconnect Figma and compare representative states from every group at the intended phone and tablet sizes. Then run native checks covering safe areas, long content, large text, screen-reader labels, keyboard-open forms and sheets, visible focus, error and success states, and biometric fallback. Record screenshots or device evidence against the exact Figma node IDs used; code presence, Jest output, and static token checks alone are insufficient.

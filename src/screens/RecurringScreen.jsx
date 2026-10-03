@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Alert, Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { BottomSheet } from "../components/BottomSheet";
-import { DashedButton } from "../components/Buttons";
+import { PrimaryButton } from "../components/Buttons";
 import { EmojiGrid } from "../components/EmojiGrid";
 import { EmptyState } from "../components/EmptyState";
 import { OptionChipRow } from "../components/OptionChipRow";
@@ -393,9 +393,9 @@ export function RecurringScreen({ navigation }) {
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
             Tip: press and hold a bill card to edit or delete.
           </Text>
-          <DashedButton disabled={busy} onPress={beginAdd}>
+          <PrimaryButton disabled={busy} onPress={beginAdd}>
             {busy ? "Saving…" : "+ Add recurring bill"}
-          </DashedButton>
+          </PrimaryButton>
         </>
       ) : null}
 
@@ -524,9 +524,9 @@ export function RecurringScreen({ navigation }) {
           </View>
 
           <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.md }}>
-            <DashedButton disabled={busy} onPress={() => void finishCreate()}>
+            <PrimaryButton disabled={busy} onPress={() => void finishCreate()}>
               {busy ? "Saving…" : "Save bill"}
-            </DashedButton>
+            </PrimaryButton>
             <Pressable
               accessibilityRole="button"
               onPress={() => setIsAddOpen(false)}
