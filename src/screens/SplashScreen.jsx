@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
+import { BrandMark } from "../components/BrandMark";
 import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { useUiStore } from "../store/uiStore";
@@ -17,7 +18,13 @@ export function SplashScreen({ navigation }) {
   const onboardingLoadError = useUiStore((state) => state.onboardingLoadError);
   const splashReadError = useUiStore((state) => state.splashReadError);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 1400);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleGetStarted = async () => {
     // Settings uses this screen as a replayable preview, not as a first-run reset.
@@ -74,21 +81,8 @@ export function SplashScreen({ navigation }) {
       testID="splash-screen"
     >
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: theme.spacing.lg }}>
-        {/* Brand IconCircle */}
-        <View
-          style={{
-            alignItems: "center",
-            backgroundColor: theme.colors.tint,
-            borderRadius: theme.radii.round,
-            height: theme.sizes.lockCircle,
-            justifyContent: "center",
-            width: theme.sizes.lockCircle,
-          }}
-        >
-          <Text style={{ fontSize: theme.typeScale.heroAmount }}>💰</Text>
-        </View>
+        <BrandMark loading={loading || busy} size={112} />
 
-        {/* Brand Text */}
         <View style={{ alignItems: "center", gap: theme.spacing.sm }}>
           <Text
             style={{
@@ -114,10 +108,9 @@ export function SplashScreen({ navigation }) {
         </View>
       </View>
 
-      {/* CTA Section */}
       <View style={{ gap: theme.spacing.md, width: "100%" }}>
         <PrimaryButton disabled={busy} onPress={() => void handleGetStarted()}>
-          {busy ? "Starting…" : "Get started"}
+          {busy ? "Starting\u2026" : "Get started"}
         </PrimaryButton>
         {onboardingDraftInvalid ? (
           <PrimaryButton disabled={busy} onPress={confirmDiscard}>Discard saved setup</PrimaryButton>
@@ -135,7 +128,7 @@ export function SplashScreen({ navigation }) {
             textAlign: "center",
           }}
         >
-          🔒 Optional app lock is available in Settings
+          Optional app lock is available in Settings
         </Text>
       </View>
     </ScreenContainer>
