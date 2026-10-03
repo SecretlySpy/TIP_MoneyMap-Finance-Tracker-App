@@ -24,6 +24,8 @@ FR-13/NFR-07 have group-level source/static/component coverage in [Design Protot
 not 104 verified frame comparisons. Production dependency remediation is a separate reviewed release gate;
 do not use `npm audit fix --force` to downgrade Expo or arbitrarily replace the native stack.
 
+The remaining native gates are specified in [Native Mobile Test Suite and Validation Checklist](../docs/native-mobile-test-suite.md). It defines SQLCipher, App Lock/biometric, notification, accessibility, and phone/tablet cases with device matrices, evidence requirements, release-blocking priorities, and a final checklist. Its live visual baseline is the user-supplied [MoneyMap Figma file](https://www.figma.com/design/JeEeOG1jZ0B72pA8gf7fMk/MoneyMap---Finance-Tracker?m=auto&t=EWhtWgnswUW8ZrcN-6); exact frame/node IDs must be recorded during an authenticated visual run.
+
 ## Historical QA evidence (2026-09-28)
 
 See [QA Verification Report 2026-09-28](./QA%20Verification%20Report%202026-09-28.md) for evidence from that run: **32 suites / 199 tests passed without exclusions**, Expo Doctor **18/18**, Android JS export passed, and **1,829 local stress operations had zero errors**. The workload started with 10,000 rows, 100 budgets/rules, and reached 32 actual SQLite writers. Dashboard p95 was **15.19 ms**; writer p99 at concurrency 32 was **2,517.33 ms**. These were desktop SQLite observations, not native SQLCipher/device acceptance.
@@ -58,9 +60,9 @@ Updated: 2026-09-27
 | `__tests__/goals.test.js` | 6 | Savings goals progress, completion calculation, contribution overflow, deadline sorting | Passed |
 | `__tests__/importParser.test.js` | 10 | CSV & XLSX parsing, column auto-mapping detection, malformed row skips | Passed |
 | `__tests__/importAccounts.test.js` | 5 | Source account extraction, automatic resolution, unresolved account identification | Passed |
-| `__tests__/repositories.test.js` | 15 | SQLCipher repository CRUD: Accounts, Categories, Transactions, Budgets, RecurringRules, Goals | Passed |
+| `__tests__/repositories.test.js` | 15 | Repository CRUD through the unencrypted desktop SQLite test adapter: Accounts, Categories, Transactions, Budgets, RecurringRules, Goals; not native SQLCipher evidence | Passed |
 | `__tests__/schema.test.js` | 4 | Database table creation, column integrity, initial migration execution | Passed |
-| `__tests__/keyManager.test.js` | 4 | SecureStore key generation, retrieval, and separate encryption verifier storage | Passed |
+| `__tests__/keyManager.test.js` | 4 | Database-key generation/reuse contract through an in-memory key-store double; not native SecureStore evidence | Passed |
 | `__tests__/appLock.test.js` | 8 | PIN verification, lockout cooldown calculation, free attempts thresholds | Passed |
 | `__tests__/remindersScheduling.test.js` | 6 | Expo Notifications scheduling for recurring bills, lead time calculation | Passed |
 | `__tests__/recurringCatchUp.test.js` | 6 | Catch-up planning for past due recurring rules, anchor day advancement | Passed |

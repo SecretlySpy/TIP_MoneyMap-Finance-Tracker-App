@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Alert, Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { BottomSheet } from "../components/BottomSheet";
-import { DashedButton } from "../components/Buttons";
+import { PrimaryButton } from "../components/Buttons";
 import { EmojiGrid } from "../components/EmojiGrid";
 import { EmptyState } from "../components/EmptyState";
 import { GoalCard } from "../components/GoalCard";
@@ -279,9 +279,9 @@ export function GoalsScreen({ navigation }) {
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
             Tip: press and hold a goal card to edit or delete.
           </Text>
-          <DashedButton disabled={busy} onPress={beginCreate}>
+          <PrimaryButton disabled={busy} onPress={beginCreate}>
             + Add goal
-          </DashedButton>
+          </PrimaryButton>
         </>
       ) : null}
 
@@ -374,9 +374,9 @@ export function GoalsScreen({ navigation }) {
           </View>
 
           <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.md }}>
-            <DashedButton disabled={busy} onPress={() => void handleSaveGoal()}>
+            <PrimaryButton disabled={busy} onPress={() => void handleSaveGoal()}>
               {busy ? "Saving…" : "Save goal"}
-            </DashedButton>
+            </PrimaryButton>
             <Pressable
               accessibilityRole="button"
               onPress={() => setIsAddOpen(false)}

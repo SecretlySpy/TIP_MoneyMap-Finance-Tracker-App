@@ -16,9 +16,11 @@ this checkout.
 - `npm test -- --watch=false`: **37/37 suites and 232/232 tests passed**.
 - The installed application is Expo SDK 54 / React Native 0.81 with Zustand and OP-SQLite
   SQLCipher schema version 4. There is no owned REST/GraphQL backend.
-- Live Figma retrieval was attempted for file `JeEeOG1jZ0B72pA8gf7fMk`, node `75:172`, but the
-  connector requires reauthentication. The supplied 52-mobile/52-tablet state inventory is
-  therefore user-supplied evidence; live parity is **UNVERIFIED**.
+- Public Figma/oEmbed metadata now verifies file `JeEeOG1jZ0B72pA8gf7fMk`, title `MoneyMap - Finance
+  Tracker`, and a 2026-10-03 modification date. Authenticated node context/full-size screenshots for
+  node `75:172` remain unavailable in this environment. The supplied 52-mobile/52-tablet inventory
+  remains user-supplied evidence; live frame parity is **UNVERIFIED** until the native suite records
+  exact page/frame/node IDs and comparisons.
 
 ### Conflict and gap decisions
 

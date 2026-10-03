@@ -24,6 +24,8 @@ eas build --profile production --platform android
 
 ## Verify install
 
+Execute and attach the required P0/P1 results from [`docs/native-mobile-test-suite.md`](./native-mobile-test-suite.md). The abbreviated items below are not a substitute for that evidence.
+
 1. Install APK/AAB on a clean device/emulator (API 26+).
 2. Cold start &lt; ~2s on mid-range hardware after first open.
 3. With Smart Tips **off**, confirm no outbound Gemini traffic (airplane mode still shows offline tips when enabled with consent).
@@ -31,6 +33,9 @@ eas build --profile production --platform android
 5. Import sample CSV and XLSX; bad rows reported.
 6. App lock PIN + biometric fallback.
 7. Backup → wipe app data → restore.
+8. Complete SQLCipher byte/wrong-key/key-loss and schema-upgrade checks with synthetic data.
+9. Complete TalkBack, Accessibility Scanner, maximum text size, keyboard, safe-area, rotation, and tablet checks.
+10. Compare representative phone/tablet states against the live Figma file with exact revision and frame/node IDs recorded.
 
 ## Out of scope (do not ship)
 

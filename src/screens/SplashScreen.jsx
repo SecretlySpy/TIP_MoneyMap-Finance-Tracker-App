@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Alert, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
-import { DashedButton, PrimaryButton } from "../components/Buttons";
+import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -120,7 +120,7 @@ export function SplashScreen({ navigation }) {
           {busy ? "Starting…" : "Get started"}
         </PrimaryButton>
         {onboardingDraftInvalid ? (
-          <DashedButton disabled={busy} onPress={confirmDiscard}>Discard saved setup</DashedButton>
+          <PrimaryButton disabled={busy} onPress={confirmDiscard}>Discard saved setup</PrimaryButton>
         ) : null}
         {error !== null || onboardingLoadError !== null || splashReadError !== null ? (
           <Text accessibilityRole="alert" style={{ color: theme.colors.expense, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label, textAlign: "center" }}>

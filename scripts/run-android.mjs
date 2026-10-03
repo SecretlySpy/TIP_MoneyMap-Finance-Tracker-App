@@ -286,6 +286,12 @@ function createAndroidEnvironment() {
   environment.JAVA_HOME = java.home;
   environment.NODE_ENV = "development";
 
+  // Prevent com.android.prefs.AndroidLocationsException caused by having both
+  // ANDROID_PREFS_ROOT and ANDROID_USER_HOME set in environment.
+  if (environment.ANDROID_PREFS_ROOT && environment.ANDROID_USER_HOME) {
+    delete environment.ANDROID_PREFS_ROOT;
+  }
+
   const pathKey =
     Object.keys(environment).find((key) => key.toLowerCase() === "path") ?? "PATH";
   environment[pathKey] = [

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { Chip } from "../components/Chip";
-import { DashedButton } from "../components/Buttons";
+import { PrimaryButton } from "../components/Buttons";
 import { EmptyState } from "../components/EmptyState";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
@@ -206,9 +206,9 @@ export function ManageAccountsScreen({ navigation }) {
       )}
 
       {active.length > 0 ? (
-        <DashedButton disabled={busy} onPress={() => setCreateStep("name")}>
+        <PrimaryButton disabled={busy} onPress={() => setCreateStep("name")}>
           + Add account
-        </DashedButton>
+        </PrimaryButton>
       ) : null}
 
       {archived.length > 0 ? (
@@ -259,9 +259,9 @@ export function ManageAccountsScreen({ navigation }) {
               </Chip>
             ))}
           </View>
-          <DashedButton disabled={busy} onPress={() => void handleCreate()}>
+          <PrimaryButton disabled={busy} onPress={() => void handleCreate()}>
             {busy ? "Creating…" : "Create account"}
-          </DashedButton>
+          </PrimaryButton>
           <Pressable onPress={() => setCreateStep(null)} style={{ minHeight: 44, justifyContent: "center" }}>
             <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, textAlign: "center" }}>
               Cancel
