@@ -1,15 +1,15 @@
 import * as SecureStore from "expo-secure-store";
 import { AppState } from "react-native";
 import { create } from "zustand";
-import { clearPin, getPinLockoutStatus, hasStoredPin, setPin, tryLocalAuthentication, verifyPinWithLockout, } from "../services/appLock";
+import { clearPin, getPinLockoutStatus, hasStoredPin, setPin, tryLocalAuthentication, tryRecoveryAuthentication, verifyPinWithLockout, } from "../services/appLock";
 import { getReminderPermissionStatus, syncBillReminderNotifications, } from "../services/notificationScheduler";
 import { clearOnboardingDraft, createOnboardingDraft, loadOnboardingDraftResult, saveOnboardingDraft, } from "../services/onboarding";
-import { DEFAULT_PREFERENCES, loadPreferencesResult, savePreferences, } from "../services/preferences";
+import { DEFAULT_PREFERENCES, loadPreferencesResult, savePreferences, SPLASH_SEEN_KEY, } from "../services/preferences";
 let preferencesPromise = null;
 let onboardingWriteQueue = Promise.resolve();
 let preferenceWriteQueue = Promise.resolve();
 let appStateSubscriptionAttached = false;
-const SPLASH_SEEN_KEY = "moneymap.splash.seen.v1";
+export const PIN_RECOVERY_AUTHORIZATION_MILLIS = 5 * 60 * 1000;
 /** Optional finance snapshot supplier registered by financeStore to avoid a circular import. */
 let financeSnapshotProvider = null;
 export function registerFinanceSnapshotProvider(provider) {
@@ -35,6 +35,7 @@ async function persist(state) {
 }
 async function updatePreferenceWithRollback(set, get, patch, sideEffect) {
     const previous = preferencesFromState(get());
+    const previousPatch = Object.fromEntries(Object.keys(patch).map((key) => [key, get()[key]]));
     set(patch);
     try {
         await queuePreferenceWrite(async () => {
@@ -44,7 +45,7 @@ async function updatePreferenceWithRollback(set, get, patch, sideEffect) {
             }
         });
     } catch (error) {
-        set(previous);
+        set({ ...previous, ...previousPatch });
         throw error;
     }
 }
@@ -92,6 +93,9 @@ export const useUiStore = create((set, get) => ({
     preferencesReady: false,
     notificationPermissionDenied: false,
     notificationHint: null,
+    pinRecoveryAuthorizedAt: null,
+    localDataGeneration: 0,
+    localResetInProgress: false,
     ensurePreferencesLoaded: async () => {
         if (get().preferencesReady) {
             return;
@@ -164,7 +168,10 @@ export const useUiStore = create((set, get) => ({
                     }
                     const current = get();
                     if (current.appLockEnabled && current.hasPin && !current.isLocked) {
-                        set({ isLocked: true });
+                        set({ isLocked: true, pinRecoveryAuthorizedAt: null });
+                    }
+                    else if (current.pinRecoveryAuthorizedAt !== null) {
+                        set({ pinRecoveryAuthorizedAt: null });
                     }
                 });
             }
@@ -179,7 +186,10 @@ export const useUiStore = create((set, get) => ({
     lockNow: () => {
         const current = get();
         if (current.appLockEnabled && current.hasPin) {
-            set({ isLocked: true });
+            set({ isLocked: true, pinRecoveryAuthorizedAt: null });
+        }
+        else if (current.pinRecoveryAuthorizedAt !== null) {
+            set({ pinRecoveryAuthorizedAt: null });
         }
     },
     setHasSeenSplash: async (seen) => {
@@ -257,7 +267,7 @@ export const useUiStore = create((set, get) => ({
             await updatePreferenceWithRollback(set, get, { appLockEnabled: true, hasPin: pinExists, isLocked: pinExists });
         }
         else {
-            await updatePreferenceWithRollback(set, get, { appLockEnabled: false, isLocked: false });
+            await updatePreferenceWithRollback(set, get, { appLockEnabled: false, isLocked: false, pinRecoveryAuthorizedAt: null });
         }
     },
     setRemindersEnabled: async (enabled) => {
@@ -295,7 +305,7 @@ export const useUiStore = create((set, get) => ({
     },
     setupPin: async (pin) => {
         await setPin(pin);
-        await updatePreferenceWithRollback(set, get, { hasPin: true, appLockEnabled: true, isLocked: false });
+        await updatePreferenceWithRollback(set, get, { hasPin: true, appLockEnabled: true, isLocked: false, pinRecoveryAuthorizedAt: null });
     },
     clearStoredPin: async () => {
         await clearPin();
@@ -309,6 +319,7 @@ export const useUiStore = create((set, get) => ({
             set({
                 appLockEnabled: recoveringPreferences ? true : get().appLockEnabled,
                 isLocked: false,
+                pinRecoveryAuthorizedAt: null,
                 preferenceLoadError: null,
             });
             if (recoveringPreferences) {
@@ -329,6 +340,7 @@ export const useUiStore = create((set, get) => ({
             set({
                 appLockEnabled: recoveringPreferences ? true : get().appLockEnabled,
                 isLocked: false,
+                pinRecoveryAuthorizedAt: null,
                 preferenceLoadError: null,
             });
             if (recoveringPreferences) {
@@ -340,5 +352,69 @@ export const useUiStore = create((set, get) => ({
             }
         }
         return result;
+    },
+    beginPinRecovery: async () => {
+        set({ pinRecoveryAuthorizedAt: null });
+        const result = await tryRecoveryAuthentication();
+        if (result === "success") {
+            set({ pinRecoveryAuthorizedAt: Date.now() });
+        }
+        return result;
+    },
+    cancelPinRecovery: () => set({ pinRecoveryAuthorizedAt: null }),
+    completePinRecovery: async (pin, now = Date.now()) => {
+        const authorizedAt = get().pinRecoveryAuthorizedAt;
+        const authorized = Number.isSafeInteger(authorizedAt)
+            && now >= authorizedAt
+            && now - authorizedAt <= PIN_RECOVERY_AUTHORIZATION_MILLIS;
+        if (!authorized) {
+            set({ pinRecoveryAuthorizedAt: null });
+            return { ok: false, reason: "authorization-expired" };
+        }
+        set({ pinRecoveryAuthorizedAt: null });
+        await setPin(pin);
+        set({
+            appLockEnabled: true,
+            hasPin: true,
+            isLocked: false,
+            preferenceLoadError: null,
+        });
+        await queuePreferenceWrite(() => savePreferences({
+            ...preferencesFromState(get()),
+            appLockEnabled: true,
+        })).catch(() => {
+            set({ preferenceLoadError: "Your new PIN was saved, but secure app-lock settings could not be rewritten. The next launch will require your new PIN again." });
+        });
+        return { ok: true };
+    },
+    beginLocalReset: async () => {
+        set({ localResetInProgress: true, pinRecoveryAuthorizedAt: null });
+        await Promise.all([
+            onboardingWriteQueue.catch(() => undefined),
+            preferenceWriteQueue.catch(() => undefined),
+        ]);
+    },
+    cancelLocalReset: () => set({ localResetInProgress: false }),
+    resetUiAfterLocalReset: () => {
+        preferencesPromise = null;
+        onboardingWriteQueue = Promise.resolve();
+        preferenceWriteQueue = Promise.resolve();
+        set((state) => ({
+            ...DEFAULT_PREFERENCES,
+            hasPin: false,
+            hasSeenSplash: false,
+            isLocked: false,
+            onboardingDraft: null,
+            onboardingLoadError: null,
+            onboardingDraftInvalid: false,
+            splashReadError: null,
+            preferenceLoadError: null,
+            preferencesReady: true,
+            notificationPermissionDenied: false,
+            notificationHint: null,
+            pinRecoveryAuthorizedAt: null,
+            localDataGeneration: state.localDataGeneration + 1,
+            localResetInProgress: false,
+        }));
     },
 }));

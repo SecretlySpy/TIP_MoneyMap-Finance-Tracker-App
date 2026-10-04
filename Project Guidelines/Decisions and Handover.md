@@ -1,5 +1,30 @@
 # Decisions and Handover
 
+## PIN recovery handover (2026-10-04)
+
+**Outcome:** Forgot PIN is implemented on the dirty `main` worktree without a commit or production change.
+The locked root now includes a recovery-only route. Strong platform authentication with device fallback
+authorizes a five-minute in-memory grant; a confirmed replacement PIN changes only the atomic v2 PIN record
+and preserves v1 PIN readability. The SQLCipher database key identity is unchanged.
+
+**Destructive fallback:** If native verification cannot establish device access, the user sees two warning
+stages and must type `RESET`. Persistent cleanup writes `moneymap.local-reset.pending.v1` first, blocks new
+database initialization, deletes the OP-SQLite file before its key and app-lock state, clears app preferences,
+onboarding draft, and app notifications, then removes the marker last. Startup completes a pending reset
+before hydration. Exported backups are outside this deletion boundary.
+
+**Evidence:** `52/52` Jest suites and `341/341` tests pass; Expo Doctor is `18/18`; Android launcher/toolchain
+checks and Android export pass; 1,829 synthetic stress operations completed with zero errors. An API 35 Pixel
+9 Pro XL emulator opened the current app/SQLCipher store, exposed a non-plaintext DB header, remained locked
+after background/foreground, and exercised Forgot PIN unavailable plus both reset warning stages without
+deleting data. Error-level app logs were empty after the lifecycle smoke.
+
+**Open release gates:** Do not claim native recovery/reset completion yet. Use only synthetic data to verify
+enrolled physical-device authentication, successful replacement with unchanged known ledger rows/key identity,
+correct/wrong PIN and cooldown, process-kill reset resume, resulting file/key erasure, TalkBack, and phone/tablet
+layouts. The production audit still fails with 46 advisories (31 high, 15 moderate); no force fix was applied.
+The user's pre-existing edits in `BudgetsScreen.jsx` and `SplashScreen.jsx` were preserved.
+
 ## Active handover (2026-10-03)
 
 **Outcome:** The supplied UI/backend plan was audited against the existing Expo 54, Zustand,

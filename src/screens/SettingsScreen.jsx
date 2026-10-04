@@ -176,7 +176,7 @@ export function SettingsScreen({ navigation }) {
       </Text>
 
       <SettingsSection title="SECURITY">
-        <SettingsRow emoji="🔒" label="Optional app lock (PIN + biometric)" onPress={() => rootNavigation?.navigate("AppLock")} trailing={<Toggle enabled={appLockEnabled && hasPin} label="App lock" onChange={(enabled) => void handleAppLockToggle(enabled)}/>}/>
+        <SettingsRow emoji="🔒" label="Optional app lock (PIN or biometrics)" onPress={() => rootNavigation?.navigate("AppLock")} trailing={<Toggle enabled={appLockEnabled && hasPin} label="App lock" onChange={(enabled) => void handleAppLockToggle(enabled)}/>}/>
         <SettingsRow emoji="🛡️" label="Encrypted database · separate key" trailing={trailingText("On")}/>
       </SettingsSection>
 

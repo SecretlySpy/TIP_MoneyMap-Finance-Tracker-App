@@ -33,7 +33,7 @@ export function HistoryBody({
         <EmptyState
           actionLabel="Clear search"
           emoji="🔍"
-          message={`No transactions matched "${searchQuery.trim()}" in ${selectedMonthYear}. Try checking for typos, selecting another month, or clear your search.`}
+          message={`No transactions matched "${searchQuery.trim()}" in ${selectedMonthYear}. Try checking for typos, selecting another month, or clearing your search.`}
           onAction={onClearSearch}
           title="No transactions found"
         />

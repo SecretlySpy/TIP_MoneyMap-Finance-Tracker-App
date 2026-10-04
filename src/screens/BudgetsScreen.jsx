@@ -290,7 +290,7 @@ export function BudgetsScreen({ navigation }) {
         </Text>
         <EmojiGrid onChange={setPendingEmoji} value={pendingEmoji} />
         <PrimaryButton onPress={handleNameStepNext}>
-          Next: set limit
+          Next
         </PrimaryButton>
         <Pressable
           accessibilityRole="button"

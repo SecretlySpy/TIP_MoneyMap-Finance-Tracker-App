@@ -1,5 +1,23 @@
 # Plan and Goals
 
+## PIN recovery reconciliation (2026-10-04)
+
+The approved reconciliation keeps Expo 54, Zustand, OP-SQLite/SQLCipher, SecureStore, Expo Crypto,
+and LocalAuthentication. Financial persistence remains local. The app PIN remains an access gate and
+never becomes the database key.
+
+| ID | Requirement | Implementation | Status |
+|---|---|---|---|
+| FR-14 | Fourth-digit unlock | PIN state updates are pure; validation starts automatically at four digits and the locked navigator contains no Main route | Implemented; component/store tests pass, correct-PIN native input open |
+| FR-15 | Forgot PIN | Locked-only recovery route uses strong native authentication with device fallback, then creates and confirms a replacement PIN | Implemented; unavailable native path observed, enrolled success open |
+| FR-16 | Preserve encrypted ledger during recovery | Recovery updates one atomic v2 PIN record with v1 read compatibility and does not call database/key services | Source and automated boundary checks pass; known-record native proof open |
+| FR-17 | Safe destructive fallback | Two warning stages plus typed `RESET`; pending marker, database guard, OP-SQLite delete, key/security cleanup, startup resume | Automated interruption/order checks and UI smoke pass; real deletion/process-kill open |
+| NFR-08 | Privacy/accessibility | No remote recovery or ledger persistence; modality-neutral labels, alert roles, disabled states, practical touch targets | Static/component checks pass; API 35 tree inspection prompted a PIN-count fix; post-fix TalkBack/tablet verification open |
+
+Release remains blocked on enrolled physical-device recovery success, correct/wrong PIN and cooldown,
+known-row/key preservation, real reset interruption, physical accessibility, tablet layout, and compatible
+dependency-advisory disposition. See [Verification and Evaluation](./Verification%20and%20Evaluation.md).
+
 ## UI/backend development-plan execution (2026-10-03)
 
 This section is the active manual-planning record for the user-supplied

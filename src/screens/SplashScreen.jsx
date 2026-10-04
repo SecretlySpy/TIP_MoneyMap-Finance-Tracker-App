@@ -104,7 +104,7 @@ export function SplashScreen({ navigation }) {
               textAlign: "center",
             }}
           >
-            {"Track your allowance, budgets and bills.\nCore finance works offline."}
+            Track your allowance, budgets and bills.
           </Text>
         </View>
       </View>
@@ -121,16 +121,6 @@ export function SplashScreen({ navigation }) {
             {error ?? splashReadError ?? onboardingLoadError}
           </Text>
         ) : null}
-        <Text
-          style={{
-            color: theme.colors.sub,
-            fontFamily: theme.fonts.regular,
-            fontSize: theme.typeScale.small,
-            textAlign: "center",
-          }}
-        >
-          Optional app lock is available in Settings
-        </Text>
       </View>
     </ScreenContainer>
   );

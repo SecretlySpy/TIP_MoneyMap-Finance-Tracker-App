@@ -1,18 +1,18 @@
 # Verification and Evaluation
 
-## Current implementation evidence (2026-10-03)
+## Current implementation evidence (2026-10-04)
 
-Executed on Windows with Node `v24.16.0` (the documented baseline is Node 22 LTS), npm `11.13.0`,
-JDK 21, and the local desktop SQLite test driver:
+Executed on Linux with Node `v22.20.0`, npm `10.9.3`, JDK 21, an API 35 Pixel 9 Pro XL emulator,
+and the local desktop SQLite test driver:
 
 | Check | Observation | Limit |
 |---|---|---|
-| `npm test -- --watch=false --runInBand` | **45/45 suites, 307/307 tests pass**; includes v4-to-v7 upgrades, archived-account preservation, onboard expense correction, source-key import reconciliation after edit, truthful file/paste outcomes, paste invalid/partial paths, restore one-shot undo and injected mid-transaction rollback | Native providers mocked; Jest is not device verification |
-| `npx expo export --platform android --output-dir .expo/export-android-2026-10-03-final` | PASS; 1 Hermes Android bundle (5.69 MB), 20 asset entries | No Gradle APK or installed-device smoke test |
-| `npm run android:check` and `npx expo-doctor` | PASS; local SDK/JDK 21 present, Expo Doctor 18/18; launcher warns Node 24 vs Node 22 baseline | Native build and device runtime unverified |
-| `npm run test:stress -- docs/qa/2026-10-03/stress-final.json` | PASS; 1,829 operations/zero errors, 10,000 transactions, 100 budgets/rules, dashboard p95 **8.43 ms**, 32-writer p99 **2,621.75 ms**, integrity `ok` | File-backed desktop SQLite, not native SQLCipher or UI latency; full data in [stress-final.json](../docs/qa/2026-10-03/stress-final.json) |
-| `npm audit --omit=dev` | **FAIL**; latest run reported 48 production-graph advisories (33 high, 15 moderate); an earlier run in the same session reported 46 | Advisory feed changes; `xlsx@0.20.3` is installed from an integrity-pinned vendor URL not comprehensively assessed by npm audit. No forced upgrades applied |
-| `npm run emulator` | No connected ADB device or configured AVD on this workstation | Real phone/tablet, SQLCipher open/reopen, biometrics, notifications, accessibility and visual parity remain UNVERIFIED |
+| `npm test -- --watch=false` | **52/52 suites, 341/341 tests pass**; adds fourth-digit auto-submit, recovery-auth policy/results, expiring authorization, locked-only routing, atomic v2 PIN record with v1 compatibility, marker-last local reset, interrupted reset resume, startup-before-hydration ordering, OP-SQLite deletion/blocking, in-memory clearing, and recovery/reset UI coverage | Native providers are mocked; Jest does not prove device authentication or native deletion |
+| `npx expo export --platform android --output-dir /tmp/kilo/moneymap-postchange-export` | PASS; 1 Hermes Android bundle (5.76 MB), 20 asset entries | Bundle/import validation, not a production AAB |
+| `npm run android:check`, `npm run test:android-launcher`, and `npx expo-doctor` | PASS; Android SDK/JDK 21 detected, launcher 3/3, Expo Doctor 18/18 | Host/tooling checks do not replace device acceptance |
+| `npm run test:stress -- /tmp/kilo/moneymap-stress.json` | PASS; 1,829 operations/zero errors, 10,000 transactions, 100 budgets/rules, dashboard p95 **9.30 ms**, 32-writer p99 **2,321.31 ms**, integrity and foreign keys `ok` | File-backed desktop SQLite, not native SQLCipher or UI latency; temporary artifact was not added to the repository |
+| `npm audit --omit=dev --audit-level=moderate` | **FAIL**; 46 production-graph advisories (31 high, 15 moderate) | `xlsx@0.20.3` is integrity-pinned from a vendor URL not comprehensively assessed by npm audit. No forced or breaking upgrades applied |
+| API 35 Pixel 9 Pro XL emulator development-build smoke | PASS for current-JS startup to locked root, existing SQLCipher DB open, non-plaintext DB header (`06ba...`, not `SQLite format 3`), Forgot PIN navigation, native-auth unavailable fail-closed result, both reset warning stages with erase disabled before `RESET`, and background/foreground relock; no error-level app logs after the lifecycle smoke | Existing PIN was not accessed; correct/wrong PIN, cooldown, enrolled recovery success, replacement PIN, actual reset/interruption, physical biometrics, TalkBack, notifications, and tablet remain UNVERIFIED |
 | `kilo mcp list` | Remote Figma requires authentication; desktop Figma endpoint is unavailable | Supplied 52-state-per-device inventory used as a group map, not independent per-frame inspection |
 
 Requirement-to-check coverage: FR-09/10 use `monthChipCalendar.test.jsx`, `transactionEdit.test.js`,
@@ -24,7 +24,14 @@ FR-13/NFR-07 have group-level source/static/component coverage in [Design Protot
 not 104 verified frame comparisons. Production dependency remediation is a separate reviewed release gate;
 do not use `npm audit fix --force` to downgrade Expo or arbitrarily replace the native stack.
 
-The remaining native gates are specified in [Native Mobile Test Suite and Validation Checklist](../docs/native-mobile-test-suite.md). It defines SQLCipher, App Lock/biometric, notification, accessibility, and phone/tablet cases with device matrices, evidence requirements, release-blocking priorities, and a final checklist. Its live visual baseline is the user-supplied [MoneyMap Figma file](https://www.figma.com/design/JeEeOG1jZ0B72pA8gf7fMk/MoneyMap---Finance-Tracker?m=auto&t=EWhtWgnswUW8ZrcN-6); exact frame/node IDs must be recorded during an authenticated visual run.
+Forgot PIN and destructive reset map to `appLock.test.js`, `appLockScreen.test.jsx`,
+`uiStoreRecovery.test.js`, `pinRecoveryScreen.test.jsx`, `localReset.test.js`,
+`databaseClientReset.test.js`, `financeStoreReset.test.js`, and `rootNavigationMode.test.js`.
+The successful recovery path changes only the app-lock verifier; it does not call the database-key or
+database services. Reset writes its pending marker before destructive work, keeps database initialization
+blocked, deletes the OP-SQLite file before key/security state, and clears the marker last.
+
+The remaining native gates are specified in [Native Mobile Test Suite and Validation Checklist](../docs/native-mobile-test-suite.md). Enrolled native recovery success, preservation of known SQLCipher records/key identity, real destructive reset plus process-kill resume, physical biometrics, TalkBack, and phone/tablet coverage remain release blockers. Its live visual baseline is the user-supplied [MoneyMap Figma file](https://www.figma.com/design/JeEeOG1jZ0B72pA8gf7fMk/MoneyMap---Finance-Tracker?m=auto&t=EWhtWgnswUW8ZrcN-6); exact frame/node IDs must be recorded during an authenticated visual run.
 
 ## Historical QA evidence (2026-09-28)
 
@@ -43,9 +50,12 @@ Updated: 2026-09-27
 | Atomic import and named account flow (Figma 16 & 16b) | `__tests__/e2eVerification.test.js`, `ImportScreen.jsx` | Passed |
 | Named accounts and History filters | component/static UI tests | Passed |
 | Optional lock and separate database key copy | `__tests__/appLock.test.js`, `AppLockScreen.jsx` | Passed |
+| Correct fourth PIN digit immediately transitions out of the locked shell | `appLockScreen.test.jsx`, `uiStoreRecovery.test.js`, locked-root emulator smoke | Automated passed; correct-PIN native input unverified |
+| Native-authenticated PIN replacement preserves the database/key boundary | `appLock.test.js`, `uiStoreRecovery.test.js`, `pinRecoveryScreen.test.jsx`, source boundary review | Automated passed; enrolled-device success unverified |
+| Destructive fallback is deliberate and interruption-safe | `localReset.test.js`, `databaseClientReset.test.js`, `financeStoreReset.test.js`, reset-warning emulator smoke | Automated/UI smoke passed; real native deletion/process-kill unverified |
 | Fixed TIP QC with no location permission | Expo public config, generated manifest inspection, source review | Passed |
 | 14-day new reminder default & notification scheduling | `__tests__/remindersScheduling.test.js`, `__tests__/emojiAndDueDate.test.js` | Passed |
-| Figma parity for all 22 frames (`MoneyMap — Update 092726`) | `__tests__/uiFidelityStatic.test.js`, full screen inspection | Passed |
+| Static UI constraints and representative recovery layout | `uiFidelityStatic.test.js`, component tests, API 35 emulator captures | Passed for inspected states; live Figma and full phone/tablet parity unverified |
 | End-to-end functionality across all backend pipelines | `__tests__/e2eVerification.test.js` (11 integration checks) | Passed |
 
 ## Executed test suites (all passing)
@@ -63,7 +73,14 @@ Updated: 2026-09-27
 | `__tests__/repositories.test.js` | 15 | Repository CRUD through the unencrypted desktop SQLite test adapter: Accounts, Categories, Transactions, Budgets, RecurringRules, Goals; not native SQLCipher evidence | Passed |
 | `__tests__/schema.test.js` | 4 | Database table creation, column integrity, initial migration execution | Passed |
 | `__tests__/keyManager.test.js` | 4 | Database-key generation/reuse contract through an in-memory key-store double; not native SecureStore evidence | Passed |
-| `__tests__/appLock.test.js` | 8 | PIN verification, lockout cooldown calculation, free attempts thresholds | Passed |
+| `__tests__/appLock.test.js` | 18 | PIN verification, v1/v2 PIN records, cooldowns, ordinary biometrics, strong recovery-auth outcomes | Passed |
+| `__tests__/appLockScreen.test.jsx` | 3 | Automatic fourth-digit submit, failed PIN retention, locked recovery entry | Passed |
+| `__tests__/uiStoreRecovery.test.js` | 6 | Expiring recovery grant, fail-closed replacement, clean first-run reset state | Passed |
+| `__tests__/pinRecoveryScreen.test.jsx` | 4 | Native-auth gate, replacement confirmation, deliberate reset, interrupted reset UI | Passed |
+| `__tests__/localReset.test.js` | 4 | Pending-marker ordering, interruption retention, startup resume, no-op startup | Passed |
+| `__tests__/databaseClientReset.test.js` | 2 | Active/uncached OP-SQLite delete paths, WAL checkpoint, pending-marker initialization block | Passed |
+| `__tests__/databaseGateReset.test.jsx` | 1 | Pending reset completes before finance hydration | Passed |
+| `__tests__/financeStoreReset.test.js` | 2 | Immediate in-memory financial-state clearing on success/failure | Passed |
 | `__tests__/remindersScheduling.test.js` | 6 | Expo Notifications scheduling for recurring bills, lead time calculation | Passed |
 | `__tests__/recurringCatchUp.test.js` | 6 | Catch-up planning for past due recurring rules, anchor day advancement | Passed |
 | `__tests__/dataTransfer.test.js` | 6 | CSV export serialization, JSON backup creation, and atomic restore verification | Passed |
@@ -80,7 +97,7 @@ Updated: 2026-09-27
 | `__tests__/androidSecureScreenPlugin.test.js` | 1 | Expo config plugin: FLAG_SECURE on Android | Passed |
 | `__tests__/androidOpenSslPackagingPlugin.test.js` | 1 | Expo config plugin: OpenSSL packaging options for SQLCipher | Passed |
 
-**Total Test Coverage**: 27 test suites passed, 165 total tests passed, 0 failures, 0 snapshots.
+**Current full regression result**: 52 test suites passed, 341 total tests passed, 0 failures, 0 snapshots.
 
 ## Figma prototype audit & parity verification
 

@@ -32,7 +32,7 @@ The current Jest and desktop-SQLite suites remain prerequisite regression eviden
 | Capability | Production surfaces | Existing non-native coverage | Native gap closed by this suite |
 |---|---|---|---|
 | SQLCipher | `src/db/client.js`, `databaseKey.js`, `keyManager.js`, `schema.js`, `plugins/withAndroidOpenSslJniPackaging.js` | `keyManager.test.js`, `schema.test.js`, `repositories.test.js`, persistence/stress suites, packaging-plugin test | Compiled cipher, encrypted bytes, real SecureStore key, open/reopen, upgrade, corruption, process death |
-| App Lock and biometrics | `src/services/appLock.js`, `src/store/uiStore.js`, `AppLockScreen.jsx`, `RootNavigator.jsx` | `appLock.test.js`, `preferences.test.js`, `rootNavigationMode.test.js` | Real biometric prompt, hardware/enrollment states, background lock, cancellation, OS lockout, PIN fallback |
+| App Lock and recovery | `appLock.js`, `localReset.js`, `localResetState.js`, `uiStore.js`, `AppLockScreen.jsx`, `PinRecoveryScreen.jsx`, `RootNavigator.jsx` | Lock/recovery/reset service, store, component, database-delete, and route tests | Real prompts, hardware/enrollment states, replacement with ledger/key preservation, destructive reset/process death, background lock, OS lockout |
 | Local notifications | `src/services/reminders.js`, `notificationScheduler.js`, `uiStore.js`, `App.js` | `remindersScheduling.test.js`, `emojiAndDueDate.test.js`, recurring tests | Runtime permission, Android channel, actual delivery, reboot/time-zone behavior, tap routing, cancellation |
 | Accessibility | Screens/components, React Navigation, theme tokens | `responsiveAccessibility.test.jsx`, component roles, static contrast checks | TalkBack/VoiceOver, focus order, announcements, large text, switch/keyboard access, OS audits |
 | Responsive UI | `ScreenContainer.jsx`, `BottomSheet.jsx`, `tokens.js`, all screens | 600 dp breakpoint and 540/760 dp caps checked statically | Safe areas, rotation, keyboard, system bars, split screen, phone/tablet screenshots and visual review |
@@ -184,7 +184,7 @@ Use a debuggable build and disposable synthetic app data for byte-level inspecti
 
 ## 7. App Lock, PIN, and biometric validation
 
-App Lock is a local access gate, not account authentication and not the SQLCipher key. The system prompt is configured to use biometrics only (`disableDeviceFallback: true`); MoneyMap's 4-digit PIN is the intended fallback.
+App Lock is a local access gate, not account authentication and not the SQLCipher key. Ordinary unlock keeps its biometrics-only policy (`disableDeviceFallback: true`, current weak/Class 2 allowance) with the MoneyMap PIN as fallback. Forgotten-PIN recovery is separate: it requests strong/Class 3 biometrics and permits the platform device credential fallback. A successful system result authorizes only a short-lived in-memory PIN-replacement grant.
 
 | ID | Priority | Setup and action | Pass criteria | Evidence |
 |---|---:|---|---|---|
@@ -207,7 +207,13 @@ App Lock is a local access gate, not account authentication and not the SQLCiphe
 | AUTH-17 | P1 | Repeat enable, background relock, correct/wrong PIN, cancel, and biometric success or unavailable fallback on `A-TABLET-REF`; repeat on iPad when in scope. | Tablet never bypasses the gate; supported biometrics work, and unsupported hardware falls back cleanly to PIN without layout loss. | Tablet external-camera recording and modality record |
 | AUTH-18 | P1 | Accumulate wrong-PIN failures, unlock biometrically, relock, then inspect the PIN cooldown. | Behavior matches the documented policy. Current code does not reset PIN failures on biometric success; the retained cooldown is visible and not misreported as reset. Any policy change gets a regression test. | Failure count/timestamps and external-camera recording |
 | AUTH-19 | Conditional P0 | On Face ID iPhone/iPad, inspect visible copy, iconography, VoiceOver label, native prompt, permission denial, cancel, and PIN fallback. | Denial/cancel leaves PIN available without crash. Copy and accessibility labels use modality-neutral or correct Face ID language; no “fingerprint” instruction is announced/shown on a Face ID-only device. Current mismatch is filed rather than passed. | External-camera capture, VoiceOver transcript, defect ID |
-| AUTH-20 | P1 | On a synthetic locked profile with unavailable biometrics, exercise a forgotten PIN scenario. | App does not provide a bypass or silently clear finance data. The absence of PIN recovery is explicitly disclosed in product/release documentation with an approved support/reset policy. | UI capture and approved product decision |
+| AUTH-20 | P0 | Enter a correct synthetic PIN one digit at a time and rapidly; repeat after a relock. | The fourth digit immediately validates and opens Main exactly once. No Submit/Confirm/Continue action exists; partial or extra rapid input does not unlock. | External-camera recording and transition timestamps |
+| AUTH-21 | P0 | On an enrolled physical device, choose Forgot PIN, complete strong biometric or device-credential recovery, set/confirm a replacement PIN, relock, and reopen. Record known synthetic row counts/checksums and a non-secret key identity before/after. | Old PIN no longer unlocks; new PIN unlocks; all known ledger rows and the existing SQLCipher key identity are unchanged. | Physical-device recording and redacted before/after manifest |
+| AUTH-22 | P0 | Exercise recovery cancel, non-match, system lockout, no enrollment, no device credential, native error, background, and process recreation during the prompt. | Every non-success remains on a locked-only route, exposes no finance UI, retains the old PIN/data, and distinguishes retry from unavailable fallback truthfully. | Recording per outcome and redacted logs |
+| AUTH-23 | P1 | Leave the replacement-PIN screen idle beyond five minutes and background/foreground it; try mismatch and SecureStore fault injection. | Expired/background grants cannot replace a PIN, mismatch restarts creation, storage failure remains locked, and no reusable recovery token persists. | Timestamped recording and fault log |
+| AUTH-24 | P0 | With a disposable synthetic fixture and an exported backup outside the sandbox, follow destructive recovery. Try Back/Keep Data, incomplete/wrong confirmation text, then exact `RESET`. | No deletion occurs before exact confirmation. Confirmed reset removes internal ledger, key, PIN, attempts, preferences, draft, and MoneyMap notifications; external backup remains. App returns to clean first run. | Before/after manifests, schedule list, and recording |
+| AUTH-25 | P0 | Kill the process after the reset marker and at each instrumented cleanup boundary, then cold start. Repeat reset after partial completion. | Startup finishes cleanup before database hydration; reset is idempotent; old data never opens with a new key; pending marker clears only after success. | Instrumented boundary log, process-kill recording, sandbox manifest |
+| AUTH-26 | P1 | On Android devices supporting Class 2 and Class 3 modalities plus device credential, compare ordinary unlock and recovery prompts. | Ordinary unlock matches its documented policy; recovery accepts only strong biometrics or the system device credential and never falls back to a MoneyMap master PIN. | Modality/security-class record and prompt capture |
 
 ## 8. System notification validation
 
@@ -389,6 +395,10 @@ Use these severities:
 - [ ] Biometric unlock after PIN failures follows the documented cooldown-reset policy.
 - [ ] Face ID devices use correct/modality-neutral visible and spoken copy when Apple is in scope.
 - [ ] Forgotten-PIN behavior has no bypass and has an approved, truthful recovery/reset policy.
+- [ ] Enrolled recovery success replaces only the app PIN and preserves known SQLCipher rows/key identity.
+- [ ] Recovery cancellation, unavailable security, expiration, backgrounding, and process death remain locked.
+- [ ] Destructive reset requires both warning stages plus exact confirmation and preserves exported backups.
+- [ ] Process-kill reset resumes before database hydration and erases database/key/PIN state idempotently.
 - [ ] Lock screen is usable with screen reader, large text, rotation, and rapid input.
 - [ ] Recents/screenshots do not expose sensitive finance UI on Android.
 - [ ] App Lock/PIN plus biometric success or unavailable fallback pass on the reference tablet.

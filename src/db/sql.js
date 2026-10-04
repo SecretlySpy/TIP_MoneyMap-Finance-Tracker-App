@@ -45,4 +45,7 @@ export class OpSqliteDatabase {
     close() {
         this.database.close();
     }
+    delete() {
+        this.database.delete();
+    }
 }

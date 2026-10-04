@@ -10,6 +10,7 @@ import { ACCOUNT_TYPES } from "../domain/types";
 import { runRecurringCatchUp } from "../services/recurringCatchUp";
 import { buildBackup, parseBackup, serializeBackup, validateBackup } from "../services/dataTransfer";
 import { ONBOARDING_FIRST_TRANSACTION_SOURCE_KEY } from "../services/onboarding";
+import { performLocalReset } from "../services/localReset";
 import { registerFinanceSnapshotProvider, syncRemindersFromStores } from "./uiStore";
 const DEFAULT_ACCOUNTS = [
     { name: "Cash", type: "CASH" },
@@ -209,6 +210,35 @@ export const useFinanceStore = create((set, get) => ({
         });
         void syncRemindersFromStores({ requestPermissionIfNeeded: false });
     },
+    resetLocalData: async () => withMutationLock(async () => {
+        databaseRef = null;
+        hydratePromise = null;
+        inFlightRestorePromise = null;
+        inFlightRestoreSerialized = null;
+        set({
+            accounts: [],
+            budgets: [],
+            categories: [],
+            errorMessage: null,
+            goals: [],
+            recurringRules: [],
+            refreshPending: false,
+            selectedMonthYear: toMonthYear(),
+            status: "resetting",
+            transactions: [],
+        });
+        try {
+            await performLocalReset();
+            set({ status: "idle", revision: get().revision + 1 });
+        }
+        catch (error) {
+            set({
+                status: "error",
+                errorMessage: error instanceof Error ? error.message : "Local reset could not be completed.",
+            });
+            throw error;
+        }
+    }),
     addTransaction: async (input) => {
         await get().ensureHydrated();
         const database = databaseRef;

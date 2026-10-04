@@ -6,6 +6,7 @@ This file retains the historical module notes relocated from the repository root
 |---|---|---|
 | Architecture and operations | `App.js`, `src/navigation/`, `src/store/` | [Architecture and Operations](./Architecture%20and%20Operations.md) |
 | Persistence and imports | `src/db/`, `src/services/dataTransfer.js` | [Database Structure](./Database%20Structure.md), [Backend Functionalities](./Backend%20Functionalities.md) |
+| App Lock and local recovery | `src/services/appLock.js`, `src/services/localReset*.js`, `src/screens/AppLockScreen.jsx`, `src/screens/PinRecoveryScreen.jsx`, `src/store/uiStore.js` | [Architecture and Operations](./Architecture%20and%20Operations.md), [Backend Functionalities](./Backend%20Functionalities.md), [Verification and Evaluation](./Verification%20and%20Evaluation.md) |
 | Screens and UI | `src/screens/`, `src/components/` | [Design Prototype](./Design%20Prototype.md) |
 | Setup and checks | `package.json`, `__tests__/` | [Tech Stack Setup Guide](./Tech%20Stack%20Setup%20Guide.md), [Verification and Evaluation](./Verification%20and%20Evaluation.md) |
 | QA defects, stress and native limits | `scripts/qa-stress.cjs`, `__tests__/qa*`, `docs/qa/2026-10-03/`, `docs/native-mobile-test-suite.md` | [Current Verification and Evaluation](./Verification%20and%20Evaluation.md); [native validation suite](../docs/native-mobile-test-suite.md); [historical QA report](./QA%20Verification%20Report%202026-09-28.md) |

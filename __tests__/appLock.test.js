@@ -36,6 +36,7 @@ const {
   isValidPin,
   setPin,
   tryLocalAuthentication,
+  tryRecoveryAuthentication,
   verifyPin,
 } = require("../src/services/appLock");
 
@@ -58,6 +59,21 @@ describe("appLock PIN", () => {
     expect(await hasStoredPin()).toBe(true);
     expect(await verifyPin("2468")).toBe(true);
     expect(await verifyPin("0000")).toBe(false);
+  });
+
+  it("keeps existing version-1 PIN records readable", async () => {
+    SecureStore.__store.set("moneymap.pin.salt.v1", "legacy-salt");
+    SecureStore.__store.set("moneymap.pin.hash.v1", "hash:legacy-salt:8642");
+
+    expect(await hasStoredPin()).toBe(true);
+    expect(await verifyPin("8642")).toBe(true);
+  });
+
+  it("fails closed when persisted PIN material is malformed", async () => {
+    SecureStore.__store.set("moneymap.pin.record.v2", "not-json");
+
+    expect(await hasStoredPin()).toBe(true);
+    await expect(verifyPin("1234")).rejects.toThrow(/invalid/i);
   });
 
   it("rejects invalid PIN on set", async () => {
@@ -118,5 +134,37 @@ describe("appLock biometrics", () => {
     mockHasHardware.mockRejectedValue(new Error("native missing"));
     expect(await canUseBiometrics()).toBe(false);
     expect(await tryLocalAuthentication()).toBe("unavailable");
+  });
+
+  it("uses strong system authentication with device fallback for PIN recovery", async () => {
+    mockAuthenticate.mockResolvedValue({ success: true });
+
+    await expect(tryRecoveryAuthentication()).resolves.toBe("success");
+    expect(mockAuthenticate).toHaveBeenCalledWith({
+      promptMessage: "Verify to reset your MoneyMap PIN",
+      promptSubtitle: "MoneyMap recovery",
+      promptDescription: "Use your device security to create a replacement app PIN.",
+      cancelLabel: "Cancel",
+      fallbackLabel: "Use device passcode",
+      disableDeviceFallback: false,
+      biometricsSecurityLevel: "strong",
+    });
+  });
+
+  it.each([
+    ["user_cancel", "cancelled"],
+    ["system_cancel", "cancelled"],
+    ["not_enrolled", "unavailable"],
+    ["passcode_not_set", "unavailable"],
+    ["authentication_failed", "failed"],
+    ["lockout", "failed"],
+  ])("maps recovery error %s to %s", async (error, expected) => {
+    mockAuthenticate.mockResolvedValue({ success: false, error });
+    await expect(tryRecoveryAuthentication()).resolves.toBe(expected);
+  });
+
+  it("fails recovery closed when the native module throws", async () => {
+    mockAuthenticate.mockRejectedValue(new Error("native unavailable"));
+    await expect(tryRecoveryAuthentication()).resolves.toBe("unavailable");
   });
 });

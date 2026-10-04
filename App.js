@@ -29,6 +29,7 @@ function MoneyMapApp() {
     const themePreference = useUiStore((state) => state.themePreference);
     const isLocked = useUiStore((state) => state.isLocked);
     const hasSeenSplash = useUiStore((state) => state.hasSeenSplash);
+    const localDataGeneration = useUiStore((state) => state.localDataGeneration);
     const theme = useTheme(themePreference);
     const baseNavigationTheme = theme.mode === "dark" ? DarkTheme : DefaultTheme;
     const navigationTheme = {
@@ -65,7 +66,7 @@ function MoneyMapApp() {
             appStateSub.remove();
         };
     }, []);
-    return (<DatabaseGate>
+    return (<DatabaseGate key={localDataGeneration}>
       <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <StatusBar style={theme.mode === "dark" ? "light" : "dark"}/>
         <RootNavigator />

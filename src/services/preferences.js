@@ -8,7 +8,8 @@ export const DEFAULT_PREFERENCES = {
     smartTipsConsentAccepted: false,
     themePreference: "system",
 };
-const PREFERENCES_KEY = "moneymap.preferences.v1";
+export const PREFERENCES_KEY = "moneymap.preferences.v1";
+export const SPLASH_SEEN_KEY = "moneymap.splash.seen.v1";
 function isThemePreference(value) {
     return value === "system" || value === "light" || value === "dark";
 }
@@ -57,4 +58,12 @@ export async function loadPreferences() {
 export async function savePreferences(preferences) {
     const normalized = normalizePreferences(preferences);
     await SecureStore.setItemAsync(PREFERENCES_KEY, JSON.stringify(normalized));
+}
+
+export async function clearPreferences() {
+    await SecureStore.deleteItemAsync(PREFERENCES_KEY);
+}
+
+export async function clearSplashSeen() {
+    await SecureStore.deleteItemAsync(SPLASH_SEEN_KEY);
 }

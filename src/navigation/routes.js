@@ -57,6 +57,7 @@ export function selectRootNavigationMode({ preferencesReady, hasSeenSplash, onbo
  * @typedef {Object} RootStackParamList
  * @property {import('@react-navigation/native').NavigatorScreenParams<MainTabParamList> | undefined} Main
  * @property {undefined} AppLock
+ * @property {undefined} PinRecovery
  * @property {undefined} Onboarding
  * @property {undefined} Splash
  */
