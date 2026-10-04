@@ -147,3 +147,44 @@ Potential deletion: `src/screens/fixtures.js` is an empty deprecated export and 
 | `npm run build:readme-page` | Regenerated `docs/index.html` from the updated Android Studio setup instructions | PASS |
 
 The native Gradle build and device launch remain **UNVERIFIED** in this launcher preflight. Run the shared Android configuration with Node 22, a started device/AVD, and the target host's Android Studio installation before treating native execution as accepted.
+
+## Reconciliation verification classification (2026-10-04)
+
+All new security and recovery changes were developed against the existing Expo 54 + OP-SQLite + SecureStore architecture.
+
+| Area | Classification | Evidence |
+|---|---|---|
+| PIN fourth-digit auto-submit (FR-01/02) | Executed (Jest + component), Observed (API 35 emulator smoke) | `appLockScreen.test.jsx`, `uiStoreRecovery.test.js`, emulator locked-root launch + digit entry path | Not Verified (actual device correct-PIN transition on physical hardware) |
+| Incorrect PIN + cooldown (FR-03/05) | Executed | `appLock.test.js` (full ladder + persisted state) |
+| Rapid/repeated input guard (FR-04) | Executed (store + component) | `uiStoreRecovery.test.js`, `appLockScreen.test.jsx` (single call) |
+| Forgot PIN discoverable entry (FR-06) | Executed + Observed | Locked-only route in `RootNavigator.jsx`, `AppLockScreen.jsx`, emulator navigation |
+| Native recovery auth (FR-07/08) | Executed (service + UI) | `appLock.test.js` (strong policy + result mapping), `pinRecoveryScreen.test.jsx` | Not Verified (enrolled Class 3 + device credential success on physical device) |
+| PIN replacement preserves DB/key (FR-09) | Executed (boundary tests) + Reasoned (code inspection) | `uiStoreRecovery.test.js`, `localReset.test.js`, `appLock.test.js` (no DB calls), source review of `databaseKey.js` | Not Verified (before/after row checksum + key identity on real reset) |
+| Fail-closed on cancel/unavailable (FR-10/11) | Executed + Observed | Recovery auth error mapping + emulator "unavailable" path + locked root only |
+| Deliberate destructive reset (FR-12/13/14) | Executed (tests + smoke) | `localReset.test.js`, `databaseClientReset.test.js`, `financeStoreReset.test.js`, `pinRecoveryScreen.test.jsx`, emulator two-stage warning + disabled until RESET | Not Verified (actual file/key erasure + process-kill resume on device) |
+| Lifecycle state after background/restart (US-06) | Executed + Observed | `rootNavigationMode.test.js`, emulator background/foreground relock smoke |
+| UX copy audit + accessibility labels (FR-16, NFR-07) | Executed (static + component) + Observed (emulator tree) | String inventory, `responsiveAccessibility.test.jsx`, API 35 uiautomator + fixes for labels/touch targets/PIN dots | Not Verified (full TalkBack traversal on physical device + tablet) |
+| Privacy (no raw ledger in remote) | Executed | `smartTipsClient.test.js`, `qaRemoteResilience.test.js` |
+| SQLCipher + SecureStore lifecycle | Executed (prior) + Observed (emulator) | Non-plaintext header (`06ba...`), successful open under gate | Not Verified (post-recovery key identity, real device keystore rotation) |
+
+## Production release gate (2026-10-04)
+
+MoneyMap is acceptable for release only when the following hold. Current status after this implementation pass:
+
+| Gate | Required | Current status | Evidence / gap |
+|---|---|---|---|
+| Automated regression | All new + existing critical flows | **Executed**: 52/52 suites, 341/341 tests pass | Full `npm test` |
+| Immediate fourth-digit unlock | No extra CTA, single validation | **Executed + Observed** (emulator) | Tests + smoke; correct-PIN device input gap |
+| Forgot PIN via native auth | Strong policy + device fallback, no bypass | **Executed** (policy + UI) | Service + component tests; enrolled physical success **Not Verified** |
+| PIN replacement preserves ledger + key | Existing rows and encryption material unchanged | **Executed** (boundary) + **Reasoned** (no DB path) | `uiStoreRecovery.test.js`; real before/after + key identity **Not Verified** |
+| Destructive reset is explicit + interruption-safe | Multi-step + pending marker + resume before hydrate | **Executed** (order + guard tests + UI) | `localReset*`, `database*Reset*`; real deletion + kill resume **Not Verified** |
+| No raw financial data in remote | Smart Tips / places payloads | **Executed** | Privacy regression tests |
+| Native SQLCipher + lock on device | Encrypted header, gate, relock | **Observed** (emulator) | Header + locked startup/resume; full physical + biometrics **Not Verified** |
+| Accessibility + responsive | Labels, targets, TalkBack, phone/tablet | **Executed** (static/component) + **Observed** (emulator tree) | Fixes applied; physical TalkBack + tablet **Not Verified** |
+| Dependency advisories | Reviewed, no unsafe forced change | **Reasoned** (no fix applied) | 46 advisories remain; compatible upgrade path required before store release |
+| Documentation current | Verification matrix + release checklist match behavior | Updated in this pass | README, Verification, native suite, Plan/Goals, Architecture, Backend, Database Structure, Handover |
+
+**Release decision**: Implementation complete. Release candidate may be built for synthetic-data device verification. Do not publish or claim production readiness until the "Not Verified" items above have executed evidence on required hardware (physical enrolled Android device + tablet). All P0/P1 security items have either passing automated evidence or are explicitly marked unverified with concrete next checks.
+
+Updated: 2026-10-04
+Status: implementation + automated + limited-emulator verification complete; full native release gate open.
