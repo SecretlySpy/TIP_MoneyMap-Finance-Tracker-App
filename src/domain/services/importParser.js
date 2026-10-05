@@ -125,6 +125,9 @@ export function parseImportDate(value) {
       return new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0, 0).getTime();
     }
   }
+  if (/T|\d{1,2}:\d{2}/.test(trimmed)) {
+    throw new Error(`Date "${trimmed}" contains a time. Provide date only in YYYY-MM-DD format.`);
+  }
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
   if (iso !== null) {
     const year = Number(iso[1]);
@@ -144,6 +147,9 @@ export function parseImportDate(value) {
     const month = Number(slash[1]);
     const day = Number(slash[2]);
     const year = Number(slash[3]);
+    if (month <= 12 && day <= 12 && month !== day) {
+      throw new Error(`Ambiguous date "${trimmed}". Specify dates in unambiguous YYYY-MM-DD format.`);
+    }
     if (year < MIN_IMPORT_YEAR || year > MAX_IMPORT_YEAR) {
       throw new Error(`Date year ${year} is outside supported range (1970-2100).`);
     }
@@ -152,15 +158,6 @@ export function parseImportDate(value) {
       throw new Error(`Invalid date "${trimmed}".`);
     }
     return date.getTime();
-  }
-  const parsed = Date.parse(trimmed);
-  if (!Number.isNaN(parsed)) {
-    const date = new Date(parsed);
-    const year = date.getFullYear();
-    if (year < MIN_IMPORT_YEAR || year > MAX_IMPORT_YEAR) {
-      throw new Error(`Date year ${year} is outside supported range (1970-2100).`);
-    }
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0).getTime();
   }
   throw new Error(`Invalid date "${trimmed}". Use YYYY-MM-DD.`);
 }

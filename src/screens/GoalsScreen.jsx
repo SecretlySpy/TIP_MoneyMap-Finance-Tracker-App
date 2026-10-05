@@ -2,8 +2,7 @@ import { useMemo, useState } from "react";
 import { Alert, Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { BottomSheet } from "../components/BottomSheet";
-import { DashedButton } from "../components/Buttons";
-import { EmojiGrid } from "../components/EmojiGrid";
+import { PrimaryButton } from "../components/Buttons";
 import { EmptyState } from "../components/EmptyState";
 import { GoalCard } from "../components/GoalCard";
 import { ScreenContainer } from "../components/ScreenContainer";
@@ -11,7 +10,7 @@ import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
 import { formatLocalDateISO, parseLocalDateToNoonEpoch } from "../domain/services/emoji";
 import { applyGoalContribution, sortGoalsForDisplay } from "../domain/services/goals";
-import { parseDecimalToMinor } from "../domain/services/money";
+import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -32,7 +31,6 @@ export function GoalsScreen({ navigation }) {
   const [draftName, setDraftName] = useState("");
   const [draftTargetText, setDraftTargetText] = useState("");
   const [draftDeadlineText, setDraftDeadlineText] = useState("");
-  const [draftEmoji, setDraftEmoji] = useState("💻");
 
   const [contributeId, setContributeId] = useState(null);
   const [renameId, setRenameId] = useState(null);
@@ -46,7 +44,6 @@ export function GoalsScreen({ navigation }) {
     setDraftName("");
     setDraftTargetText("");
     setDraftDeadlineText("");
-    setDraftEmoji("💻");
     setIsAddOpen(true);
   };
 
@@ -124,7 +121,7 @@ export function GoalsScreen({ navigation }) {
         Alert.alert(
           "Goal reached 🎉",
           outcome.overflowMinor > 0
-            ? `${goal.name} is fully funded, with ${(outcome.overflowMinor / 100).toFixed(2)} to spare.`
+            ? `${goal.name} is fully funded, with ${formatMinor(outcome.overflowMinor, { currencySymbol })} to spare.`
             : `${goal.name} is fully funded.`,
         );
       }
@@ -279,9 +276,9 @@ export function GoalsScreen({ navigation }) {
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
             Tip: press and hold a goal card to edit or delete.
           </Text>
-          <DashedButton disabled={busy} onPress={beginCreate}>
+          <PrimaryButton disabled={busy} onPress={beginCreate}>
             + Add goal
-          </DashedButton>
+          </PrimaryButton>
         </>
       ) : null}
 
@@ -366,17 +363,10 @@ export function GoalsScreen({ navigation }) {
             />
           </View>
 
-          <View style={{ gap: theme.spacing.xs }}>
-            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
-              Choose icon
-            </Text>
-            <EmojiGrid onChange={setDraftEmoji} value={draftEmoji} />
-          </View>
-
           <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.md }}>
-            <DashedButton disabled={busy} onPress={() => void handleSaveGoal()}>
+            <PrimaryButton disabled={busy} onPress={() => void handleSaveGoal()}>
               {busy ? "Saving…" : "Save goal"}
-            </DashedButton>
+            </PrimaryButton>
             <Pressable
               accessibilityRole="button"
               onPress={() => setIsAddOpen(false)}
@@ -393,9 +383,10 @@ export function GoalsScreen({ navigation }) {
       {/* Contribution / edit dialogs */}
       <TextPromptModal
         confirmLabel="Add"
+        disabled={busy}
         initialValue="100.00"
         keyboardType="decimal-pad"
-        message="How much are you setting aside now?"
+        message="Track your savings progress (progress tracker only; does not transfer cash between accounts)."
         onCancel={() => setContributeId(null)}
         onConfirm={(value) => void handleContribute(value)}
         placeholder="100.00"

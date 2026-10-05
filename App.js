@@ -7,10 +7,12 @@ import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { AppState } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { DatabaseGate } from "./src/components/DatabaseGate";
-import { navigateToRecurringReminders, navigationRef } from "./src/navigation/navigationRef";
+import { flushPendingNavigation, navigateToRecurringReminders, navigationRef } from "./src/navigation/navigationRef";
 import { RootNavigator } from "./src/navigation/RootNavigator";
+import { useFinanceStore } from "./src/store/financeStore";
 import {
     configureNotificationHandler,
     subscribeReminderNotificationResponses,
@@ -25,6 +27,9 @@ defineRecurringCatchUpTask();
 void configureNotificationHandler();
 function MoneyMapApp() {
     const themePreference = useUiStore((state) => state.themePreference);
+    const isLocked = useUiStore((state) => state.isLocked);
+    const hasSeenSplash = useUiStore((state) => state.hasSeenSplash);
+    const localDataGeneration = useUiStore((state) => state.localDataGeneration);
     const theme = useTheme(themePreference);
     const baseNavigationTheme = theme.mode === "dark" ? DarkTheme : DefaultTheme;
     const navigationTheme = {
@@ -40,17 +45,28 @@ function MoneyMapApp() {
         },
     };
     useEffect(() => {
+        if (!isLocked && hasSeenSplash) {
+            flushPendingNavigation();
+        }
+    }, [isLocked, hasSeenSplash]);
+    useEffect(() => {
         let remove = null;
         void subscribeReminderNotificationResponses(() => {
             navigateToRecurringReminders();
         }).then((subscription) => {
             remove = subscription;
         });
+        const appStateSub = AppState.addEventListener("change", (nextState) => {
+            if (nextState === "active") {
+                void useFinanceStore.getState().refresh().catch(() => {});
+            }
+        });
         return () => {
             remove?.remove?.();
+            appStateSub.remove();
         };
     }, []);
-    return (<DatabaseGate>
+    return (<DatabaseGate key={localDataGeneration}>
       <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <StatusBar style={theme.mode === "dark" ? "light" : "dark"}/>
         <RootNavigator />

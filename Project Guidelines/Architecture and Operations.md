@@ -24,6 +24,11 @@ flowchart LR
 - Finance values are integer minor units. Domain calculations stay pure where practical.
 - Screens depend on store actions and view models; repositories own validation and SQL.
 - SQLCipher encryption and optional App Lock solve different problems and use separate key material.
+- Forgot PIN uses a separate strong native-authentication policy and a five-minute in-memory authorization;
+  PIN replacement writes one versioned SecureStore record and leaves the SQLCipher key/database untouched.
+- Destructive local reset writes a SecureStore pending marker, blocks database initialization, checkpoints
+  and deletes the OP-SQLite database, removes key/PIN/preferences/onboarding state, clears app notifications,
+  and deletes the marker last. Startup resumes any pending reset before database hydration.
 - The app is local-only: it owns no application server, remote user account, server database, or sync API.
 - First-run onboarding persists a bounded, versioned SecureStore draft; SQLCipher remains authoritative for
   accounts and transactions. Root navigation chooses one mutually exclusive shell: loading, first-run,
@@ -47,7 +52,7 @@ flowchart LR
 
 ## Reliability and observability
 
-QA update (2026-10-03): the schema is version 7. Recurring duplicate checks/posts/schedule advancement share one transaction; goal increments are atomic SQL updates. Budget spending and posted recurring occurrences are indexed once in memory instead of repeatedly scanning the ledger. Restore validates backup fields before replacement, then records the previous state in one single-use recovery slot. Import source keys make retries after a committed-but-unrefreshed result reconcilable. `npm run test:stress -- docs/qa/2026-10-03/stress-final.json` ran an isolated synthetic file-backed SQLite workload: 1,829 operations/zero errors, dashboard p95 8.43 ms and 32-writer p99 2,621.75 ms. This sends no remote traffic and is not HTTP RPS, native SQLCipher, or real concurrent-user evidence. See [Verification and Evaluation](./Verification%20and%20Evaluation.md) for current checks.
+QA update (2026-10-04): the schema remains version 7. The full suite is 52/52 suites and 341/341 tests. An isolated synthetic file-backed SQLite workload completed 1,829 operations with zero errors, dashboard p95 9.30 ms and 32-writer p99 2,321.31 ms. API 35 emulator smoke opened an existing SQLCipher database, showed a non-plaintext database header, kept the root locked across background/foreground, and exercised unavailable Forgot PIN plus both non-destructive reset-warning stages. This is not enrolled biometric, real reset/process-kill, physical-device, tablet, or production evidence. See [Verification and Evaluation](./Verification%20and%20Evaluation.md) for current checks.
 
 - Database migrations and imports run transactionally; foreign keys and a five-second busy timeout are on.
 - Recurring catch-up is idempotent for a rule/scheduled timestamp and preserves the monthly anchor day.
@@ -65,10 +70,11 @@ smoke test. Release remains gated by the checklist in [`docs/release-checklist.m
 Schema migrations 5–7 are additive and have no automated downgrade. Do not release an older build against a
 database already upgraded to v7. A production rollout was not performed.
 
-Static/Jest/desktop-SQLite evidence does not establish native acceptance. Android development-build startup,
-SQLCipher migration/open/reopen, SecureStore failure recovery, PIN/biometric background locking, notification
-delivery, file-picker import, restore/undo, tablet layout, and live Gemini/Overpass/Nominatim behavior remain
-**UNVERIFIED** until run on supported devices and providers. Expo Go is not a valid substitute for these checks.
+Static/Jest/desktop-SQLite evidence does not establish native acceptance. The API 35 development-build smoke
+partially covers startup, encrypted-file appearance, lock-shell layout, unavailable recovery, and relock.
+Enrolled recovery success, known-record/key preservation, correct/wrong PIN and cooldown, real reset/process
+death, SecureStore fault recovery, notifications, file-picker import, restore/undo, physical accessibility,
+tablet layout, and live providers remain **UNVERIFIED**. Expo Go is not a substitute for these checks.
 
 ## Repository layout and cleanup
 

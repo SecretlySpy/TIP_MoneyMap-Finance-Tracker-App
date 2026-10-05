@@ -24,13 +24,19 @@ eas build --profile production --platform android
 
 ## Verify install
 
+Execute and attach the required P0/P1 results from [`docs/native-mobile-test-suite.md`](./native-mobile-test-suite.md). The abbreviated items below are not a substitute for that evidence.
+
 1. Install APK/AAB on a clean device/emulator (API 26+).
 2. Cold start &lt; ~2s on mid-range hardware after first open.
 3. With Smart Tips **off**, confirm no outbound Gemini traffic (airplane mode still shows offline tips when enabled with consent).
 4. Enable reminders → grant notifications → create recurring bill → confirm schedule.
 5. Import sample CSV and XLSX; bad rows reported.
-6. App lock PIN + biometric fallback.
+6. App lock: immediate fourth-digit PIN unlock, wrong-PIN cooldown, ordinary biometric fallback, Forgot PIN native-auth success/cancel/unavailable, replacement PIN with unchanged ledger/key, deliberate local reset, and interrupted-reset resume.
 7. Backup → wipe app data → restore.
+8. Complete SQLCipher byte/wrong-key/key-loss and schema-upgrade checks with synthetic data.
+9. Complete TalkBack, Accessibility Scanner, maximum text size, keyboard, safe-area, rotation, and tablet checks.
+10. Compare representative phone/tablet states against the live Figma file with exact revision and frame/node IDs recorded.
+11. Confirm destructive-reset evidence uses a disposable synthetic fixture, preserves external backup files, removes the internal database/key/PIN state, and never captures secrets or real financial records.
 
 ## Out of scope (do not ship)
 

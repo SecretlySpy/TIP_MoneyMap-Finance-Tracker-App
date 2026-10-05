@@ -159,7 +159,7 @@ describe("A1 - savings goals survive a backup/restore round trip", () => {
     });
   });
 
-  it("still accepts an older backup written before goals existed", () => {
+  it("rejects an older backup written before goals existed to protect existing goals", () => {
     const legacy = JSON.stringify({
       format: "moneymap-backup",
       version: 1,
@@ -170,8 +170,7 @@ describe("A1 - savings goals survive a backup/restore round trip", () => {
       budgets: [],
       recurringRules: [],
     });
-    const parsed = parseBackup(legacy);
-    expect(parsed.goals).toEqual([]); // absent, not a parse failure
+    expect(() => parseBackup(legacy)).toThrow(/missing the goals field/);
   });
 
   it("tolerates a snapshot with no goals key", () => {

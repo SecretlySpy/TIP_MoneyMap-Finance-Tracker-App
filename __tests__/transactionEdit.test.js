@@ -95,7 +95,7 @@ describe("transaction editing and recurring guards", () => {
   it("guards recurring transaction: prevents date modification while allowing other edits", async () => {
     const store = useFinanceStore.getState();
     const scheduledDate = new Date(2026, 8, 1, 12, 0, 0).getTime();
-    const originalNextRun = new Date(2026, 9, 1, 12, 0, 0).getTime();
+    const originalNextRun = new Date(2026, 10, 1, 12, 0, 0).getTime();
 
     // Create a recurring rule
     const rule = await repos.recurring.create({
@@ -165,7 +165,7 @@ describe("transaction editing and recurring guards", () => {
   it("deleting a recurring transaction occurrence leaves the recurring rule schedule untouched", async () => {
     const store = useFinanceStore.getState();
     const scheduledDate = new Date(2026, 8, 1, 12, 0, 0).getTime();
-    const nextRun = new Date(2026, 9, 1, 12, 0, 0).getTime();
+    const nextRun = new Date(2026, 10, 1, 12, 0, 0).getTime();
 
     const rule = await repos.recurring.create({
       amountMinor: 50_000,

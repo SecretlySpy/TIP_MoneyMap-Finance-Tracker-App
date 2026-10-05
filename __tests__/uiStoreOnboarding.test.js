@@ -33,6 +33,7 @@ jest.mock("../src/services/preferences", () => {
   };
   return {
     DEFAULT_PREFERENCES: defaults,
+    SPLASH_SEEN_KEY: "moneymap.splash.seen.v1",
     loadPreferencesResult: jest.fn(async () => ({ preferences: defaults, status: "loaded" })),
     savePreferences: jest.fn(async () => {}),
   };

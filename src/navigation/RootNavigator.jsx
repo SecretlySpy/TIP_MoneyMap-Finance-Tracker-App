@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "../components/AppText";
 import { TabIcon } from "../components/TabIcon";
 import { AppLockScreen } from "../screens/AppLockScreen";
+import { PinRecoveryScreen } from "../screens/PinRecoveryScreen";
 import { BudgetsScreen } from "../screens/BudgetsScreen";
 import { DashboardScreen } from "../screens/DashboardScreen";
 import { EntryScreen } from "../screens/EntryScreen";
@@ -197,11 +198,12 @@ export function RootNavigator() {
         );
     }
 
-    // A locked root registers only AppLock. Changing the key destroys any
-    // previously mounted Main stack, so background locking cannot reveal it.
+    // A locked root registers only lock and recovery routes. Changing the key
+    // destroys any mounted Main stack, so recovery cannot reveal finance UI.
     if (rootMode === "locked") {
         return (<RootStack.Navigator key="root-locked" screenOptions={{ headerShown: false }}>
           <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
+          <RootStack.Screen name="PinRecovery" component={PinRecoveryScreen} options={{ animation: "slide_from_right" }} />
         </RootStack.Navigator>);
     }
 

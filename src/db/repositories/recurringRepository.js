@@ -26,6 +26,12 @@ function validateRecurringRule(rule) {
     assertOneOf(rule.frequency, RECURRING_FREQUENCIES, "frequency");
     assertSafeInteger(rule.nextRunEpochMillis, "nextRunEpochMillis");
     assertNonNegativeInteger(rule.reminderLeadDays, "reminderLeadDays");
+    if (rule.anchorDay !== undefined && rule.anchorDay !== null) {
+        assertPositiveInteger(rule.anchorDay, "anchorDay");
+        if (rule.anchorDay > 31) {
+            throw new RangeError("anchorDay must be between 1 and 31.");
+        }
+    }
 }
 export class RecurringRepository {
     constructor(database) {

@@ -15,7 +15,7 @@ The Pages site is the polished setup guide: root [`index.html`](./index.html) (s
 | Task 11 bill reminders (local notifications) | Done |
 | Task 12 CSV export + backup | Done — file-based share; backup now includes savings goals (QA 2026-08-31) |
 | Task 13 CSV + Excel import | Done |
-| Task 14 app lock (PIN + biometrics) | Done — with attempt lockout; **no forgot-PIN recovery** |
+| Task 14 app lock (PIN + biometrics) | Implemented — attempt lockout plus device-authenticated PIN replacement and an explicit local-reset fallback; enrolled-device recovery remains release-gated |
 | Task 15 Smart Tips offline rules | Done |
 | Task 16 Smart Tips online Gemini (opt-in) | Done |
 | Task 17 polish | Done |
@@ -37,10 +37,10 @@ SQLite; live Figma and Android device acceptance remain separate.
 
 | Gap | Impact |
 |---|---|
-| Native SQLCipher key/storage, PIN/biometric and notification lifecycles, phone/tablet layout and accessibility | No connected device or configured AVD on this workstation; native acceptance is **UNVERIFIED** |
+| Native SQLCipher key/storage, PIN/biometric and notification lifecycles, phone/tablet layout and accessibility | API 35 emulator smoke verified encrypted-file header, locked startup/resume, Forgot PIN unavailable behavior, and reset confirmation UI. Enrolled recovery success, real deletion/interruption, physical phone/tablet, notifications, and assistive-technology acceptance remain **UNVERIFIED** |
 | Current 52 mobile + 52 tablet state frames | Figma connector requires authentication; six feature groups are mapped to code, individual visual parity is **UNVERIFIED** |
-| Dependency advisories | `npm audit --omit=dev` reported 48 advisories (33 high, 15 moderate) on its latest run. `xlsx@0.20.3` is integrity-pinned from the vendor CDN; audit coverage of this tarball is incomplete. Review compatible updates before release |
-| Account transfers, budget rollover, and "delete all data" reset | Still outside the current product scope; imported rows edited since an earlier import are reported as skipped rather than overwritten |
+| Dependency advisories | `npm audit --omit=dev` reported 46 advisories (31 high, 15 moderate) on 2026-10-04. `xlsx@0.20.3` is integrity-pinned from the vendor CDN; audit coverage of this tarball is incomplete. Review compatible updates before release |
+| Account transfers and budget rollover | Still outside the current product scope; imported rows edited since an earlier import are reported as skipped rather than overwritten |
 
 The Jest suite covers domain, data-transfer, store, component, and static UI contracts. Native
 device behavior still requires the Android verification path below.

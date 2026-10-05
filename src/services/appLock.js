@@ -4,6 +4,7 @@ import * as SecureStore from "expo-secure-store";
 
 const PIN_HASH_KEY = "moneymap.pin.hash.v1";
 const PIN_SALT_KEY = "moneymap.pin.salt.v1";
+const PIN_RECORD_KEY = "moneymap.pin.record.v2";
 const PIN_ATTEMPTS_KEY = "moneymap.pin.attempts.v1";
 
 /** Failures tolerated before the keypad starts locking out. */
@@ -27,25 +28,33 @@ export function pinLockoutSeconds(failures) {
   return PIN_LOCKOUT_LADDER_SECONDS[step];
 }
 
+/**
+ * NOTE: App lock PIN is an in-app UI access gate, not the SQLite/SQLCipher encryption key.
+ * Ledger encryption is independently managed by databaseKey.js via device hardware keystore.
+ */
+let lastKnownAttemptState = { failures: 0, lockedUntilEpochMillis: 0 };
+
 async function readAttemptState() {
   try {
     const raw = await SecureStore.getItemAsync(PIN_ATTEMPTS_KEY);
     if (raw === null) {
-      return { failures: 0, lockedUntilEpochMillis: 0 };
+      return lastKnownAttemptState;
     }
     const parsed = JSON.parse(raw);
-    return {
-      failures: Number.isSafeInteger(parsed?.failures) && parsed.failures >= 0 ? parsed.failures : 0,
-      lockedUntilEpochMillis: Number.isSafeInteger(parsed?.lockedUntilEpochMillis)
-        ? parsed.lockedUntilEpochMillis
-        : 0,
-    };
+    const failures = Number.isSafeInteger(parsed?.failures) && parsed.failures >= 0 ? parsed.failures : lastKnownAttemptState.failures;
+    const lockedUntilEpochMillis = Number.isSafeInteger(parsed?.lockedUntilEpochMillis)
+      ? Math.max(parsed.lockedUntilEpochMillis, lastKnownAttemptState.lockedUntilEpochMillis)
+      : lastKnownAttemptState.lockedUntilEpochMillis;
+    lastKnownAttemptState = { failures, lockedUntilEpochMillis };
+    return lastKnownAttemptState;
   } catch {
-    return { failures: 0, lockedUntilEpochMillis: 0 };
+    // Fail closed: retain the highest known lockout rather than resetting to 0 failures
+    return lastKnownAttemptState;
   }
 }
 
 async function writeAttemptState(state) {
+  lastKnownAttemptState = state;
   try {
     await SecureStore.setItemAsync(PIN_ATTEMPTS_KEY, JSON.stringify(state));
   } catch {
@@ -76,6 +85,10 @@ const PIN_PATTERN = /^\d{4}$/;
  * @typedef {"success" | "failed" | "unavailable"} BiometricUnlockResult
  */
 
+/**
+ * @typedef {"success" | "cancelled" | "failed" | "unavailable"} RecoveryAuthenticationResult
+ */
+
 export function isValidPin(pin) {
   return PIN_PATTERN.test(pin);
 }
@@ -84,9 +97,46 @@ async function hashPin(pin, salt) {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, `${salt}:${pin}`);
 }
 
+async function loadPinMaterial() {
+  const storedRecord = await SecureStore.getItemAsync(PIN_RECORD_KEY);
+  if (storedRecord !== null) {
+    try {
+      const parsed = JSON.parse(storedRecord);
+      if (parsed?.version === 2
+        && typeof parsed.salt === "string"
+        && parsed.salt.length > 0
+        && typeof parsed.hash === "string"
+        && parsed.hash.length > 0) {
+        return { salt: parsed.salt, hash: parsed.hash };
+      }
+    } catch {
+      // The error below deliberately fails closed for malformed persisted state.
+    }
+    throw new Error("Stored PIN verification data is invalid.");
+  }
+  const [salt, hash] = await Promise.all([
+    SecureStore.getItemAsync(PIN_SALT_KEY),
+    SecureStore.getItemAsync(PIN_HASH_KEY),
+  ]);
+  if (salt === null && hash === null) {
+    return null;
+  }
+  if (salt === null || hash === null) {
+    throw new Error("Stored PIN verification data is incomplete.");
+  }
+  return { salt, hash };
+}
+
 export async function hasStoredPin() {
-  const hash = await SecureStore.getItemAsync(PIN_HASH_KEY);
-  return hash !== null && hash.length > 0;
+  const record = await SecureStore.getItemAsync(PIN_RECORD_KEY);
+  if (record !== null) {
+    return true;
+  }
+  const [salt, hash] = await Promise.all([
+    SecureStore.getItemAsync(PIN_SALT_KEY),
+    SecureStore.getItemAsync(PIN_HASH_KEY),
+  ]);
+  return salt !== null || hash !== null;
 }
 
 export async function setPin(pin) {
@@ -96,15 +146,20 @@ export async function setPin(pin) {
   const saltBytes = await Crypto.getRandomBytesAsync(16);
   const salt = Array.from(saltBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
   const hash = await hashPin(pin, salt);
-  await SecureStore.setItemAsync(PIN_SALT_KEY, salt);
-  await SecureStore.setItemAsync(PIN_HASH_KEY, hash);
   await resetPinAttempts();
+  await SecureStore.setItemAsync(PIN_RECORD_KEY, JSON.stringify({ version: 2, salt, hash }));
+  await Promise.allSettled([
+    SecureStore.deleteItemAsync(PIN_SALT_KEY),
+    SecureStore.deleteItemAsync(PIN_HASH_KEY),
+  ]);
 }
 
 export async function clearPin() {
   await SecureStore.deleteItemAsync(PIN_HASH_KEY);
   await SecureStore.deleteItemAsync(PIN_SALT_KEY);
-  await resetPinAttempts();
+  await SecureStore.deleteItemAsync(PIN_RECORD_KEY);
+  await SecureStore.deleteItemAsync(PIN_ATTEMPTS_KEY);
+  lastKnownAttemptState = { failures: 0, lockedUntilEpochMillis: 0 };
 }
 
 /**
@@ -126,15 +181,12 @@ export async function verifyPinWithLockout(pin, now = Date.now()) {
   if (!isValidPin(pin)) {
     return { ok: false, lockedForSeconds: 0, failures: state.failures };
   }
-  const [hash, salt] = await Promise.all([
-    SecureStore.getItemAsync(PIN_HASH_KEY),
-    SecureStore.getItemAsync(PIN_SALT_KEY),
-  ]);
-  if (hash === null || salt === null) {
+  const material = await loadPinMaterial();
+  if (material === null) {
     return { ok: false, lockedForSeconds: 0, failures: state.failures };
   }
-  const candidate = await hashPin(pin, salt);
-  if (candidate === hash) {
+  const candidate = await hashPin(pin, material.salt);
+  if (candidate === material.hash) {
     await resetPinAttempts();
     return { ok: true, lockedForSeconds: 0, failures: 0 };
   }
@@ -197,6 +249,48 @@ export async function tryLocalAuthentication() {
       biometricsSecurityLevel: "weak",
     });
     return result.success ? "success" : "failed";
+  } catch {
+    return "unavailable";
+  }
+}
+
+const RECOVERY_CANCEL_ERRORS = new Set(["app_cancel", "system_cancel", "user_cancel"]);
+const RECOVERY_UNAVAILABLE_ERRORS = new Set([
+  "invalid_context",
+  "no_space",
+  "not_available",
+  "not_enrolled",
+  "passcode_not_set",
+]);
+
+/**
+ * Require a higher-assurance system prompt before replacing a forgotten PIN.
+ * Device fallback stays enabled so an enrolled device credential can recover
+ * access without weakening ordinary PIN or biometric unlock behavior.
+ *
+ * @returns {Promise<RecoveryAuthenticationResult>}
+ */
+export async function tryRecoveryAuthentication() {
+  try {
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: "Verify to reset your MoneyMap PIN",
+      promptSubtitle: "MoneyMap recovery",
+      promptDescription: "Use your device security to create a replacement app PIN.",
+      cancelLabel: "Cancel",
+      fallbackLabel: "Use device passcode",
+      disableDeviceFallback: false,
+      biometricsSecurityLevel: "strong",
+    });
+    if (result.success) {
+      return "success";
+    }
+    if (RECOVERY_CANCEL_ERRORS.has(result.error)) {
+      return "cancelled";
+    }
+    if (RECOVERY_UNAVAILABLE_ERRORS.has(result.error)) {
+      return "unavailable";
+    }
+    return "failed";
   } catch {
     return "unavailable";
   }

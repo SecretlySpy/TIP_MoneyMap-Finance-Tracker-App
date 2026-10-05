@@ -9,6 +9,7 @@ const uiFiles = [
   "src/components/Buttons.jsx",
   "src/components/Chip.jsx",
   "src/components/DatabaseGate.jsx",
+  "src/components/DonutMark.jsx",
   "src/components/EmptyState.jsx",
   "src/components/EmojiGrid.jsx",
   "src/components/EmojiPickerRow.jsx",
@@ -125,4 +126,21 @@ describe("static UI fidelity boundaries", () => {
     expect(location).not.toContain('import("expo-location")');
     expect(appConfig).not.toMatch(/ACCESS_(COARSE|FINE)_LOCATION/);
   });
+
+  it("matches date button visible label and accessible name", () => {
+    const calendar = readFileSync(join(root, "src/components/CalendarPickerSheet.jsx"), "utf8");
+    expect(calendar).toContain("accessibilityLabel={`Choose ${confirmLabel}`}");
+    expect(calendar).toContain("{`Choose ${confirmLabel}`}");
+  });
+
+  it("gates deep-link localhost on successful adb reverse and checks motion preference", () => {
+    const runner = readFileSync(join(root, "scripts/run-android.mjs"), "utf8");
+    expect(runner).toContain('isReversed ? "localhost"');
+    expect(runner).toContain("launchApp(adbPath, targetSerial, 8081, reversed);");
+
+    const donut = readFileSync(join(root, "src/components/DonutMark.jsx"), "utf8");
+    expect(donut).toContain("motionReady");
+    expect(donut).toContain("resetAnim.stop();");
+  });
 });
+

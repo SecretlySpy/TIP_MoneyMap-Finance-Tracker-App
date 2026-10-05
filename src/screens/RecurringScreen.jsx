@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Alert, Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { BottomSheet } from "../components/BottomSheet";
-import { DashedButton } from "../components/Buttons";
+import { PrimaryButton } from "../components/Buttons";
 import { EmojiGrid } from "../components/EmojiGrid";
 import { EmptyState } from "../components/EmptyState";
 import { OptionChipRow } from "../components/OptionChipRow";
@@ -29,6 +29,7 @@ export function RecurringScreen({ navigation }) {
   const notificationPermissionDenied = useUiStore((state) => state.notificationPermissionDenied);
   const notificationHint = useUiStore((state) => state.notificationHint);
   const categories = useFinanceStore((state) => state.categories);
+  const accounts = useFinanceStore((state) => state.accounts);
   const recurringRules = useFinanceStore((state) => state.recurringRules);
   const addRecurringBill = useFinanceStore((state) => state.addRecurringBill);
   const updateRecurringRule = useFinanceStore((state) => state.updateRecurringRule);
@@ -46,18 +47,25 @@ export function RecurringScreen({ navigation }) {
   const [draftFrequency, setDraftFrequency] = useState("MONTHLY");
   const [draftCategory, setDraftCategory] = useState(null);
   const [draftLeadDays, setDraftLeadDays] = useState(RECURRING_REMINDER_LEAD_DAYS);
+  const [draftAccountId, setDraftAccountId] = useState(null);
 
   const [activeBillId, setActiveBillId] = useState(null);
 
-  const { categoriesById } = useMemo(
-    () => mapsFromState({ accounts: [], categories }),
-    [categories],
+  const { categoriesById, accountsById } = useMemo(
+    () => mapsFromState({ accounts, categories }),
+    [accounts, categories],
   );
   const bills = useMemo(
-    () => buildRecurringBills(recurringRules, categoriesById),
-    [recurringRules, categoriesById],
+    () => buildRecurringBills(recurringRules, categoriesById, accountsById),
+    [recurringRules, categoriesById, accountsById],
   );
   const reminder = useMemo(() => nextReminderPreview(bills), [bills]);
+
+  const activeAccounts = useMemo(() => accounts.filter((a) => !a.isArchived), [accounts]);
+  const accountOptions = useMemo(
+    () => activeAccounts.map((a) => ({ value: String(a.id), label: a.name })),
+    [activeAccounts],
+  );
 
   const expenseCategoryOptions = useMemo(
     () => categoriesForType(categories, "EXPENSE").map((c) => ({ value: c.name, label: c.name })),
@@ -72,6 +80,7 @@ export function RecurringScreen({ navigation }) {
     setActiveBillId(null);
     setDraftFrequency("MONTHLY");
     setDraftCategory(expenseCategoryOptions[0]?.value ?? null);
+    setDraftAccountId(activeAccounts[0]?.id ? String(activeAccounts[0].id) : null);
     setDraftLeadDays(RECURRING_REMINDER_LEAD_DAYS);
     setIsAddOpen(true);
   };
@@ -106,6 +115,7 @@ export function RecurringScreen({ navigation }) {
     try {
       const dueEpochMillis = parseLocalDateToNoonEpoch(dueIso);
       await addRecurringBill({
+        accountId: draftAccountId ? Number(draftAccountId) : undefined,
         amountMinor,
         categoryName: draftCategory ?? preferred.name,
         name: trimmedName,
@@ -321,7 +331,7 @@ export function RecurringScreen({ navigation }) {
         <EmptyState
           actionLabel="+ Add recurring bill"
           emoji="🔔"
-          message="Name, icon, amount, and due date. You’ll be reminded 14 days before. Long-press a card to edit or delete."
+          message="Name, icon, amount, and due date. Each bill uses its own lead time for reminders. Long-press a card to edit or delete."
           onAction={beginAdd}
           title="No recurring bills yet"
         />
@@ -356,7 +366,7 @@ export function RecurringScreen({ navigation }) {
                     {bill.name}
                   </Text>
                   <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-                    {bill.frequencyLabel} · Due {bill.due}
+                    {bill.frequencyLabel} · Due {bill.due}{bill.accountName ? ` · ${bill.accountName}` : ""}
                   </Text>
                 </View>
                 <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.listName }}>
@@ -393,9 +403,9 @@ export function RecurringScreen({ navigation }) {
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
             Tip: press and hold a bill card to edit or delete.
           </Text>
-          <DashedButton disabled={busy} onPress={beginAdd}>
+          <PrimaryButton disabled={busy} onPress={beginAdd}>
             {busy ? "Saving…" : "+ Add recurring bill"}
-          </DashedButton>
+          </PrimaryButton>
         </>
       ) : null}
 
@@ -502,6 +512,16 @@ export function RecurringScreen({ navigation }) {
             />
           ) : null}
 
+          {accountOptions.length > 0 ? (
+            <OptionChipRow
+              accessibilityLabel="Bill account"
+              label="Account"
+              onChange={setDraftAccountId}
+              options={accountOptions}
+              value={draftAccountId ?? accountOptions[0].value}
+            />
+          ) : null}
+
           <OptionChipRow
             accessibilityLabel="Reminder lead time"
             label="Remind me"
@@ -524,9 +544,9 @@ export function RecurringScreen({ navigation }) {
           </View>
 
           <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.md }}>
-            <DashedButton disabled={busy} onPress={() => void finishCreate()}>
+            <PrimaryButton disabled={busy} onPress={() => void finishCreate()}>
               {busy ? "Saving…" : "Save bill"}
-            </DashedButton>
+            </PrimaryButton>
             <Pressable
               accessibilityRole="button"
               onPress={() => setIsAddOpen(false)}

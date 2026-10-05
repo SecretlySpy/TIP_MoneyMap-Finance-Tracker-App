@@ -50,6 +50,7 @@ describe("root navigation mode", () => {
     );
     expect(lockedBranch).toContain('key="root-locked"');
     expect(lockedBranch).toContain('name="AppLock"');
+    expect(lockedBranch).toContain('name="PinRecovery"');
     expect(lockedBranch).not.toContain('name="Main"');
     expect(source).toContain('key="root-main"');
   });

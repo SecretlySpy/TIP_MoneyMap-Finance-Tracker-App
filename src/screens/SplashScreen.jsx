@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
-import { DashedButton, PrimaryButton } from "../components/Buttons";
+import { PrimaryButton } from "../components/Buttons";
+import { DonutMark } from "../components/DonutMark";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -17,7 +18,13 @@ export function SplashScreen({ navigation }) {
   const onboardingLoadError = useUiStore((state) => state.onboardingLoadError);
   const splashReadError = useUiStore((state) => state.splashReadError);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 1400);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleGetStarted = async () => {
     // Settings uses this screen as a replayable preview, not as a first-run reset.
@@ -74,21 +81,9 @@ export function SplashScreen({ navigation }) {
       testID="splash-screen"
     >
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: theme.spacing.lg }}>
-        {/* Brand IconCircle */}
-        <View
-          style={{
-            alignItems: "center",
-            backgroundColor: theme.colors.tint,
-            borderRadius: theme.radii.round,
-            height: theme.sizes.lockCircle,
-            justifyContent: "center",
-            width: theme.sizes.lockCircle,
-          }}
-        >
-          <Text style={{ fontSize: theme.typeScale.heroAmount }}>💰</Text>
-        </View>
+        {/* Brand Donut Mark */}
+        <DonutMark animating={loading || busy} size={theme.sizes.lockCircle} />
 
-        {/* Brand Text */}
         <View style={{ alignItems: "center", gap: theme.spacing.sm }}>
           <Text
             style={{
@@ -109,34 +104,23 @@ export function SplashScreen({ navigation }) {
               textAlign: "center",
             }}
           >
-            {"Track your allowance, budgets and bills.\nCore finance works offline."}
+            Track your allowance, budgets and bills.
           </Text>
         </View>
       </View>
 
-      {/* CTA Section */}
       <View style={{ gap: theme.spacing.md, width: "100%" }}>
         <PrimaryButton disabled={busy} onPress={() => void handleGetStarted()}>
-          {busy ? "Starting…" : "Get started"}
+          {busy ? "Starting\u2026" : "Get started"}
         </PrimaryButton>
         {onboardingDraftInvalid ? (
-          <DashedButton disabled={busy} onPress={confirmDiscard}>Discard saved setup</DashedButton>
+          <PrimaryButton disabled={busy} onPress={confirmDiscard}>Discard saved setup</PrimaryButton>
         ) : null}
         {error !== null || onboardingLoadError !== null || splashReadError !== null ? (
           <Text accessibilityRole="alert" style={{ color: theme.colors.expense, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label, textAlign: "center" }}>
             {error ?? splashReadError ?? onboardingLoadError}
           </Text>
         ) : null}
-        <Text
-          style={{
-            color: theme.colors.sub,
-            fontFamily: theme.fonts.regular,
-            fontSize: theme.typeScale.small,
-            textAlign: "center",
-          }}
-        >
-          🔒 Optional app lock is available in Settings
-        </Text>
       </View>
     </ScreenContainer>
   );

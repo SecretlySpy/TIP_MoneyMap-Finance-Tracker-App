@@ -176,7 +176,7 @@ export function SettingsScreen({ navigation }) {
       </Text>
 
       <SettingsSection title="SECURITY">
-        <SettingsRow emoji="🔒" label="Optional app lock (PIN + biometric)" onPress={() => rootNavigation?.navigate("AppLock")} trailing={<Toggle enabled={appLockEnabled && hasPin} label="App lock" onChange={(enabled) => void handleAppLockToggle(enabled)}/>}/>
+        <SettingsRow emoji="🔒" label="Optional app lock (PIN or biometrics)" onPress={() => rootNavigation?.navigate("AppLock")} trailing={<Toggle enabled={appLockEnabled && hasPin} label="App lock" onChange={(enabled) => void handleAppLockToggle(enabled)}/>}/>
         <SettingsRow emoji="🛡️" label="Encrypted database · separate key" trailing={trailingText("On")}/>
       </SettingsSection>
 
@@ -214,7 +214,7 @@ export function SettingsScreen({ navigation }) {
             }
             Alert.alert(
                 "Enable Smart Tips?",
-                "When online, MoneyMap may send an anonymized budget summary to Google Gemini: period, remaining budget, per-category spend ratios, and currency symbol. Raw transactions, notes, and account names never leave this device. Offline tips always stay local.",
+                "When online, MoneyMap may share category names, spend ratios, remaining budget amounts, and currency symbol with Google Gemini to generate suggestions. Notes, accounts, and individual transactions never leave your device. You can turn this off at any time to keep tips offline.",
                 [
                     { text: "Not now", style: "cancel", onPress: () => { void declineSmartTipsConsent(); } },
                     { text: "I understand", onPress: () => { void acceptSmartTipsConsent(); } },

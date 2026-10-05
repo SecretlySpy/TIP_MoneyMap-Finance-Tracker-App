@@ -6,7 +6,10 @@
   "scripts": {
     "start": "expo start --dev-client",
     "android": "node scripts/run-android.mjs",
+    "android:clean": "node scripts/run-android.mjs --clean",
+    "android:preserve": "node scripts/run-android.mjs --preserve-data",
     "android:check": "node scripts/run-android.mjs --check",
+    "clean:state": "node scripts/run-android.mjs --clean-only",
     "asset:splash": "node scripts/render-splash-icon.mjs",
     "prebuild": "expo prebuild",
     "test": "jest --runInBand",
@@ -43,6 +46,7 @@
     "expo-local-authentication": "~17.0.9",
     "expo-notifications": "~0.32.17",
     "expo-secure-store": "~15.0.8",
+    "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.8",
     "expo-system-ui": "~6.0.9",

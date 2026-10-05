@@ -57,7 +57,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Allow MoneyMap to use Face ID to unlock the app."
+          "faceIDPermission": "Allow MoneyMap to use Face ID to unlock the app or reset your PIN."
         }
       ],
       [

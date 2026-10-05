@@ -3,7 +3,7 @@ import { Alert, Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { BottomSheet } from "../components/BottomSheet";
 import { BudgetCard } from "../components/BudgetCard";
-import { DashedButton } from "../components/Buttons";
+import { PrimaryButton } from "../components/Buttons";
 import { EmojiGrid } from "../components/EmojiGrid";
 import { EmptyState } from "../components/EmptyState";
 import { MonthChip } from "../components/MonthChip";
@@ -22,6 +22,7 @@ export function BudgetsScreen({ navigation }) {
   const budgets = useFinanceStore((state) => state.budgets);
   const categories = useFinanceStore((state) => state.categories);
   const transactions = useFinanceStore((state) => state.transactions);
+  const accounts = useFinanceStore((state) => state.accounts);
   const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
   const addBudget = useFinanceStore((state) => state.addBudget);
   const addCategory = useFinanceStore((state) => state.addCategory);
@@ -42,8 +43,8 @@ export function BudgetsScreen({ navigation }) {
     [categories],
   );
   const cards = useMemo(
-    () => buildBudgetCards(budgets, transactions, categoriesById, selectedMonthYear),
-    [budgets, transactions, categoriesById, selectedMonthYear],
+    () => buildBudgetCards(budgets, transactions, categoriesById, selectedMonthYear, accounts),
+    [budgets, transactions, categoriesById, selectedMonthYear, accounts],
   );
   const summary = useMemo(() => budgetSummary(cards), [cards]);
 
@@ -228,7 +229,7 @@ export function BudgetsScreen({ navigation }) {
 
       {cards.length === 0 ? (
         <EmptyState
-          actionLabel="+ Add budget"
+          actionLabel="Add Budget"
           emoji="📊"
           message="Name a category, pick an icon, and set a monthly limit. Long-press a card to edit or delete."
           onAction={beginAddBudget}
@@ -254,9 +255,9 @@ export function BudgetsScreen({ navigation }) {
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>
             Tip: press and hold a budget card to edit or delete.
           </Text>
-          <DashedButton disabled={busy} onPress={beginAddBudget}>
-            {busy ? "Saving…" : "+ Add budget"}
-          </DashedButton>
+          <PrimaryButton disabled={busy} onPress={beginAddBudget}>
+            {busy ? "Saving…" : "Add Budget"}
+          </PrimaryButton>
         </>
       ) : null}
 
@@ -268,6 +269,7 @@ export function BudgetsScreen({ navigation }) {
         visible={sheetStep === "name"}
       >
         <TextInput
+          accessibilityLabel="Budget category"
           autoFocus
           onChangeText={setPendingCategoryName}
           placeholder="Sample supplies"
@@ -287,9 +289,9 @@ export function BudgetsScreen({ navigation }) {
           Icon
         </Text>
         <EmojiGrid onChange={setPendingEmoji} value={pendingEmoji} />
-        <DashedButton onPress={handleNameStepNext}>
-          Next: set limit
-        </DashedButton>
+        <PrimaryButton onPress={handleNameStepNext}>
+          Next
+        </PrimaryButton>
         <Pressable
           accessibilityRole="button"
           onPress={closeSheet}
@@ -307,6 +309,7 @@ export function BudgetsScreen({ navigation }) {
         visible={sheetStep === "limit"}
       >
         <TextInput
+          accessibilityLabel="Monthly limit"
           autoFocus
           keyboardType="decimal-pad"
           onChangeText={setPendingLimitInput}
@@ -327,9 +330,9 @@ export function BudgetsScreen({ navigation }) {
           {`${pendingCategoryName || editingLimitName || "Budget"} · ${formatMonthChip(selectedMonthYear)}`}
         </Text>
         <EmojiGrid onChange={setPendingEmoji} value={pendingEmoji} />
-        <DashedButton disabled={busy} onPress={() => void handleLimitConfirm(pendingLimitInput)}>
+        <PrimaryButton disabled={busy} onPress={() => void handleLimitConfirm(pendingLimitInput)}>
           {busy ? "Saving…" : "Save budget"}
-        </DashedButton>
+        </PrimaryButton>
         <Pressable
           accessibilityRole="button"
           onPress={closeSheet}

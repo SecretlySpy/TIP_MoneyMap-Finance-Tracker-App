@@ -51,6 +51,8 @@ export function SmartTipsScreen({ navigation }) {
   useEffect(() => {
     let cancelled = false;
     if (!smartTipsEnabled) {
+      setAiTips(null);
+      setAiStatus("idle");
       return undefined;
     }
     // Always start from offline tips; AI is additive/fallback merge.

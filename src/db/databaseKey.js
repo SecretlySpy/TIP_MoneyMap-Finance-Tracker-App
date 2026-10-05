@@ -20,3 +20,9 @@ const secureDatabaseKeyStore = {
 export function loadDatabaseKey() {
     return getOrCreateDatabaseKey(secureDatabaseKeyStore, Crypto.getRandomBytesAsync);
 }
+
+export function clearDatabaseKey() {
+    return SecureStore.deleteItemAsync(DATABASE_KEY_NAME, {
+        keychainService: DATABASE_KEY_SERVICE,
+    });
+}

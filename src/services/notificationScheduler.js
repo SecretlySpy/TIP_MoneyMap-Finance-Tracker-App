@@ -141,6 +141,20 @@ async function cancelMoneyMapReminders(Notifications) {
   return cancelled;
 }
 
+export async function clearMoneyMapNotifications() {
+  const Notifications = await loadNotifications();
+  if (Notifications === null) {
+    return false;
+  }
+  await cancelMoneyMapReminders(Notifications);
+  try {
+    await Notifications.dismissAllNotificationsAsync();
+  } catch {
+    // Delivered notifications are best-effort cleanup and must not block local erasure.
+  }
+  return true;
+}
+
 /**
  * Cancel existing MoneyMap reminder schedules and rebuild from rules when enabled + permitted.
  *

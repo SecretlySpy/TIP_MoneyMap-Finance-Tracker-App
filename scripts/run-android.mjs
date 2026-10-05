@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Starts Expo's native Android workflow with project-local, cross-platform setup.
  *
@@ -11,6 +12,7 @@
 // optional global command-line packages have been installed.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
+import { createConnection } from "node:net";
 import { homedir } from "node:os";
 import { delimiter, dirname, posix, resolve, win32 } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -286,6 +288,12 @@ function createAndroidEnvironment() {
   environment.JAVA_HOME = java.home;
   environment.NODE_ENV = "development";
 
+  // Prevent com.android.prefs.AndroidLocationsException caused by having both
+  // ANDROID_PREFS_ROOT and ANDROID_USER_HOME set in environment.
+  if (environment.ANDROID_PREFS_ROOT && environment.ANDROID_USER_HOME) {
+    delete environment.ANDROID_PREFS_ROOT;
+  }
+
   const pathKey =
     Object.keys(environment).find((key) => key.toLowerCase() === "path") ?? "PATH";
   environment[pathKey] = [
@@ -322,44 +330,186 @@ function printCheckResult(configuration) {
   }
 }
 
+export const PACKAGE_NAME = "com.example.financetracker";
+
+// Check if a local port is already accepting connections (e.g. active Metro bundler).
+export function isPortInUse(port = 8081, host = "127.0.0.1") {
+  return new Promise((resolveResult) => {
+    const socket = createConnection({ port, host });
+    socket.once("connect", () => {
+      socket.destroy();
+      resolveResult(true);
+    });
+    socket.once("error", () => {
+      resolveResult(false);
+    });
+  });
+}
+
+// Clear application data on the target Android device to guarantee clean state.
+export function clearAppData(adbPath, serial = null, packageName = PACKAGE_NAME) {
+  const args = serial
+    ? ["-s", serial, "shell", "pm", "clear", packageName]
+    : ["shell", "pm", "clear", packageName];
+  try {
+    const result = spawnSync(adbPath, args, {
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    return (result.stdout || "").includes("Success");
+  } catch {
+    return false;
+  }
+}
+
+// Reverse Metro port over ADB so emulator reliably communicates with local host.
+export function reverseMetroPort(adbPath, serial = null, port = 8081) {
+  const args = serial
+    ? ["-s", serial, "reverse", `tcp:${port}`, `tcp:${port}`]
+    : ["reverse", `tcp:${port}`, `tcp:${port}`];
+  try {
+    const result = spawnSync(adbPath, args, {
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+// Launch the application using Expo development client deep link or MainActivity.
+export function launchApp(adbPath, serial = null, port = 8081, isReversed = true) {
+  const isEmulator = !serial || serial.startsWith("emulator-");
+  const host = isReversed ? "localhost" : isEmulator ? "10.0.2.2" : "localhost";
+  const deepLink = `exp+moneymap-finance-tracker://expo-development-client/?url=http%3A%2F%2F${host}%3A${port}`;
+  const deepLinkArgs = serial
+    ? ["-s", serial, "shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", deepLink]
+    : ["shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", deepLink];
+  try {
+    const deepResult = spawnSync(adbPath, deepLinkArgs, {
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    if (deepResult.status === 0 && !(deepResult.stderr || "").includes("Error")) {
+      return true;
+    }
+  } catch {
+    // Fall back to direct component launch below
+  }
+
+  const fallbackArgs = serial
+    ? ["-s", serial, "shell", "am", "start", "-n", `${PACKAGE_NAME}/.MainActivity`]
+    : ["shell", "am", "start", "-n", `${PACKAGE_NAME}/.MainActivity`];
+  try {
+    const fallbackResult = spawnSync(adbPath, fallbackArgs, {
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    return fallbackResult.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+// Parse launcher-specific options while keeping forwarded Expo arguments clean.
+export function parseLauncherOptions(argv) {
+  const checkOnly = argv.includes("--check");
+  const cleanOnly = argv.includes("--clean-only");
+  const preserveData = argv.includes("--preserve-data") || argv.includes("--no-clean");
+  const forceClean = argv.includes("--clean");
+  const hasDeviceArg = argv.some((arg) => arg === "-d" || arg.startsWith("--device"));
+
+  // Strip MoneyMap-internal flags so Expo CLI does not reject unknown arguments.
+  const internalFlags = new Set(["--clean", "--clean-only", "--preserve-data", "--no-clean"]);
+  const expoForwardedArgs = argv.filter((arg) => !internalFlags.has(arg));
+
+  return {
+    checkOnly,
+    cleanOnly,
+    preserveData,
+    forceClean,
+    hasDeviceArg,
+    expoForwardedArgs,
+  };
+}
+
 // Run Expo with the same Node executable selected by Android Studio. Forward all
 // extra npm arguments so options such as `--device` continue to work.
 async function run() {
   try {
     const configuration = createAndroidEnvironment();
-    const forwardedArguments = process.argv.slice(2);
-    const checkOnly = forwardedArguments.includes("--check");
+    const rawArguments = process.argv.slice(2);
+    const options = parseLauncherOptions(rawArguments);
 
-    if (checkOnly) {
+    if (options.checkOnly) {
       printCheckResult(configuration);
       return;
     }
 
+    const adbExecutable =
+      configuration.targetPlatform === "win32" ? "adb.exe" : "adb";
+    const adbPath = resolve(
+      configuration.androidSdk,
+      "platform-tools",
+      adbExecutable,
+    );
+
     // Ensure an Android device or emulator is running and booted before launching Expo.
     // This eliminates the race condition where Expo queries ADB before an emulator finishes booting.
-    const hasDeviceArg = forwardedArguments.some(
-      (arg) => arg === "-d" || arg.startsWith("--device"),
-    );
-    if (!hasDeviceArg) {
-      const adbExecutable =
-        configuration.targetPlatform === "win32" ? "adb.exe" : "adb";
-      const adbPath = resolve(
-        configuration.androidSdk,
-        "platform-tools",
-        adbExecutable,
-      );
-      const devices = getConnectedDevices(adbPath);
-      const activeDevice = devices.find((d) => d.state === "device");
-      if (!activeDevice) {
-        console.log("[MoneyMap] No booted Android device detected. Launching emulator...");
-        await startEmulator();
+    let devices = getConnectedDevices(adbPath);
+    let activeDevice = devices.find((d) => d.state === "device");
+    if (!activeDevice && !options.hasDeviceArg) {
+      console.log("[MoneyMap] No booted Android device detected. Launching emulator...");
+      await startEmulator();
+      devices = getConnectedDevices(adbPath);
+      activeDevice = devices.find((d) => d.state === "device");
+    }
+
+    const targetSerial = activeDevice?.serial ?? null;
+
+    let reversed = false;
+    // Set up ADB reverse port forwarding so Metro connections always succeed.
+    if (targetSerial) {
+      reversed = reverseMetroPort(adbPath, targetSerial, 8081);
+    }
+
+    // Fast-path: clear state and launch existing build without Gradle rebuild.
+    if (options.cleanOnly) {
+      if (targetSerial) {
+        console.log(`[MoneyMap] Resetting app state on ${targetSerial}...`);
+        const cleared = clearAppData(adbPath, targetSerial);
+        console.log(cleared ? "[MoneyMap] App state cleared (clean state)." : "[MoneyMap] App state reset.");
+        console.log("[MoneyMap] Launching app...");
+        launchApp(adbPath, targetSerial, 8081, reversed);
+      } else {
+        console.warn("[MoneyMap] No active Android device found to clean state.");
       }
+      return;
+    }
+
+    // Default clean-state behavior on emulator: clear app data unless --preserve-data was specified.
+    const shouldClean = options.forceClean || !options.preserveData;
+    if (shouldClean && targetSerial) {
+      console.log(`[MoneyMap] Ensuring clean state on ${targetSerial}...`);
+      clearAppData(adbPath, targetSerial);
+    }
+
+    // Detect if Metro bundler is already running to avoid port conflict prompts.
+    const expoArgs = [...options.expoForwardedArgs];
+    const portActive = await isPortInUse(8081);
+    const hasBundlerArg = expoArgs.some(
+      (arg) => arg.startsWith("--no-bundler") || arg === "-p" || arg.startsWith("--port"),
+    );
+    if (portActive && !hasBundlerArg) {
+      console.log("[MoneyMap] Metro is already running on port 8081. Skipping bundler startup (--no-bundler).");
+      expoArgs.push("--no-bundler");
     }
 
     const expoArguments = [
       configuration.expoCli,
       "run:android",
-      ...forwardedArguments,
+      ...expoArgs,
     ];
     const child = spawn(process.execPath, expoArguments, {
       cwd: projectRoot,

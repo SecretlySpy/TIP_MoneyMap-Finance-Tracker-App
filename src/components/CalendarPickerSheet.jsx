@@ -276,11 +276,11 @@ export function CalendarPickerSheet({
         )}
 
         <PrimaryButton
-          accessibilityLabel={`Use ${confirmLabel}`}
+          accessibilityLabel={`Choose ${confirmLabel}`}
           onPress={() => onConfirm(pendingDate)}
           style={{ marginTop: theme.spacing.sm }}
         >
-          {`Use ${confirmLabel}`}
+          {`Choose ${confirmLabel}`}
         </PrimaryButton>
       </View>
     </BottomSheet>

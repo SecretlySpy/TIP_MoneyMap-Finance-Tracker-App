@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
+import { resumePendingLocalReset } from "../services/localReset";
 import { useTheme } from "../theme/tokens";
 import { AppText as Text } from "./AppText";
 export function DatabaseGate({ children }) {
@@ -13,7 +14,8 @@ export function DatabaseGate({ children }) {
     useEffect(() => {
         let isMounted = true;
         setInitializationState("loading");
-        void ensureHydrated()
+        void resumePendingLocalReset()
+            .then(() => ensureHydrated())
             .then(() => {
             if (isMounted) {
                 setInitializationState("ready");
@@ -43,7 +45,7 @@ export function DatabaseGate({ children }) {
               MoneyMap could not open your encrypted data.
             </Text>
             <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.cardHeader, lineHeight: theme.spacing.top, textAlign: "center" }}>
-              Your records were not changed. Make sure this is a development build, then try again.
+              MoneyMap kept the app closed to protect local data. Make sure this is a development build, then try again.
             </Text>
             <Pressable accessibilityRole="button" onPress={() => setAttempt((currentAttempt) => currentAttempt + 1)} style={{ alignItems: "center", backgroundColor: theme.colors.primary, borderRadius: theme.radii.button, justifyContent: "center", minHeight: 48, minWidth: 128, paddingHorizontal: theme.spacing.top, paddingVertical: theme.spacing.md }}>
               <Text style={{ color: theme.colors.onPrimary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>Retry</Text>

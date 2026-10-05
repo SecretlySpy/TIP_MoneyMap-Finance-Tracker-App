@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
-import { DashedButton, PrimaryButton } from "../components/Buttons";
+import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { parseDecimalToMinor } from "../domain/services/money";
 import {
@@ -365,7 +365,7 @@ export function OnboardingScreen({ navigation }) {
             <Field accessibilityLabel="Expense note" onChangeText={(note) => patchDraft({ expense: { note } })} placeholder="Lunch" value={draft.expense.note} />
           </View>
           <PrimaryButton disabled={busy} onPress={() => void handleExpenseContinue()}>{busy ? "Saving…" : "Add expense and continue"}</PrimaryButton>
-          <DashedButton disabled={busy} onPress={() => void movePastExpense()}>Skip this expense</DashedButton>
+          <PrimaryButton disabled={busy} onPress={() => void movePastExpense()}>Skip this expense</PrimaryButton>
         </>
       ) : null}
 
@@ -382,7 +382,7 @@ export function OnboardingScreen({ navigation }) {
           ) : (
             <>
               <PrimaryButton disabled={busy} onPress={() => void openAppLock()}>Set up app lock</PrimaryButton>
-              <DashedButton disabled={busy} onPress={() => void finishSetup()}>Finish without app lock</DashedButton>
+              <PrimaryButton disabled={busy} onPress={() => void finishSetup()}>Finish without app lock</PrimaryButton>
             </>
           )}
         </>

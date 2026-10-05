@@ -1,5 +1,5 @@
 import { TRANSACTION_TYPES, } from "../../domain/types";
-import { assertNonBlank, assertOneOf, assertPositiveInteger, assertSafeInteger, readEnum, readInteger, readNullableString, } from "../validation";
+import { assertNonBlank, assertOneOf, assertPositiveInteger, assertSafeInteger, assertValidEpochMillis, readEnum, readInteger, readNullableString, } from "../validation";
 import { deleteRow, findRowById, insertRow, listRows, requireCreatedEntity, updateRow, } from "./shared";
 function mapTransaction(row) {
     const recurringRuleIdValue = row.recurring_rule_id;
@@ -23,12 +23,12 @@ function validateTransaction(transaction) {
     assertOneOf(transaction.type, TRANSACTION_TYPES, "type");
     assertPositiveInteger(transaction.categoryId, "categoryId");
     assertPositiveInteger(transaction.accountId, "accountId");
-    assertSafeInteger(transaction.dateEpochMillis, "dateEpochMillis");
+    assertValidEpochMillis(transaction.dateEpochMillis, "dateEpochMillis");
     if (transaction.recurringRuleId !== null) {
         assertPositiveInteger(transaction.recurringRuleId, "recurringRuleId");
     }
     if (transaction.scheduledDateEpochMillis !== null && transaction.scheduledDateEpochMillis !== undefined) {
-        assertSafeInteger(transaction.scheduledDateEpochMillis, "scheduledDateEpochMillis");
+        assertValidEpochMillis(transaction.scheduledDateEpochMillis, "scheduledDateEpochMillis");
     }
     if (transaction.sourceKey !== null && transaction.sourceKey !== undefined) {
         if (typeof transaction.sourceKey !== "string") {
@@ -143,6 +143,12 @@ export class TransactionRepository {
         }
         if (patch.dateEpochMillis !== undefined) {
             assertSafeInteger(patch.dateEpochMillis, "dateEpochMillis");
+            const current = await this.getById(id);
+            if (current && (current.recurringRuleId !== null || current.scheduledDateEpochMillis !== null)) {
+                if (patch.dateEpochMillis !== current.dateEpochMillis) {
+                    throw new Error("Cannot change the date of a recurring bill occurrence.");
+                }
+            }
             assignments.push({ column: "date_epoch_millis", value: patch.dateEpochMillis });
         }
         if (patch.note !== undefined) {

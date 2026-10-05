@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
-import { DashedButton } from "../components/Buttons";
+import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
@@ -145,12 +145,12 @@ export function ManageCategoriesScreen({ navigation }) {
       </View>
       {renderGroup("EXPENSE", expense)}
       {renderGroup("INCOME", income)}
-      <DashedButton disabled={busy} onPress={() => setPromptType("EXPENSE")}>
+      <PrimaryButton disabled={busy} onPress={() => setPromptType("EXPENSE")}>
         + Add expense category
-      </DashedButton>
-      <DashedButton disabled={busy} onPress={() => setPromptType("INCOME")}>
+      </PrimaryButton>
+      <PrimaryButton disabled={busy} onPress={() => setPromptType("INCOME")}>
         + Add income category
-      </DashedButton>
+      </PrimaryButton>
       <TextPromptModal
         confirmLabel="Add"
         message="Custom categories stay on this device only."

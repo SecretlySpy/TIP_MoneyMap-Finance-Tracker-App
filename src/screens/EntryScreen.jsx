@@ -171,6 +171,12 @@ export function EntryScreen({ navigation }) {
             // completed mutation key while preserving it across any failed/uncertain retry.
             sourceKeyRef.current = createManualSourceKey();
             setSelectedMonthYear(toMonthYear(new Date(selectedDateEpochMillis)));
+            setAmountInput("");
+            setNote("");
+            setSelectedDateEpochMillis(localNoonToday());
+            if (typeof navigation?.canGoBack === "function" && navigation.canGoBack()) {
+                navigation.goBack();
+            }
             tabNavigation?.navigate("History", { screen: "HistoryList" });
         }
         catch (error) {
@@ -235,7 +241,7 @@ export function EntryScreen({ navigation }) {
           style={{ alignItems: "center", justifyContent: "center", minHeight: 44, paddingHorizontal: theme.spacing.md }}
         >
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
-            {selectedAccountLabel} · {dateLabel(selectedDateEpochMillis)} ▾
+            {dateLabel(selectedDateEpochMillis)} ▾
           </Text>
         </Pressable>
       </View>

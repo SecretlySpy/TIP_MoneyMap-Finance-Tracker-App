@@ -34,13 +34,19 @@ export function selectRootNavigationMode({ preferencesReady, hasSeenSplash, onbo
  * @typedef {Object} BudgetsStackParamList
  * @property {undefined} BudgetsOverview
  * @property {undefined} Recurring
+ * @property {undefined} Import
+ * @property {{ transactionId: number }} TransactionDetail
+ * @property {{ transactionId: number }} EditTransaction
  *
  * @typedef {Object} SettingsStackParamList
  * @property {undefined} SettingsOverview
  * @property {undefined} Goals
  * @property {undefined} ManageCategories
  * @property {undefined} ManageAccounts
+ * @property {undefined} Import
  * @property {{ mode: 'csv' | 'backup' }} PasteImport
+ * @property {{ transactionId: number }} TransactionDetail
+ * @property {{ transactionId: number }} EditTransaction
  *
  * @typedef {Object} MainTabParamList
  * @property {import('@react-navigation/native').NavigatorScreenParams<HomeStackParamList> | undefined} Home
@@ -51,6 +57,7 @@ export function selectRootNavigationMode({ preferencesReady, hasSeenSplash, onbo
  * @typedef {Object} RootStackParamList
  * @property {import('@react-navigation/native').NavigatorScreenParams<MainTabParamList> | undefined} Main
  * @property {undefined} AppLock
+ * @property {undefined} PinRecovery
  * @property {undefined} Onboarding
  * @property {undefined} Splash
  */

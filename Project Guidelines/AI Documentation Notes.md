@@ -6,9 +6,10 @@ This file retains the historical module notes relocated from the repository root
 |---|---|---|
 | Architecture and operations | `App.js`, `src/navigation/`, `src/store/` | [Architecture and Operations](./Architecture%20and%20Operations.md) |
 | Persistence and imports | `src/db/`, `src/services/dataTransfer.js` | [Database Structure](./Database%20Structure.md), [Backend Functionalities](./Backend%20Functionalities.md) |
+| App Lock and local recovery | `src/services/appLock.js`, `src/services/localReset*.js`, `src/screens/AppLockScreen.jsx`, `src/screens/PinRecoveryScreen.jsx`, `src/store/uiStore.js` | [Architecture and Operations](./Architecture%20and%20Operations.md), [Backend Functionalities](./Backend%20Functionalities.md), [Verification and Evaluation](./Verification%20and%20Evaluation.md) |
 | Screens and UI | `src/screens/`, `src/components/` | [Design Prototype](./Design%20Prototype.md) |
 | Setup and checks | `package.json`, `__tests__/` | [Tech Stack Setup Guide](./Tech%20Stack%20Setup%20Guide.md), [Verification and Evaluation](./Verification%20and%20Evaluation.md) |
-| QA defects, stress and native limits | `scripts/qa-stress.cjs`, `__tests__/qa*`, `docs/qa/2026-10-03/` | [Current Verification and Evaluation](./Verification%20and%20Evaluation.md); [historical QA report](./QA%20Verification%20Report%202026-09-28.md) |
+| QA defects, stress and native limits | `scripts/qa-stress.cjs`, `__tests__/qa*`, `docs/qa/2026-10-03/`, `docs/native-mobile-test-suite.md` | [Current Verification and Evaluation](./Verification%20and%20Evaluation.md); [native validation suite](../docs/native-mobile-test-suite.md); [historical QA report](./QA%20Verification%20Report%202026-09-28.md) |
 | Decisions and cleanup history | `Project Guidelines/` | [Decisions and Handover](./Decisions%20and%20Handover.md), [Architecture and Operations](./Architecture%20and%20Operations.md#repository-layout-and-cleanup) |
 
 ## Historical module notes
@@ -1328,12 +1329,12 @@ This file retains the historical module notes relocated from the repository root
 
 # Module / File: scripts/render-splash-icon.mjs
 ## Function: module initialization
-- **Purpose**: Deterministically rasterize the exact Figma Home SVG geometry into Expo's source splash PNG.
+- **Purpose**: Deterministically rasterize the canonical MoneyMap Donut Mark SVG into Expo's source splash and launcher PNG.
 - **Inputs**:
-  - `assets/icons/home.svg` (`UTF-8 SVG`): Committed source geometry and neutral design stroke.
+  - `assets/icons/app-icon-donut.svg` (`UTF-8 SVG`): Canonical Donut Mark source geometry without background rect.
 - **Outputs**: `assets/splash-icon.png`, a transparent 384 by 384 PNG.
 - **Dependencies**: Node path/file APIs and development-only Sharp 0.35.3.
-- **Behavior**: Resolves repository paths from the module URL, reads the SVG, substitutes the MoneyMap primary color, rasterizes at high density, resizes with contain semantics, and writes PNG output.
+- **Behavior**: Resolves repository paths from the module URL, reads the SVG, strips the background rect to ensure transparency across light and dark splash surfaces, rasterizes at high density, resizes with contain semantics, and writes PNG output.
 - **Side Effects**: Replaces only the generated splash PNG when the npm asset script runs.
 - **DSA Used**: O(n + p) time for `n` SVG bytes and `p` output pixels; O(n + p) temporary memory in the rasterizer.
 - **Data Analysis Notes**: Repeated generation from identical input produces the same SHA-256 hash.
@@ -2261,4 +2262,3 @@ This section updates the prototype parity and test verification status:
 - Automated test coverage: 27 test suites passed, 165 total tests passed (including comprehensive `e2eVerification.test.js` validating all backend algorithmic pipelines, money precision, and database schemas).
 - Static UI fidelity verified: Zero hexadecimal color literals across all 37 UI components and screen files (enforcing strict `theme.colors.*` token consumption).
 - Continuity source: [Decisions and Handover](./Decisions%20and%20Handover.md).
-

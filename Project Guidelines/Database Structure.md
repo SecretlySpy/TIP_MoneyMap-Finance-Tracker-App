@@ -1,6 +1,6 @@
 # Database Structure
 
-Updated: 2026-10-03
+Updated: 2026-10-04
 Engine: SQLite via OP-SQLite with SQLCipher; schema version 7
 
 ## Data model
@@ -68,6 +68,10 @@ replaced by undo, as disclosed in its confirmation copy. This is local recovery,
 cross-device sync; at-rest encryption on the native target still needs device verification.
 
 - SQLCipher keys are generated separately from App Lock PIN material and stored through SecureStore.
+- PIN replacement never migrates or rekeys SQLCipher. Destructive local reset is the only forgotten-PIN
+  fallback without native verification: it clears cached finance state, checkpoints/deletes the internal
+  database before its key, and uses a persisted pending marker so startup can finish an interrupted reset.
+  User-exported backup files outside the app sandbox are not deleted.
 - Android automatic backup is disabled; explicit app backup/export is the supported recovery path.
 - Foreign keys, `STRICT` tables, WAL, `synchronous=FULL`, and `foreign_key_check` protect local integrity.
 - There is no remote database. Import files and exports are user-selected local/share artifacts.

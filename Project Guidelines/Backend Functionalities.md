@@ -18,7 +18,7 @@ still requires an installed development build to verify.
 | Recurring catch-up | Pure planner → idempotent repository writes | Existing scheduled posts are skipped; next run advances after processing |
 | Reminders | Expo local notifications | Permission/scheduling failure is surfaced locally; finance data remains intact |
 | Backup/export | Local file/share services | Export failure does not mutate the database; restore validates first and captures one pre-restore snapshot in the database for a single-use undo |
-| App Lock preferences | SecureStore preference result + stored PIN → root gate | Missing, invalid, or unreadable preferences with an existing PIN fail closed to the PIN screen; successful PIN verification attempts to rewrite secure defaults |
+| App Lock and recovery | SecureStore preference/PIN result + native device authentication → locked-only root | Missing, invalid, or unreadable lock state fails closed. A short-lived native-auth grant can replace only the app PIN; destructive fallback uses a pending marker and never unlocks the old ledger |
 
 Onboarding draft data is deliberately small and contains unfinished form state only. Authoritative accounts
 and transactions remain in SQLite. Unreadable or unsupported drafts are preserved and not overwritten;
@@ -54,7 +54,9 @@ credentials, rate limits, network variability, and production responses were not
 
 ## Authentication and authorization
 
-There is no account authentication. Optional PIN/biometric App Lock is a local access gate, not identity or
-authorization for a backend. Its PIN-derived verifier is separate from the SQLCipher key. The root navigator
-mounts only the lock shell while locked, but PIN, biometric, SecureStore, and background/relaunch behavior on
-a native Android device remain **UNVERIFIED**.
+There is no account authentication. Optional PIN/biometric App Lock is a local access gate, not backend
+authorization. Its PIN verifier is separate from the SQLCipher key. Forgotten-PIN recovery delegates to
+platform device security, stores only an expiring in-memory grant, replaces the PIN atomically, and never
+reads or regenerates the database key. The locked root mounts only App Lock and PIN Recovery. API 35 emulator
+smoke verified locked startup/resume and the unavailable-auth/reset-warning path; enrolled native success,
+real deletion/interruption, physical hardware, and tablet behavior remain **UNVERIFIED**.
