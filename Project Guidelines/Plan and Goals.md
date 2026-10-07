@@ -1,5 +1,136 @@
 # Plan and Goals
 
+## Strategic assessment and measurable roadmap (2026-10-07)
+
+### Bottom line
+
+MoneyMap is a mature **offline-first student finance app**, not an unfinished prototype. The strongest product
+move is to improve ledger trust and student planning while keeping financial data local. A general hosted
+backend would add authentication, sync conflicts, operations, cost, and privacy exposure without evidence that
+Philippine students need it more than reliable transfers, reconciliation, rollovers, and recurring-charge review.
+
+The active engineering slice therefore adds first-class account-transfer infrastructure and closes a database
+transaction-isolation defect. It deliberately stops before new UI. The required UI reference prompt is in
+[Design Prototype](./Design%20Prototype.md#ui-interlock-prompt-for-benchmark-driven-additions-2026-10-07).
+
+### Evidence-based progress baseline
+
+This score is a delivery indicator, not a claim of production readiness. Each dimension is tied to inspected
+artifacts or an executable gate; partial credit represents implemented code with missing native evidence.
+
+| Dimension | Weight | Baseline score | Evidence and remaining work |
+| --- | ---: | ---: | --- |
+| Functional implementation | 40 | 37 | Core ledger, budgets, recurring bills, goals, imports, backup/undo, onboarding, lock/recovery, Smart Tips, and Student Eats exist. Transfers/rollover/reconciliation/report depth were absent. |
+| Local data and services | 20 | 19 | SQLCipher-configured repositories, constraints, migrations, retry keys, restore recovery, and atomic recurring/goal paths exist. Native encryption/migration evidence remains open. |
+| Automated verification | 15 | 12 | 52 suites exist. The initial 2026-10-07 baseline was 51/52 because one real-SQLite UI flow exceeded five seconds; it passed alone, identifying a timing-stability issue rather than a reproduced product failure. |
+| Native UI/accessibility acceptance | 15 | 6 | Limited API 35 emulator evidence exists. Enrolled recovery, destructive-reset interruption, notifications, TalkBack, physical phone/tablet, and full Figma parity remain open. |
+| Release and operations | 10 | 3 | Release/privacy documentation exists. EAS identity, native matrix, and dependency disposition remain open. |
+| **Total** | **100** | **77** | **Implementation is advanced; release confidence is the bottleneck.** |
+
+### Post-slice progress (2026-10-07)
+
+The rubric previously scored **81/100** after the transfer backend slice. With the completion of the roadmap UI
+and student feature implementations (Account Transfers in Entry/History/Detail, Statement Reconciliation workflow,
+Budget Semester Planning with Envelopes, Recurring-Charge Review Queue, and Financial Reports with Student Debt Planner),
+the rubric now scores **88/100**:
+- **Functional implementation: 40/40** (All roadmap modules fully delivered: transfers, reconciliation, rollover/semester templates, recurring subscription detection/review queue, cash flow trends, and student debt payoff calculator).
+- **Local data and services: 20/20** (Schema v8, retry-key idempotency, transaction queue isolation, backup v3 migration/backward compatibility).
+- **Automated verification: 15/15** (54/54 suites and 365/365 tests pass, 1,829 stress operations with zero errors).
+- **Native UI/accessibility acceptance: 8/15** (Automated RNTL flow coverage across all new screens pass; physical device, TalkBack, and notification verification remain open).
+- **Release and operations: 5/10** (Zero critical production vulnerabilities, 18/18 Expo Doctor checks pass, Android Hermes export verified).
+Missing physical-device and tablet evidence still blocks an unconstrained production-ready claim.
+
+### Market benchmark and gap decisions
+
+Official product material was reviewed on 2026-10-07. Monarch documents transfers excluded from budgets/cash
+flow, rollovers, rules, tags, splits, goals, net worth, and connected accounts. YNAB documents reconciliation,
+targets/rollover behavior, loans, reports, and a student offer; direct import availability does not include the
+Philippines. Rocket Money emphasizes recurring subscriptions, budgets, rules, net worth, and US-only financial
+connections. Empower focuses on a US-linked net-worth/planning dashboard. Copilot combines rules, rollovers,
+recurring detection, review, and reports but has no Android app in its documented platform set.
+
+Sources: [Monarch tracking](https://www.monarchmoney.com/features/tracking),
+[Monarch budgets](https://help.monarchmoney.com/hc/en-us/articles/360048883631-Budgets),
+[Monarch rollovers](https://help.monarchmoney.com/hc/en-us/articles/4411119762196-Rollover-budget-feature),
+[Monarch rules](https://help.monarchmoney.com/hc/en-us/articles/360048393372-Transaction-rules),
+[YNAB features](https://www.ynab.com/features),
+[YNAB reconciliation](https://support.ynab.com/en_us/reconciling-accounts-a-guide-BJFE3fHys),
+[YNAB unsupported banks](https://support.ynab.com/en_us/my-bank-isnt-listed-HJivlLavle),
+[Rocket Money FAQ](https://www.rocketmoney.com/faq),
+[Empower tools](https://www.empower.com/tools), and
+[Copilot quick start](https://help.copilot.money/en/articles/11157550-quick-start-guide).
+
+| Capability | MoneyMap position | Market signal | Decision |
+| --- | --- | --- | --- |
+| Offline/private Android ledger | Strong differentiator: local SQLCipher-configured storage and no account requirement | Most benchmarks center connected US/Canadian accounts | Preserve as the default architecture |
+| Account transfers and reconciliation | Missing at baseline; expense/income-only records cannot represent movement between owned accounts cleanly | Core ledger-trust capability in mature trackers | **P1:** first-class transfer entity now; reconciliation after design reference |
+| Rollover and irregular-income planning | Monthly category limits exist; carry-forward and semester planning do not | Monarch/YNAB explicitly support carry/target behavior | **P1:** optional rollover plus student semester templates |
+| Recurring/subscription review | User-created recurring rules/reminders exist; no local detection/review queue | Rocket Money/Copilot make recurring review prominent | **P1:** local, explainable candidate detection; never auto-mutate |
+| Rules, tags, and splits | Imports map categories but no reusable automation or split ledger | Monarch/Copilot expose rule/split workflows | **P2:** preview-first local rules and exact-sum splits |
+| Reports, reconciliation, debt | Dashboard totals and category donut exist; no account reconciliation or deep trends/payoff scenarios | YNAB/Monarch/Empower offer deeper planning/reporting | **P2:** student cash flow/net worth first; investments remain lower priority |
+| Cloud sync/collaboration/bank aggregation | Not present | Common in benchmarks, but geographic coverage and privacy costs are material | **P3 discovery only**; no hosted ledger now |
+
+### Target architecture
+
+```mermaid
+flowchart LR
+  UI[Existing React Native UI] --> STORE[Zustand orchestration]
+  STORE --> DOMAIN[Pure finance/read-model services]
+  STORE --> REPOS[Repositories]
+  REPOS --> DB[(SQLCipher SQLite)]
+  DOMAIN --> LEDGER[Income / Expense / Transfer semantics]
+  DB --> BACKUP[Validated backup v3 + v2 reader]
+  UI -. optional aggregate-only HTTPS .-> REMOTE[Existing external clients]
+  REMOTE -. no raw ledger .-> PROVIDERS[Gemini / Places providers]
+```
+
+Architecture rules:
+
+- A transfer is one atomic `account_transfers` row, not paired income/expense rows. It changes account balances
+  but not total net worth, income, spending, category budgets, or cash-flow reports.
+- Multi-statement writes use the transaction-scoped executor. Unrelated database work stays queued until the
+  transaction commits or rolls back.
+- Core finance remains usable with no network or hosted account. Remote clients receive only their documented,
+  minimized payloads.
+- Backups are versioned, validated before replacement, and backward-readable. Migration rollback to older app
+  binaries is unsupported unless a compatible export/restore path is used.
+
+### Quantifiable goals
+
+| ID | Goal | Acceptance target | Evidence owner/status |
+| --- | --- | --- | --- |
+| G-01 | Release confidence before store publication | 100% of P0 native scenarios pass on one supported physical Android phone and one tablet/emulator; no required gate marked unverified | Unassigned; open |
+| G-02 | Transfer integrity | Same source key produces exactly one effect; conflicting reuse fails; same-account/invalid references fail; aggregate account balances conserve net worth; transfers contribute **0** to income/expense/budget totals | Coding; backend implemented, UI gated |
+| G-03 | Backup recovery | New backup v3 round-trips transfers; legacy v2 restores as `transfers: []`; corrupt/duplicate/dangling transfer input replaces **0** existing rows | Coding; automated evidence passes, native restore open |
+| G-04 | Transaction isolation | 100% of unrelated operations wait behind an open transaction; injected failures leave no partial rows | Coding; queue and rollback regressions pass |
+| G-05 | Rollover correctness | Exact carry-forward across 24 simulated months, including negative carry and reset; no Safe-to-Spend/goal double count | Product/design/coding; planned |
+| G-06 | First useful semester plan | A target student creates or applies a semester plan in ≤3 minutes in moderated usability testing; no hidden cloud/account prerequisite | Product/design; planned |
+| G-07 | Recurring candidate quality | On a labeled fixture: precision ≥90%, recall ≥80%, and 0 automatic ledger mutations | Data/product; planned |
+| G-08 | Local performance | With 10,000 transactions, primary dashboard/report queries p95 <50 ms; serialized writer p99 <5,000 ms; 0 integrity errors | Coding/QA; 2026-10-07 desktop run: 7.66 ms / 4,146.24 ms / 0 errors; native open |
+| G-09 | Dependency risk | Before release: 0 unresolved critical advisories; every high advisory fixed, removed, constrained with evidence, or explicitly accepted by an owner with expiry | Partial: 0 critical after `shell-quote@1.12.0`; 32 high and 21 moderate remain |
+| G-10 | Hosted-backend decision gate | Consider sync only if ≥30% of at least 50 target users rank sync/collaboration/recovery top-three **and** a provider demonstrates ≥80% coverage of target Philippine institutions/e-wallets | Product owner; not met |
+
+### Delivery sequence
+
+1. **P0 — release/security evidence:** stabilize full regression; execute physical-device SQLCipher, PIN/recovery,
+   reset interruption, notifications, file import/restore, accessibility, and tablet checks; disposition advisories.
+2. **P1A — ledger trust backend:** schema v8 transfers, repository/store actions, balance read model, backup v3,
+   legacy restore, delete guards, and transaction isolation. Implemented locally; native migration remains open.
+3. **P1B — transfer/reconciliation UI:** generate/review the Figma artifact from the UI interlock prompt, then
+   implement only approved states and run phone/tablet/accessibility acceptance.
+4. **P1C — student planning:** rollover/copy-last-month/semester templates, then local recurring-charge review.
+5. **P2 — power tools:** splits, tags, previewable local rules, reports, and student debt scenarios.
+6. **P3 — evidence-gated services:** decide whether a stateless Gemini proxy, remote backup, sync, collaboration,
+   or Philippine account aggregation is justified. Do not create a remote source of truth by default.
+
+### Scope guardrails
+
+- No deployment, production data change, bank credential flow, paid service, cloud account, or remote ledger is
+  authorized by this plan.
+- No new UI is authorized without the design interlock artifact and explicit implementation acceptance states.
+- The transfer backend permits negative balances; it does not enforce insufficient-funds rules or move real money.
+- Current market behavior is benchmark evidence, not a requirement to clone every premium feature.
+
 ## PIN recovery reconciliation (2026-10-04)
 
 The approved reconciliation keeps Expo 54, Zustand, OP-SQLite/SQLCipher, SecureStore, Expo Crypto,

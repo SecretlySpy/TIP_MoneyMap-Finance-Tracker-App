@@ -16,7 +16,6 @@ export class OpSqliteDatabase {
         this.database = database;
         this.executor = new OpSqliteExecutor(database.execute.bind(database));
         this.queue = Promise.resolve();
-        this.inTransaction = false;
     }
     enqueue(work) {
         const pending = this.queue.then(work, work);
@@ -24,22 +23,14 @@ export class OpSqliteDatabase {
         return pending;
     }
     execute(query, parameters = []) {
-        if (this.inTransaction) {
-            return this.executor.execute(query, parameters);
-        }
         return this.enqueue(() => this.executor.execute(query, parameters));
     }
     async transaction(work) {
         return this.enqueue(async () => {
-            this.inTransaction = true;
-            try {
-                await this.database.transaction(async (transaction) => {
-                    const executor = new OpSqliteExecutor(transaction.execute.bind(transaction));
-                    await work(executor);
-                });
-            } finally {
-                this.inTransaction = false;
-            }
+            await this.database.transaction(async (transaction) => {
+                const executor = new OpSqliteExecutor(transaction.execute.bind(transaction));
+                await work(executor);
+            });
         });
     }
     close() {

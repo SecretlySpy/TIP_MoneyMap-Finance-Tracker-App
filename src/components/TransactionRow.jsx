@@ -35,7 +35,7 @@ export function TransactionRow({ amountMinor, compact = false, emoji, meta, titl
                 </Text>
             </View>
             <Text style={{
-                color: type === "EXPENSE" ? theme.colors.expense : theme.colors.income,
+                color: type === "EXPENSE" ? theme.colors.expense : type === "INCOME" ? theme.colors.income : theme.colors.text,
                 fontFamily: theme.fonts.bold,
                 fontSize: theme.typeScale.body,
             }}>

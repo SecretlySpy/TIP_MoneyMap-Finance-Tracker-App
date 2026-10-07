@@ -17,6 +17,7 @@ import {
   parseLocalDateToNoonEpoch,
 } from "../domain/services/emoji";
 import { buildRecurringBills, categoriesForType, nextReminderPreview } from "../domain/services/financeView";
+import { detectRecurringCandidates } from "../domain/services/recurringDetection";
 import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -31,6 +32,7 @@ export function RecurringScreen({ navigation }) {
   const categories = useFinanceStore((state) => state.categories);
   const accounts = useFinanceStore((state) => state.accounts);
   const recurringRules = useFinanceStore((state) => state.recurringRules);
+  const transactions = useFinanceStore((state) => state.transactions);
   const addRecurringBill = useFinanceStore((state) => state.addRecurringBill);
   const updateRecurringRule = useFinanceStore((state) => state.updateRecurringRule);
   const deleteRecurringById = useFinanceStore((state) => state.deleteRecurringById);
@@ -50,6 +52,7 @@ export function RecurringScreen({ navigation }) {
   const [draftAccountId, setDraftAccountId] = useState(null);
 
   const [activeBillId, setActiveBillId] = useState(null);
+  const [dismissedKeys, setDismissedKeys] = useState([]);
 
   const { categoriesById, accountsById } = useMemo(
     () => mapsFromState({ accounts, categories }),
@@ -58,6 +61,10 @@ export function RecurringScreen({ navigation }) {
   const bills = useMemo(
     () => buildRecurringBills(recurringRules, categoriesById, accountsById),
     [recurringRules, categoriesById, accountsById],
+  );
+  const candidates = useMemo(
+    () => detectRecurringCandidates({ transactions, recurringRules, dismissedKeys }),
+    [transactions, recurringRules, dismissedKeys]
   );
   const reminder = useMemo(() => nextReminderPreview(bills), [bills]);
 
@@ -320,6 +327,86 @@ export function RecurringScreen({ navigation }) {
               {reminder.dueLabel}
             </Text>
           </View>
+        </View>
+      ) : null}
+
+      {candidates.length > 0 ? (
+        <View style={{ gap: theme.spacing.sm }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+              Detected Subscriptions ({candidates.length})
+            </Text>
+            <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
+              Local review queue
+            </Text>
+          </View>
+          {candidates.map((c) => (
+            <View
+              key={c.key}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.outline,
+                borderRadius: theme.radii.card,
+                borderWidth: 1,
+                gap: theme.spacing.sm,
+                padding: theme.spacing.md,
+              }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                    {c.merchant}
+                  </Text>
+                  <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
+                    {c.confidenceExplanation}
+                  </Text>
+                </View>
+                <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                  {formatMinor(c.latestAmountMinor, { currencySymbol })}
+                </Text>
+              </View>
+              {c.hasPriceChange ? (
+                <View style={{ backgroundColor: theme.colors.tint, borderRadius: theme.radii.chip, padding: theme.spacing.xs }}>
+                  <Text style={{ color: theme.colors.primary, fontSize: theme.typeScale.tiny, fontFamily: theme.fonts.bold }}>
+                    ⚠️ Price changed: recently {formatMinor(c.latestAmountMinor, { currencySymbol })} vs usual {formatMinor(c.usualAmountMinor, { currencySymbol })}
+                  </Text>
+                </View>
+              ) : null}
+              <View style={{ flexDirection: "row", gap: theme.spacing.md, justifyContent: "flex-end", alignItems: "center" }}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setDismissedKeys((prev) => [...prev, c.key])}
+                  style={{ paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.xs }}
+                >
+                  <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                    Dismiss
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setDraftName(c.merchant);
+                    setDraftAmountText((c.latestAmountMinor / 100).toFixed(2));
+                    setDraftFrequency(c.frequency);
+                    if (c.accountId) setDraftAccountId(String(c.accountId));
+                    setIsAddOpen(true);
+                  }}
+                  style={{
+                    backgroundColor: theme.colors.tint,
+                    borderColor: theme.colors.primary,
+                    borderRadius: theme.radii.chip,
+                    borderWidth: 1,
+                    paddingHorizontal: theme.spacing.md,
+                    paddingVertical: theme.spacing.xs,
+                  }}
+                >
+                  <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                    Track as Bill
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
         </View>
       ) : null}
 

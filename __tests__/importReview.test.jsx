@@ -217,13 +217,15 @@ describe("Import review, duplicate detection, atomic commit, and rollback", () =
     await waitFor(() => screen.getByRole("button", { name: "Review import" }));
     await fireEvent.press(screen.getByRole("button", { name: "Review import" }));
 
-    // Inject database failure on import transaction insert in native SQLite
-    const origNativeExecute = native.execute.bind(native);
-    jest.spyOn(native, "execute").mockImplementation(async (sql, params) => {
+    // The transaction-scoped executor intentionally bypasses the public queued
+    // execute method. Inject at the native direct-execution boundary so the
+    // rollback contract remains exercised without weakening transaction isolation.
+    const origNativeExecuteDirect = native.executeDirect.bind(native);
+    jest.spyOn(native, "executeDirect").mockImplementation((sql, params) => {
       if (/^INSERT INTO transactions/.test(sql)) {
         throw new Error("simulated disk crash during bulk insert");
       }
-      return origNativeExecute(sql, params);
+      return origNativeExecuteDirect(sql, params);
     });
 
     await waitFor(() => screen.getByRole("button", { name: "Import 1 transaction" }));

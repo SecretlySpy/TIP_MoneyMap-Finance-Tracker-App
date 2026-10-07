@@ -1,13 +1,14 @@
-import { AccountRepository, BudgetRepository, CategoryRepository, RecurringRepository, TransactionRepository, } from "../src/db/repositories";
+import { AccountRepository, BudgetRepository, CategoryRepository, RecurringRepository, TransactionRepository, TransferRepository, } from "../src/db/repositories";
 import { migrateDatabase } from "../src/db/schema";
 import { TestSqliteDatabase } from "./support/testDatabase";
-describe("five-table repository CRUD contracts", () => {
+describe("finance repository CRUD contracts", () => {
     let database;
     let accounts;
     let budgets;
     let categories;
     let recurringRules;
     let transactions;
+    let transfers;
     beforeEach(async () => {
         database = new TestSqliteDatabase();
         await migrateDatabase(database);
@@ -16,6 +17,7 @@ describe("five-table repository CRUD contracts", () => {
         categories = new CategoryRepository(database);
         recurringRules = new RecurringRepository(database);
         transactions = new TransactionRepository(database);
+        transfers = new TransferRepository(database);
     });
     afterEach(() => {
         database.close();
@@ -113,6 +115,41 @@ describe("five-table repository CRUD contracts", () => {
         delete withoutNote.note;
         const firstWithoutNote = await transactions.create(withoutNote);
         await expect(transactions.create(withoutNote)).resolves.toMatchObject({ id: firstWithoutNote.id, note: null });
+    });
+    test("creates an idempotent account transfer without recording income or expense", async () => {
+        const cash = (await accounts.list())[0];
+        const card = await accounts.create({
+            name: "Student card",
+            type: "CARD",
+            startingBalanceMinor: -50_000,
+            isArchived: false,
+        });
+        const payload = {
+            amountMinor: 10_000,
+            fromAccountId: cash.id,
+            toAccountId: card.id,
+            dateEpochMillis: 1_785_542_400_000,
+            note: "Card payment",
+            sourceKey: "manual-transfer:v1:test-retry",
+        };
+        const created = await transfers.create(payload);
+        expect(await transfers.create(payload)).toEqual(created);
+        expect(await transactions.list()).toHaveLength(0);
+        expect(await transfers.list()).toEqual([created]);
+        await expect(transfers.create({ ...payload, amountMinor: 10_001 })).rejects.toThrow("different financial effect");
+
+        await accounts.update(card.id, { isArchived: true });
+        await expect(transfers.create(payload)).resolves.toEqual(created);
+        await expect(transfers.create({ ...payload, sourceKey: "manual-transfer:v1:archived" }))
+            .rejects.toThrow("active accounts");
+        await accounts.update(card.id, { isArchived: false });
+
+        const updated = await transfers.update(created.id, { amountMinor: 12_000, note: null });
+        expect(updated).toMatchObject({ amountMinor: 12_000, note: null });
+        await expect(transfers.create({ ...payload, fromAccountId: cash.id, toAccountId: cash.id }))
+            .rejects.toThrow("different accounts");
+
+        expect(await transfers.delete(created.id)).toBe(true);
     });
     test("creates, reads, updates, lists, and deletes a unique expense budget", async () => {
         const food = (await categories.list()).find(({ name, type }) => name === "Food" && type === "EXPENSE");

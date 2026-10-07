@@ -1,6 +1,68 @@
 # Design Prototype
 
-Updated: 2026-10-03
+Updated: 2026-10-07
+
+## UI interlock prompt for benchmark-driven additions (2026-10-07)
+
+The schema/repository layer may support account transfers without a new visual surface. No transfer,
+reconciliation, rollover, subscription-review, or reporting screen/component should be implemented until a
+design produced from the prompt below has exact frame/node IDs and has been reviewed against the current
+MoneyMap component system.
+
+> Extend the existing **MoneyMap — Finance Tracker** Figma file on a new page named
+> **MoneyMap — Strategy 100726**. Preserve the existing visual identity, Roboto typography, semantic light/dark
+> tokens, rounded cards/sheets, spacing rhythm, student-friendly offline voice, and current navigation model.
+> Design paired Android phone **412×892** and tablet **834×1194** states; use responsive reflow rather than a
+> desktop redesign. Do not add login, bank linking, cloud sync, household sharing, investment trading, or
+> remote-finance storage.
+>
+> **1. Account transfer flow.** Extend Add Transaction with a clearly distinct Transfer mode that never reads as
+> income or expense. Include From account, To account, swap action, amount, local-noon date picker, optional
+> note, current-balance context, post-transfer balance preview, and Save. Design default, focused, partially
+> complete, loading, saved, retry-safe saved, database-error, fewer-than-two-active-accounts, archived-account,
+> same-account, invalid/zero amount, and safe-integer/range error states. Negative destination/source balances
+> are allowed and must be explained rather than blocked. Show transfer rows in History with directional copy
+> (for example, “Cash → Student Card”), neutral styling, account filters, detail, edit, and deliberate delete
+> confirmation. Transfers must be excluded from income, spending, budget, and cash-flow totals.
+>
+> **2. Account balance and reconciliation flow.** Add an account-detail entry point from Manage Accounts. Show
+> opening balance, cleared balance, working balance, inflows, outflows, inbound/outbound transfers, and last
+> reconciled date. Design a reconciliation sheet with statement date/balance, a transaction checklist,
+> cleared/uncleared states, live difference, “balanced” success, discrepancy explanation, cancel/resume, and an
+> optional adjustment transaction that requires explicit confirmation and names its effect. Include empty
+> account, negative card balance/debt, stale statement, unmatched imported row, and interrupted-save states.
+>
+> **3. Budget rollover and semester funds.** Add a per-category rollover control and a semester-plan setup flow.
+> Show the formula `prior carry + this month plan − actual = next carry`, including positive and negative carry,
+> first-month starting balance, toggle-off consequences, copy-last-month, and reset. Provide templates for
+> tuition, books/supplies, transport, food, mobile load/data, rent/boarding, and emergency buffer. Show how
+> rollovers interact with Safe-to-Spend and savings goals without double counting. Include 24-month boundary,
+> overspent, no-prior-budget, and edited-past-month states.
+>
+> **4. Recurring-charge review center.** Design a local-only review queue for likely recurring transactions.
+> Each candidate needs merchant/note, account, usual amount/range, cadence, confidence explanation in plain
+> language, last/next expected date, confirm, dismiss, edit, and reminder controls. Include price-change warning,
+> missed expected charge, duplicate candidate, insufficient-history, all-reviewed empty, and offline states.
+> Detection must never create or modify a ledger row without user confirmation.
+>
+> **5. Reports and student debt views.** Design cash-flow and net-worth trend views with month/semester range,
+> category/account filters, accessible chart alternatives, exact totals, empty/partial data, and an explanatory
+> “Transfers excluded” note. Add a lightweight debt-payoff scenario for credit cards, BNPL, or student loans;
+> label projections as estimates and keep them separate from recorded ledger facts.
+>
+> **Shared requirements.** Reuse or extend `ScreenContainer`, `SectionCard`, `BottomSheet`, `CalendarPickerSheet`,
+> `MonthChip`, `TransactionRow`, `Chip`, `Toggle`, `ProgressBar`, `EmptyState`, and existing semantic tokens before
+> inventing components. Define every new component and variant with exact names, dimensions, padding, typography,
+> colors/tokens, icons, elevation, pressed/disabled/focus/error states, and phone/tablet behavior. Include loading,
+> empty, success, offline, validation, retry, and destructive-confirmation states. Maintain at least **44 dp** touch
+> targets, logical TalkBack order, explicit accessibility labels/hints, non-color status cues, large-text reflow,
+> keyboard-safe sheets/forms, visible focus, reduced-motion behavior, and WCAG AA text contrast. Use realistic
+> Philippine peso student data without exposing personal data or inventing claims.
+>
+> **Handoff output.** Return a frame inventory, stable page/frame/node IDs, component/variant inventory, token
+> mapping, interaction/prototype links, copy deck, redlines, responsive annotations, accessibility annotations,
+> data dependencies, and a state-to-acceptance matrix. Clearly label observed reuse versus proposed design.
+> Do not claim implementation or parity; this artifact is the prerequisite design reference for coding.
 
 ## Source of truth and evidence boundary
 

@@ -61,7 +61,43 @@ export function transactionInMonth(transaction, monthYear) {
     const date = new Date(transaction.dateEpochMillis);
     return toMonthYear(date) === monthYear;
 }
-export function computeDashboardTotals(accounts, transactions, monthYear) {
+
+function addAccountBalance(balancesById, accountId, deltaMinor) {
+    if (!balancesById.has(accountId)) {
+        return;
+    }
+    const next = balancesById.get(accountId) + deltaMinor;
+    if (!Number.isSafeInteger(next)) {
+        throw new RangeError("An account balance exceeds JavaScript's safe integer range.");
+    }
+    balancesById.set(accountId, next);
+}
+
+export function computeAccountBalances(accounts, transactions, transfers = []) {
+    const balancesById = new Map(
+        accounts.map((account) => [account.id, account.startingBalanceMinor]),
+    );
+    for (const transaction of transactions) {
+        addAccountBalance(
+            balancesById,
+            transaction.accountId,
+            transaction.type === "INCOME" ? transaction.amountMinor : -transaction.amountMinor,
+        );
+    }
+    for (const transfer of transfers) {
+        if (!balancesById.has(transfer.fromAccountId) || !balancesById.has(transfer.toAccountId)) {
+            throw new Error("An account transfer references an unknown account.");
+        }
+        addAccountBalance(balancesById, transfer.fromAccountId, -transfer.amountMinor);
+        addAccountBalance(balancesById, transfer.toAccountId, transfer.amountMinor);
+    }
+    return accounts.map((account) => ({
+        ...account,
+        balanceMinor: balancesById.get(account.id),
+    }));
+}
+
+export function computeDashboardTotals(accounts, transactions, monthYear, transfers = []) {
     const activeAccountIds = new Set(accounts
         .filter((account) => !account.isArchived)
         .map((account) => account.id));
@@ -95,13 +131,42 @@ export function computeDashboardTotals(accounts, transactions, monthYear) {
             }
         }
     }
+    let activeTransferAdjustment = 0;
+    for (const transfer of transfers) {
+        const fromIsActive = activeAccountIds.has(transfer.fromAccountId);
+        const toIsActive = activeAccountIds.has(transfer.toAccountId);
+        if (fromIsActive && !toIsActive) {
+            activeTransferAdjustment -= transfer.amountMinor;
+        }
+        else if (!fromIsActive && toIsActive) {
+            activeTransferAdjustment += transfer.amountMinor;
+        }
+    }
     return {
-        balanceMinor: starting + lifetimeIncome - lifetimeExpense,
+        balanceMinor: starting + lifetimeIncome - lifetimeExpense + activeTransferAdjustment,
         expenseMinor: monthExpense,
         incomeMinor: monthIncome,
     };
 }
 export function buildUiTransaction(transaction, categoriesById, accountsById) {
+    if (transaction.type === "TRANSFER") {
+        const fromAccount = accountsById.get(transaction.fromAccountId);
+        const toAccount = accountsById.get(transaction.toAccountId);
+        const fromName = fromAccount?.name ?? "Account";
+        const toName = toAccount?.name ?? "Account";
+        const title = transaction.note?.trim() || `${fromName} → ${toName}`;
+        return {
+            id: String(transaction.id),
+            amountMinor: transaction.amountMinor,
+            emoji: "⇄",
+            meta: `${fromName} → ${toName}`,
+            title,
+            type: "TRANSFER",
+            transferId: transaction.id,
+            fromAccountId: transaction.fromAccountId,
+            toAccountId: transaction.toAccountId,
+        };
+    }
     const category = categoriesById.get(transaction.categoryId);
     const account = accountsById.get(transaction.accountId);
     const categoryName = category?.name ?? "Other";
@@ -243,8 +308,12 @@ function historyGroupLabel(dayStart, now = new Date()) {
     }
     return `${month} ${day}`;
 }
-export function groupHistory(transactions, categoriesById, accountsById, monthYear, now = new Date()) {
-    const filtered = transactions
+export function groupHistory(transactions, categoriesById, accountsById, monthYear, now = new Date(), transfers = []) {
+    const combined = [
+        ...transactions,
+        ...transfers.map((t) => ({ ...t, type: "TRANSFER" })),
+    ];
+    const filtered = combined
         .filter((transaction) => transactionInMonth(transaction, monthYear))
         .sort((left, right) => right.dateEpochMillis - left.dateEpochMillis);
     const groups = new Map();

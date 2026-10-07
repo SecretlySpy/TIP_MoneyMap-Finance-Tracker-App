@@ -88,6 +88,8 @@ export function HistoryScreen({ navigation }) {
   const transactions = useFinanceStore((state) => state.transactions);
   const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
   const deleteTransactionById = useFinanceStore((state) => state.deleteTransactionById);
+  const transfers = useFinanceStore((state) => state.transfers);
+  const deleteAccountTransferById = useFinanceStore((state) => state.deleteAccountTransferById);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -126,9 +128,32 @@ export function HistoryScreen({ navigation }) {
     });
   }, [transactions, searchQuery, categoryFilter, accountFilter, categoriesById, accountsById]);
 
+  const filteredTransfers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return transfers.filter((transfer) => {
+      if (categoryFilter !== null) {
+        return false;
+      }
+      if (accountFilter !== null) {
+        if (transfer.fromAccountId !== accountFilter && transfer.toAccountId !== accountFilter) {
+          return false;
+        }
+      }
+      if (q.length > 0) {
+        const noteText = (transfer.note ?? "").toLowerCase();
+        const fromAccountName = (accountsById.get(transfer.fromAccountId)?.name ?? "").toLowerCase();
+        const toAccountName = (accountsById.get(transfer.toAccountId)?.name ?? "").toLowerCase();
+        if (!noteText.includes(q) && !fromAccountName.includes(q) && !toAccountName.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [transfers, searchQuery, categoryFilter, accountFilter, accountsById]);
+
   const groups = useMemo(
-    () => groupHistory(filteredTransactions, categoriesById, accountsById, selectedMonthYear),
-    [filteredTransactions, categoriesById, accountsById, selectedMonthYear],
+    () => groupHistory(filteredTransactions, categoriesById, accountsById, selectedMonthYear, undefined, filteredTransfers),
+    [filteredTransactions, categoriesById, accountsById, selectedMonthYear, filteredTransfers],
   );
 
   const totalMatchingCount = useMemo(
@@ -353,6 +378,26 @@ export function HistoryScreen({ navigation }) {
         onClearFilters={clearFilters}
         onClearSearch={clearSearch}
         onDeleteTransaction={(transaction) => {
+          if (transaction.type === "TRANSFER" || transaction.transferId) {
+            const transferId = Number(transaction.transferId ?? transaction.id);
+            Alert.alert(
+              "Delete transfer?",
+              "Balances will be reverted across both accounts.",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: () => {
+                    void deleteAccountTransferById(transferId).catch((error) => {
+                      Alert.alert("Delete failed", error instanceof Error ? error.message : "Could not delete.");
+                    });
+                  },
+                },
+              ],
+            );
+            return;
+          }
           Alert.alert(
             transaction.title ?? "Transaction",
             "Delete this transaction? This cannot be undone.",
@@ -371,7 +416,14 @@ export function HistoryScreen({ navigation }) {
           );
         }}
         onSelectTransaction={(transaction) => {
-          navigation.navigate("TransactionDetail", { transactionId: Number(transaction.id) });
+          if (transaction.type === "TRANSFER" || transaction.transferId) {
+            navigation.navigate("TransactionDetail", {
+              isTransfer: true,
+              transferId: Number(transaction.transferId ?? transaction.id),
+            });
+          } else {
+            navigation.navigate("TransactionDetail", { transactionId: Number(transaction.id) });
+          }
         }}
         searchQuery={searchQuery}
         selectedMonthYear={selectedMonthYear}

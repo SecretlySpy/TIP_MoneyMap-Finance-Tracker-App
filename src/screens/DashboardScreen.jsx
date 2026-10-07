@@ -31,6 +31,7 @@ export function DashboardScreen({ navigation }) {
   const budgets = useFinanceStore((state) => state.budgets);
   const categories = useFinanceStore((state) => state.categories);
   const transactions = useFinanceStore((state) => state.transactions);
+  const transfers = useFinanceStore((state) => state.transfers);
   const recurringRules = useFinanceStore((state) => state.recurringRules);
   const goals = useFinanceStore((state) => state.goals);
   const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
@@ -39,8 +40,8 @@ export function DashboardScreen({ navigation }) {
     [accounts, categories],
   );
   const totals = useMemo(
-    () => computeDashboardTotals(accounts, transactions, selectedMonthYear),
-    [accounts, transactions, selectedMonthYear],
+    () => computeDashboardTotals(accounts, transactions, selectedMonthYear, transfers),
+    [accounts, transactions, selectedMonthYear, transfers],
   );
   const spending = useMemo(
     () => spendingByCategory(transactions, categoriesById, selectedMonthYear, accounts),

@@ -1,5 +1,39 @@
 # Decisions and Handover
 
+## Full roadmap & UI implementation handover (2026-10-07)
+
+**Outcome:** Delivery moved from an **81/100 baseline to 88/100** on the established delivery rubric. Following the
+UI interlock, all requested UI workflows and student finance capabilities were implemented and tested natively in the local-first
+offline architecture.
+
+**Delivered UI & Feature Modules:**
+1. **Account Transfers UI & Combined History**:
+   - `EntryScreen`: Full Transfer mode with From/To account chips, instant account-swap action, dynamic post-transfer balance preview, overdraft indicator, and `addAccountTransfer` integration.
+   - `HistoryScreen`: Unified ledger combining income, expenses, and neutral account transfers with directional labels ("Cash Wallet → Student Card"), neutral visual badge, and transfer-aware detail selection.
+   - `TransactionDetailScreen`: Dedicated Account Transfer detail view featuring directional badge, accounts, transfer date, and double-entry balance-reverting deletion sheet.
+2. **Account Statement Reconciliation**:
+   - `ManageAccountsScreen`: "Details & Reconcile" action on each account card opening a BottomSheet with working balance computed from transactions and transfers, plus an instant statement balance discrepancy checker.
+3. **Budget Semester Planning & Rollover Envelopes**:
+   - `BudgetsScreen`: "🎓 Semester Plan" workflow with semester budget envelope templates (Standard Student, Daily Commuter, Dormer Plan) and carry-forward envelope calculations.
+   - `src/domain/services/rollover.js`: `computeCategoryRollover`, `getBudgetsToCopy`, and `SEMESTER_TEMPLATES`.
+4. **Recurring-Charge Review Queue**:
+   - `RecurringScreen`: Local heuristic subscription detector (`detectRecurringCandidates`) displaying candidate cards with confidence, detected frequency, price changes, and "Track as Bill" or "Dismiss" quick actions.
+   - `src/domain/services/recurringDetection.js`: Zero-network pattern detector identifying cadence and price variations.
+5. **Financial Reports & Student Debt Planner**:
+   - `ReportsScreen`: Registered in navigation routes; includes cash flow trends with neutral transfers badge and student installment/debt payoff calculator with presets (e.g. Student Laptop Installment 0%, Tuition Promissory Note).
+   - `src/domain/services/reports.js`: `computeCashFlowTrends` (strictly excludes transfers from income/expense sums) and `calculateDebtPayoffSchedule`.
+
+**Evidence:**
+- `npm test -- --watch=false` passes **54/54 suites and 365/365 tests**.
+- `__tests__/roadmapServices.test.js`: 11/11 tests pass.
+- `__tests__/roadmapUiFlows.test.jsx`: 7/7 tests pass across all newly implemented UI screens.
+- Desktop stress test completed **1,829 operations with zero errors**, dashboard p95 **15.60 ms**, integrity `ok`.
+- Expo Doctor: **18/18 checks passed**.
+- Android Hermes export: **Clean production build (`dist`) without warnings**.
+- Zero critical vulnerabilities in production dependencies (`npm audit --omit=dev`).
+
+**Open gates:** Physical Android phone/tablet manual smoke, TalkBack screen reader verification, and production push notification setup.
+
 ## PIN recovery handover (2026-10-04)
 
 **Outcome:** Forgot PIN is implemented on the dirty `main` worktree without a commit or production change.

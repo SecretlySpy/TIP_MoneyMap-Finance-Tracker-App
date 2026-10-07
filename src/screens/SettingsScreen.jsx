@@ -90,6 +90,7 @@ export function SettingsScreen({ navigation }) {
     const accounts = useFinanceStore((state) => state.accounts);
     const categories = useFinanceStore((state) => state.categories);
     const transactions = useFinanceStore((state) => state.transactions);
+    const transfers = useFinanceStore((state) => state.transfers);
     const budgets = useFinanceStore((state) => state.budgets);
     const recurringRules = useFinanceStore((state) => state.recurringRules);
     const goals = useFinanceStore((state) => state.goals);
@@ -155,7 +156,7 @@ export function SettingsScreen({ navigation }) {
                     text: "Share Backup",
                     onPress: async () => {
                         try {
-                            const backup = buildBackup({ accounts, categories, transactions, budgets, recurringRules, goals });
+                            const backup = buildBackup({ accounts, categories, transactions, transfers, budgets, recurringRules, goals });
                             await shareDocument(
                                 "MoneyMap backup",
                                 exportFileName("moneymap-backup", "json"),
@@ -198,6 +199,7 @@ export function SettingsScreen({ navigation }) {
         <SettingsRow emoji="🎨" label="Theme" onPress={cycleThemePreference} subtitle="Light / Dark / System" trailing={valuePill(themeLabel)}/>
         <SettingsRow emoji="🗂️" label="Manage categories" onPress={() => navigation.navigate("ManageCategories")} trailing={trailingText("›")}/>
         <SettingsRow emoji="🏦" label="Manage accounts" onPress={() => navigation.navigate("ManageAccounts")} trailing={trailingText("›")}/>
+        <SettingsRow emoji="📈" label="Reports & debt tools" onPress={() => navigation.navigate("Reports")} trailing={trailingText("›")}/>
       </SettingsSection>
 
       <SettingsSection title="SMART FEATURES">

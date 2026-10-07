@@ -23,6 +23,7 @@ export function selectRootNavigationMode({ preferencesReady, hasSeenSplash, onbo
  * @property {undefined} Entry
  * @property {undefined} SmartTips
  * @property {undefined} StudentEats
+ * @property {undefined} Reports
  * @property {{ transactionId: number }} TransactionDetail
  * @property {{ transactionId: number }} EditTransaction
  *
@@ -44,6 +45,7 @@ export function selectRootNavigationMode({ preferencesReady, hasSeenSplash, onbo
  * @property {undefined} ManageCategories
  * @property {undefined} ManageAccounts
  * @property {undefined} Import
+ * @property {undefined} Reports
  * @property {{ mode: 'csv' | 'backup' }} PasteImport
  * @property {{ transactionId: number }} TransactionDetail
  * @property {{ transactionId: number }} EditTransaction

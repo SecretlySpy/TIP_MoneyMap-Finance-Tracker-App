@@ -24,6 +24,7 @@ describe("financeStore local reset", () => {
       recurringRules: [{ id: 5 }],
       status: "ready",
       transactions: [{ id: 6, note: "Sensitive note" }],
+      transfers: [{ id: 7, note: "Sensitive transfer note" }],
     });
   });
 
@@ -39,6 +40,7 @@ describe("financeStore local reset", () => {
       recurringRules: [],
       status: "idle",
       transactions: [],
+      transfers: [],
     });
   });
 
@@ -55,6 +57,7 @@ describe("financeStore local reset", () => {
       recurringRules: [],
       status: "error",
       transactions: [],
+      transfers: [],
     });
   });
 });

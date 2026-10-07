@@ -22,6 +22,7 @@ import { OnboardingScreen } from "../screens/OnboardingScreen";
 import { PasteImportScreen } from "../screens/PasteImportScreen";
 import { ImportScreen } from "../screens/ImportScreen";
 import { RecurringScreen } from "../screens/RecurringScreen";
+import { ReportsScreen } from "../screens/ReportsScreen";
 import { GoalsScreen } from "../screens/GoalsScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { SmartTipsScreen } from "../screens/SmartTipsScreen";
@@ -47,6 +48,7 @@ function HomeNavigator() {
       <HomeStack.Screen name="Entry" component={EntryScreen} options={{ animation: "slide_from_bottom" }}/>
       <HomeStack.Screen name="SmartTips" component={SmartTipsScreen}/>
       <HomeStack.Screen name="StudentEats" component={StudentEatsScreen}/>
+      <HomeStack.Screen name="Reports" component={ReportsScreen}/>
       <HomeStack.Screen name="TransactionDetail" component={TransactionDetailScreen}/>
       <HomeStack.Screen name="EditTransaction" component={EditTransactionScreen}/>
     </HomeStack.Navigator>);
@@ -80,6 +82,7 @@ function SettingsNavigator() {
       <SettingsStack.Screen name="ManageAccounts" component={ManageAccountsScreen}/>
       <SettingsStack.Screen name="PasteImport" component={PasteImportScreen}/>
       <SettingsStack.Screen name="Import" component={ImportScreen}/>
+      <SettingsStack.Screen name="Reports" component={ReportsScreen}/>
       <SettingsStack.Screen name="TransactionDetail" component={TransactionDetailScreen}/>
       <SettingsStack.Screen name="EditTransaction" component={EditTransactionScreen}/>
       <SettingsStack.Screen name="Splash" component={SplashScreen}/>

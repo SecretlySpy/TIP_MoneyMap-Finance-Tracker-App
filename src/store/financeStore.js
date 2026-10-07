@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { initializeDatabase } from "../db/client";
-import { AccountRepository, BudgetRepository, CategoryRepository, GoalRepository, RecurringRepository, TransactionRepository, } from "../db/repositories";
+import { AccountRepository, BudgetRepository, CategoryRepository, GoalRepository, RecurringRepository, TransactionRepository, TransferRepository, } from "../db/repositories";
 import { canArchiveAccount, canDeleteAccount, canDeleteCategory, canRenameCategory, } from "../domain/services/entityGuards";
 import { toMonthYear, } from "../domain/services/financeView";
 import { advanceNextRunEpochMillis } from "../domain/services/recurringCatchUp";
@@ -69,6 +69,7 @@ function repositories(database) {
         goals: new GoalRepository(database),
         recurring: new RecurringRepository(database),
         transactions: new TransactionRepository(database),
+        transfers: new TransferRepository(database),
     };
 }
 async function ensureDefaultAccounts(accountRepo) {
@@ -118,15 +119,16 @@ async function loadSnapshot(database) {
     // Defaults are a one-time bootstrap, not a repair loop. User archive/delete choices
     // and exact backup restores must survive every subsequent refresh.
     await ensureBootstrapDefaults(database);
-    const [accounts, categories, transactions, budgets, recurringRules, goals] = await Promise.all([
+    const [accounts, categories, transactions, transfers, budgets, recurringRules, goals] = await Promise.all([
         repos.accounts.list(),
         repos.categories.list(),
         repos.transactions.list(),
+        repos.transfers.list(),
         repos.budgets.list(),
         repos.recurring.list(),
         repos.goals.list(),
     ]);
-    return { accounts, categories, transactions, budgets, recurringRules, goals };
+    return { accounts, categories, transactions, transfers, budgets, recurringRules, goals };
 }
 function findCategory(categories, name, type) {
     const match = categories.find((category) => category.name.toLowerCase() === name.toLowerCase() && category.type === type);
@@ -161,6 +163,7 @@ export const useFinanceStore = create((set, get) => ({
     selectedMonthYear: toMonthYear(),
     status: "idle",
     transactions: [],
+    transfers: [],
     setSelectedMonthYear: (monthYear) => set({ selectedMonthYear: monthYear }),
     ensureHydrated: async () => {
         if (get().status === "ready" && databaseRef !== null) {
@@ -226,6 +229,7 @@ export const useFinanceStore = create((set, get) => ({
             selectedMonthYear: toMonthYear(),
             status: "resetting",
             transactions: [],
+            transfers: [],
         });
         try {
             await performLocalReset();
@@ -277,6 +281,64 @@ export const useFinanceStore = create((set, get) => ({
         await get().refresh();
         return created;
     },
+    addAccountTransfer: async (input) => withMutationLock(async () => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        if (input.fromAccountId === input.toAccountId) {
+            throw new Error("Choose two different accounts for a transfer.");
+        }
+        let created;
+        await database.transaction(async (transaction) => {
+            const transferRepo = new TransferRepository(transaction);
+            const existingSourceTransfer = input.sourceKey
+                ? await transferRepo.getBySourceKey(input.sourceKey)
+                : null;
+            created = await transferRepo.create({
+                amountMinor: input.amountMinor,
+                fromAccountId: input.fromAccountId,
+                toAccountId: input.toAccountId,
+                dateEpochMillis: input.dateEpochMillis
+                    ?? existingSourceTransfer?.dateEpochMillis
+                    ?? Date.now(),
+                note: input.note?.trim() ? input.note.trim() : null,
+                sourceKey: input.sourceKey ?? null,
+            });
+        });
+        await get().refresh();
+        return created;
+    }),
+    updateAccountTransfer: async (id, patch) => withMutationLock(async () => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const repoPatch = { ...patch };
+        if (patch.note !== undefined) {
+            repoPatch.note = patch.note?.trim() ? patch.note.trim() : null;
+        }
+        let updated;
+        await database.transaction(async (transaction) => {
+            updated = await new TransferRepository(transaction).update(Number(id), repoPatch);
+        });
+        if (updated === null) {
+            throw new Error("Account transfer not found.");
+        }
+        await get().refresh();
+        return updated;
+    }),
+    deleteAccountTransferById: async (id) => withMutationLock(async () => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        await new TransferRepository(database).delete(Number(id));
+        await get().refresh();
+    }),
     saveOnboardingExpense: async (input) => {
         await get().ensureHydrated();
         const database = databaseRef;
@@ -600,15 +662,17 @@ export const useFinanceStore = create((set, get) => ({
             }
             await database.transaction(async (tx) => {
                 const repos = repositories(tx);
-                const [accounts, transactions, recurringRules] = await Promise.all([
+                const [accounts, transactions, recurringRules, transfers] = await Promise.all([
                     repos.accounts.list(),
                     repos.transactions.list(),
                     repos.recurring.list(),
+                    repos.transfers.list(),
                 ]);
                 const guard = canDeleteAccount(id, {
                     accounts,
                     transactions,
                     recurringRules,
+                    transfers,
                 });
                 if (!guard.ok) {
                     throw new Error(guard.reason);
@@ -945,6 +1009,7 @@ export const useFinanceStore = create((set, get) => ({
                             accounts: await currentRepos.accounts.list(),
                             categories: await currentRepos.categories.list(),
                             transactions: await currentRepos.transactions.list(),
+                            transfers: await currentRepos.transfers.list(),
                             budgets: await currentRepos.budgets.list(),
                             recurringRules: await currentRepos.recurring.list(),
                             goals: await currentRepos.goals.list(),
@@ -960,6 +1025,7 @@ export const useFinanceStore = create((set, get) => ({
                         await tx.execute("DELETE FROM restore_recovery_snapshot WHERE id = 1");
                     }
             await tx.execute("DELETE FROM transactions");
+            await tx.execute("DELETE FROM account_transfers");
             await tx.execute("DELETE FROM budgets");
             await tx.execute("DELETE FROM recurring_rules");
             await tx.execute("DELETE FROM savings_goals");
@@ -970,6 +1036,23 @@ export const useFinanceStore = create((set, get) => ({
                 const nextId = await insertReturningId(tx, `INSERT INTO accounts (name, type, starting_balance_minor, is_archived)
            VALUES (?, ?, ?, ?)`, [account.name, account.type, account.startingBalanceMinor, account.isArchived ? 1 : 0]);
                 accountIdMap.set(account.id, nextId);
+            }
+            for (const transfer of backup.transfers ?? []) {
+                const fromAccountId = accountIdMap.get(transfer.fromAccountId);
+                const toAccountId = accountIdMap.get(transfer.toAccountId);
+                if (fromAccountId === undefined || toAccountId === undefined) {
+                    throw new Error("Backup transfer references could not be restored.");
+                }
+                await tx.execute(`INSERT INTO account_transfers (
+              amount_minor, from_account_id, to_account_id, date_epoch_millis, note, source_key
+            ) VALUES (?, ?, ?, ?, ?, ?)`, [
+                    transfer.amountMinor,
+                    fromAccountId,
+                    toAccountId,
+                    transfer.dateEpochMillis,
+                    transfer.note,
+                    transfer.sourceKey ?? null,
+                ]);
             }
             const categoryIdMap = new Map();
             for (const category of backup.categories) {

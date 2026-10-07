@@ -39,6 +39,18 @@
  * @typedef {Omit<Transaction, 'id'>} NewTransaction
  * @typedef {Partial<NewTransaction>} TransactionUpdate
  *
+ * @typedef {Object} AccountTransfer
+ * @property {number} id
+ * @property {number} amountMinor
+ * @property {number} fromAccountId
+ * @property {number} toAccountId
+ * @property {number} dateEpochMillis
+ * @property {string | null} note
+ * @property {string | null} sourceKey
+ *
+ * @typedef {Omit<AccountTransfer, 'id'>} NewAccountTransfer
+ * @typedef {Partial<Omit<NewAccountTransfer, 'sourceKey'>>} AccountTransferUpdate
+ *
  * @typedef {Object} Budget
  * @property {number} id
  * @property {number} categoryId

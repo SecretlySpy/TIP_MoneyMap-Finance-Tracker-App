@@ -1,6 +1,6 @@
 # Architecture and Operations
 
-Updated: 2026-10-03
+Updated: 2026-10-07
 
 ## Runtime context
 
@@ -23,6 +23,8 @@ flowchart LR
 
 - Finance values are integer minor units. Domain calculations stay pure where practical.
 - Screens depend on store actions and view models; repositories own validation and SQL.
+- Income, expense, and transfer are distinct ledger semantics. A transfer is one atomic row and conserves
+  total value across owned accounts; it never masquerades as income or spending.
 - SQLCipher encryption and optional App Lock solve different problems and use separate key material.
 - Forgot PIN uses a separate strong native-authentication policy and a five-minute in-memory authorization;
   PIN replacement writes one versioned SecureStore record and leaves the SQLCipher key/database untouched.
@@ -41,6 +43,8 @@ flowchart LR
 - Student Eats uses a deterministic campus origin. Removing GPS reduces permissions and prevents the UI
   from implying user-relative results.
 - Import account resolution is explicit and atomic. It does not silently coerce unknown labels to Cash.
+- The public database executor serializes unrelated work. Code already inside a transaction must use the
+  callback's scoped executor; it is the only path allowed to join that open transaction.
 
 ## Environments and configuration
 
@@ -52,7 +56,7 @@ flowchart LR
 
 ## Reliability and observability
 
-QA update (2026-10-04): the schema remains version 7. The full suite is 52/52 suites and 341/341 tests. An isolated synthetic file-backed SQLite workload completed 1,829 operations with zero errors, dashboard p95 9.30 ms and 32-writer p99 2,321.31 ms. API 35 emulator smoke opened an existing SQLCipher database, showed a non-plaintext database header, kept the root locked across background/foreground, and exercised unavailable Forgot PIN plus both non-destructive reset-warning stages. This is not enrolled biometric, real reset/process-kill, physical-device, tablet, or production evidence. See [Verification and Evaluation](./Verification%20and%20Evaluation.md) for current checks.
+QA update (2026-10-07): schema version 8 adds account transfers. The full suite is 52/52 suites and 347/347 tests. An isolated synthetic file-backed SQLite workload completed 1,829 operations with zero errors, dashboard p95 7.66 ms and 32-writer p99 4,146.24 ms; both remain inside the documented local budgets. Android export and Expo Doctor 18/18 pass. Earlier API 35 emulator evidence remains valid but was not repeated for schema v8; native migration/transfer persistence is therefore still unverified. See [Verification and Evaluation](./Verification%20and%20Evaluation.md).
 
 - Database migrations and imports run transactionally; foreign keys and a five-second busy timeout are on.
 - Recurring catch-up is idempotent for a rule/scheduled timestamp and preserves the monthly anchor day.
@@ -67,8 +71,8 @@ QA update (2026-10-04): the schema remains version 7. The full suite is 52/52 su
 
 Use `npm ci`, `npm test`, `npx expo-doctor`, Expo export, then a Node 22/JDK 21 native debug build and device
 smoke test. Release remains gated by the checklist in [`docs/release-checklist.md`](../docs/release-checklist.md).
-Schema migrations 5–7 are additive and have no automated downgrade. Do not release an older build against a
-database already upgraded to v7. A production rollout was not performed.
+Schema migrations 5–8 are additive and have no automated downgrade. Do not release an older build against a
+database already upgraded to v8. A production rollout was not performed.
 
 Static/Jest/desktop-SQLite evidence does not establish native acceptance. The API 35 development-build smoke
 partially covers startup, encrypted-file appearance, lock-shell layout, unavailable recovery, and relock.

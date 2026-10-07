@@ -1,6 +1,6 @@
 import { seedInitialData } from "./seed";
 import { DataIntegrityError, readInteger } from "./validation";
-export const LATEST_SCHEMA_VERSION = 7;
+export const LATEST_SCHEMA_VERSION = 8;
 const CREATE_SCHEMA_STATEMENTS = [
     `CREATE TABLE accounts (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,6 +103,29 @@ const CREATE_GOALS_STATEMENTS = [
     "CREATE INDEX idx_savings_goals_active ON savings_goals (is_archived, deadline_epoch_millis)",
 ];
 
+const CREATE_ACCOUNT_TRANSFERS_STATEMENTS = [
+    `CREATE TABLE IF NOT EXISTS account_transfers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+      from_account_id INTEGER NOT NULL,
+      to_account_id INTEGER NOT NULL,
+      date_epoch_millis INTEGER NOT NULL,
+      note TEXT,
+      source_key TEXT CHECK (
+        source_key IS NULL OR (
+          length(trim(source_key)) > 0 AND length(source_key) <= 256
+        )
+      ),
+      CHECK (from_account_id <> to_account_id),
+      FOREIGN KEY (from_account_id) REFERENCES accounts (id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+      FOREIGN KEY (to_account_id) REFERENCES accounts (id) ON UPDATE RESTRICT ON DELETE RESTRICT
+    ) STRICT`,
+    "CREATE INDEX IF NOT EXISTS idx_account_transfers_from_account_id ON account_transfers (from_account_id)",
+    "CREATE INDEX IF NOT EXISTS idx_account_transfers_to_account_id ON account_transfers (to_account_id)",
+    "CREATE INDEX IF NOT EXISTS idx_account_transfers_date_epoch_millis ON account_transfers (date_epoch_millis DESC)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_account_transfers_source_key ON account_transfers (source_key)",
+];
+
 const MIGRATIONS = [
     {
         version: 1,
@@ -201,6 +224,15 @@ const MIGRATIONS = [
               SET scheduled_date_epoch_millis = date_epoch_millis
               WHERE recurring_rule_id IS NOT NULL AND scheduled_date_epoch_millis IS NULL`);
             await database.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_recurring_scheduled ON transactions (recurring_rule_id, scheduled_date_epoch_millis) WHERE recurring_rule_id IS NOT NULL AND scheduled_date_epoch_millis IS NOT NULL");
+        },
+    },
+    {
+        version: 8,
+        name: "add first-class account transfers",
+        async apply(database) {
+            for (const statement of CREATE_ACCOUNT_TRANSFERS_STATEMENTS) {
+                await database.execute(statement);
+            }
         },
     },
 ];

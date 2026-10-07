@@ -1,4 +1,4 @@
-import { budgetStateFor, buildBudgetCards, buildRecurringBills, buildUiTransaction, computeDashboardTotals, formatMonthChip, groupHistory, nextReminderPreview, shiftMonthYear, spendingByCategory, toMonthYear, } from "../src/domain/services/financeView";
+import { budgetStateFor, buildBudgetCards, buildRecurringBills, buildUiTransaction, computeAccountBalances, computeDashboardTotals, formatMonthChip, groupHistory, nextReminderPreview, shiftMonthYear, spendingByCategory, toMonthYear, } from "../src/domain/services/financeView";
 const accounts = [
     { id: 1, name: "Cash", type: "CASH", startingBalanceMinor: 100_000, isArchived: false },
     { id: 2, name: "Card", type: "CARD", startingBalanceMinor: 0, isArchived: false },
@@ -36,6 +36,38 @@ describe("financeView", () => {
         expect(totals.balanceMinor).toBe(100_000 + 500_000 - 50_000 - 20_000);
         expect(totals.incomeMinor).toBe(500_000);
         expect(totals.expenseMinor).toBe(50_000);
+    });
+    it("moves value between accounts without changing income, expense, or total net worth", () => {
+        const transactions = [
+            tx({ id: 1, amountMinor: 50_000, type: "INCOME", categoryId: 20, dateEpochMillis: new Date(2026, 6, 1).getTime() }),
+            tx({ id: 2, accountId: 2, amountMinor: 10_000, type: "EXPENSE", categoryId: 10, dateEpochMillis: new Date(2026, 6, 2).getTime() }),
+        ];
+        const transfers = [{
+            id: 1,
+            amountMinor: 30_000,
+            fromAccountId: 1,
+            toAccountId: 2,
+            dateEpochMillis: new Date(2026, 6, 3).getTime(),
+            note: "Card payment",
+            sourceKey: null,
+        }];
+        const balances = computeAccountBalances(accounts, transactions, transfers);
+        expect(balances).toEqual([
+            expect.objectContaining({ id: 1, balanceMinor: 120_000 }),
+            expect.objectContaining({ id: 2, balanceMinor: 20_000 }),
+        ]);
+        expect(balances.reduce((sum, account) => sum + account.balanceMinor, 0)).toBe(140_000);
+        expect(computeDashboardTotals(accounts, transactions, "2026-07", transfers)).toEqual({
+            balanceMinor: 140_000,
+            incomeMinor: 50_000,
+            expenseMinor: 10_000,
+        });
+
+        const archivedCard = accounts.map((account) => (
+            account.id === 2 ? { ...account, isArchived: true } : account
+        ));
+        expect(computeDashboardTotals(archivedCard, transactions, "2026-07", transfers).balanceMinor)
+            .toBe(120_000);
     });
     it("builds UI transactions and history groups", () => {
         const lunch = tx({

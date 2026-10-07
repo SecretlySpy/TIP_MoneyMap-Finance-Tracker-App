@@ -247,6 +247,7 @@ describe("import bulk insert transaction safety", () => {
     ];
 
     await database.transaction(async (tx) => {
+      const transactionAccounts = new AccountRepository(tx);
       const insertId = async (sql, params) => {
         const result = await tx.execute(sql, params);
         if (result.insertId) return result.insertId;
@@ -258,7 +259,10 @@ describe("import bulk insert transaction safety", () => {
           `INSERT INTO categories (name, icon, color_hex, type, is_custom) VALUES (?, 'pricetag', '#64748B', ?, 1)`,
           [row.categoryName, row.type],
         );
-        let account = (await accounts.list()).find((item) => item.type === row.accountType && !item.isArchived);
+        // All work inside the transaction must use its scoped executor. Reaching
+        // through the outer database would correctly wait for this transaction
+        // and deadlock the test instead of joining the open write implicitly.
+        let account = (await transactionAccounts.list()).find((item) => item.type === row.accountType && !item.isArchived);
         if (!account) {
           const accId = await insertId(
             `INSERT INTO accounts (name, type, starting_balance_minor, is_archived) VALUES (?, ?, 0, 0)`,

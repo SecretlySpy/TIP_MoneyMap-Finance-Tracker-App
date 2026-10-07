@@ -12,7 +12,8 @@ import { parseDecimalToMinor } from "../domain/services/money";
 import { ACCOUNT_TYPES, RECURRING_FREQUENCIES, TRANSACTION_TYPES } from "../domain/types";
 import { assertMonthYear, assertValidEpochMillis } from "../db/validation";
 export const BACKUP_FORMAT = "moneymap-backup";
-export const BACKUP_VERSION = 2;
+export const BACKUP_VERSION = 3;
+const LEGACY_BACKUP_VERSION = 2;
 export function buildBackup(snapshot) {
     return {
         format: BACKUP_FORMAT,
@@ -21,6 +22,7 @@ export function buildBackup(snapshot) {
         accounts: snapshot.accounts,
         categories: snapshot.categories,
         transactions: snapshot.transactions,
+        transfers: snapshot.transfers ?? [],
         budgets: snapshot.budgets,
         recurringRules: snapshot.recurringRules,
         // Goals are wiped by restoreBackup, so they must round-trip or they are lost.
@@ -42,10 +44,11 @@ export function validateBackup(backup) {
             throw new Error(`Backup contains an invalid ${field}.`);
         }
     };
-    const collections = ["accounts", "categories", "transactions", "budgets", "recurringRules", "goals"];
+    const collections = ["accounts", "categories", "transactions", "transfers", "budgets", "recurringRules", "goals"];
     const integerFields = {
         accounts: ["startingBalanceMinor"], categories: [],
         transactions: ["amountMinor", "dateEpochMillis"], budgets: ["limitMinor"],
+        transfers: ["amountMinor", "dateEpochMillis"],
         recurringRules: ["amountMinor", "nextRunEpochMillis", "reminderLeadDays"],
         goals: ["targetMinor", "currentMinor", "createdEpochMillis"],
     };
@@ -53,13 +56,17 @@ export function validateBackup(backup) {
         accounts: ["isArchived"],
         categories: ["isCustom"],
         transactions: [],
+        transfers: [],
         budgets: [],
         recurringRules: ["isActive", "reminderEnabled"],
         goals: ["isArchived"],
     };
     const ids = new Map();
     for (const field of collections) {
-        const rows = backup[field] ?? (field === "goals" ? [] : undefined);
+        const rows = backup[field]
+            ?? (field === "goals" || (field === "transfers" && backup.version === LEGACY_BACKUP_VERSION)
+                ? []
+                : undefined);
         if (!Array.isArray(rows)) {
             throw new Error(`Backup ${field} must be an array.`);
         }
@@ -86,6 +93,9 @@ export function validateBackup(backup) {
             if (field === "transactions") {
                 assertValidEpochMillis(row.dateEpochMillis, "transaction date");
             }
+            if (field === "transfers") {
+                assertValidEpochMillis(row.dateEpochMillis, "transfer date");
+            }
             if (field === "recurringRules") {
                 assertValidEpochMillis(row.nextRunEpochMillis, "recurring rule nextRun");
             }
@@ -105,6 +115,9 @@ export function validateBackup(backup) {
             if (field === "transactions") {
                 if (!TRANSACTION_TYPES.includes(row.type)) throw new Error("Backup contains an invalid transaction type.");
                 requireNote(row.note, "transaction note");
+            }
+            if (field === "transfers") {
+                requireNote(row.note, "transfer note");
             }
             if (field === "recurringRules") {
                 if (!TRANSACTION_TYPES.includes(row.type)) throw new Error("Backup contains an invalid recurring type.");
@@ -163,6 +176,27 @@ export function validateBackup(backup) {
             throw new Error("Backup budgets contains an invalid expense category reference.");
         }
     }
+    const transferSourceKeys = new Set();
+    for (const row of backup.transfers ?? []) {
+        if (!ids.get("accounts").has(row.fromAccountId) || !ids.get("accounts").has(row.toAccountId)) {
+            throw new Error("Backup transfers contains an invalid account reference.");
+        }
+        if (row.fromAccountId === row.toAccountId) {
+            throw new Error("Backup transfers must use two different accounts.");
+        }
+        if (!Number.isSafeInteger(row.amountMinor) || row.amountMinor <= 0) {
+            throw new Error("Backup transfers contains an invalid amount.");
+        }
+        if (row.sourceKey != null) {
+            if (typeof row.sourceKey !== "string" || row.sourceKey.trim().length === 0 || row.sourceKey.length > 256) {
+                throw new Error("Backup transfers contains an invalid source key.");
+            }
+            if (transferSourceKeys.has(row.sourceKey)) {
+                throw new Error("Backup transfers contains duplicate source keys.");
+            }
+            transferSourceKeys.add(row.sourceKey);
+        }
+    }
 }
 export function parseBackup(raw) {
     let parsed;
@@ -182,7 +216,7 @@ export function parseBackup(raw) {
     if (record.goals === undefined) {
         throw new Error("Backup is missing the goals field. Restore failed to protect existing goals.");
     }
-    if (record.version !== BACKUP_VERSION) {
+    if (![LEGACY_BACKUP_VERSION, BACKUP_VERSION].includes(record.version)) {
         throw new Error(`Unsupported backup version: ${String(record.version)}`);
     }
     if (!Array.isArray(record.accounts) || !Array.isArray(record.categories)) {
@@ -190,6 +224,12 @@ export function parseBackup(raw) {
     }
     if (!Array.isArray(record.goals)) {
         throw new Error("Backup goals must be an array.");
+    }
+    if (record.version === BACKUP_VERSION && !Array.isArray(record.transfers)) {
+        throw new Error("Backup transfers must be an array.");
+    }
+    if (record.transfers !== undefined && !Array.isArray(record.transfers)) {
+        throw new Error("Backup transfers must be an array.");
     }
     // Legacy omitted collections remain supported; present malformed collections fail closed.
     for (const field of ["transactions", "budgets", "recurringRules"]) {
@@ -204,6 +244,7 @@ export function parseBackup(raw) {
         accounts: record.accounts,
         categories: record.categories,
         transactions: Array.isArray(record.transactions) ? record.transactions : [],
+        transfers: Array.isArray(record.transfers) ? record.transfers : [],
         budgets: Array.isArray(record.budgets) ? record.budgets : [],
         recurringRules: Array.isArray(record.recurringRules) ? record.recurringRules : [],
         goals: record.goals,

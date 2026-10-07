@@ -87,9 +87,9 @@ The Pages site is the polished setup guide: root <a href="https://github.com/Sec
 | Tasks 1–9 core product | Done |
 | Task 10 recurring catch-up | Done |
 | Task 11 bill reminders (local notifications) | Done |
-| Task 12 CSV export + backup | Done — file-based share; backup now includes savings goals (QA 2026-08-31) |
+| Task 12 CSV export + backup | Done — file-based share; backup v3 includes savings goals and account transfers, while the reader remains compatible with v2 |
 | Task 13 CSV + Excel import | Done |
-| Task 14 app lock (PIN + biometrics) | Done — with attempt lockout; <strong>no forgot-PIN recovery</strong> |
+| Task 14 app lock (PIN + biometrics) | Implemented — attempt lockout plus device-authenticated PIN replacement and an explicit local-reset fallback; enrolled-device recovery remains release-gated |
 | Task 15 Smart Tips offline rules | Done |
 | Task 16 Smart Tips online Gemini (opt-in) | Done |
 | Task 17 polish | Done |
@@ -99,11 +99,12 @@ The Pages site is the polished setup guide: root <a href="https://github.com/Sec
 | Settings pickers + Dashboard polish | Done (theme/currency chips, empties, tips teaser) |
 | Safe-to-Spend + Savings Goals | Done (pure calc + schema v2 + Goals screen); goal deadlines added |
 | Entry quick chips + MoM trend | Done |
+| Account-transfer backend | Done (schema v8, repository/store actions, balance semantics, delete guards, retry keys, backup/restore); visual flow is design-gated |
 </p>
 <p>
 <strong>v0.1.0</strong> — Core complete + Student Eats + Goals / Safe-to-Spend.
 </p>
-<h3>Current limits (reviewed 2026-10-03)</h3>
+<h3>Current limits (reviewed 2026-10-07)</h3>
 <p>
 The current verification matrix is in <a href="https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App/blob/main/Project%20Guidelines/Verification%20and%20Evaluation.md">Verification and Evaluation.md</a>.
 &quot;Done&quot; above describes implemented code, not a verified native release. Transaction backdating,
@@ -113,10 +114,10 @@ SQLite; live Figma and Android device acceptance remain separate.
 <p>
 | Gap | Impact |
 |---|---|
-| Native SQLCipher key/storage, PIN/biometric and notification lifecycles, phone/tablet layout and accessibility | No connected device or configured AVD on this workstation; native acceptance is <strong>UNVERIFIED</strong> |
+| Native SQLCipher key/storage, PIN/biometric and notification lifecycles, phone/tablet layout and accessibility | API 35 emulator smoke verified encrypted-file header, locked startup/resume, Forgot PIN unavailable behavior, and reset confirmation UI. Enrolled recovery success, real deletion/interruption, physical phone/tablet, notifications, and assistive-technology acceptance remain <strong>UNVERIFIED</strong> |
 | Current 52 mobile + 52 tablet state frames | Figma connector requires authentication; six feature groups are mapped to code, individual visual parity is <strong>UNVERIFIED</strong> |
-| Dependency advisories | <code>npm audit --omit=dev</code> reported 48 advisories (33 high, 15 moderate) on its latest run. <code>xlsx@0.20.3</code> is integrity-pinned from the vendor CDN; audit coverage of this tarball is incomplete. Review compatible updates before release |
-| Account transfers, budget rollover, and &quot;delete all data&quot; reset | Still outside the current product scope; imported rows edited since an earlier import are reported as skipped rather than overwritten |
+| Dependency advisories | <code>npm audit --omit=dev</code> reports 53 advisories (32 high, 21 moderate, <strong>0 critical</strong>) on 2026-10-07 after overriding transitive <code>shell-quote</code> to patched <code>1.12.0</code>. <code>xlsx@0.20.3</code> is integrity-pinned from the vendor CDN; audit coverage of this tarball is incomplete. Review Expo-compatible updates before release |
+| Transfer UI, reconciliation, and budget rollover | The transfer persistence/read-model backend is implemented, but no new visual flow was added before design review. Reconciliation and rollover remain planned; transaction CSV intentionally remains transaction-only while JSON backup v3 includes transfers |
 </p>
 <p>
 The Jest suite covers domain, data-transfer, store, component, and static UI contracts. Native
@@ -127,7 +128,7 @@ device behavior still requires the Android verification path below.
 <li>Install <strong>Node.js 22 LTS</strong>, <strong>JDK 21</strong>, Android SDK (API 35 recommended).</li>
 <li><code>npm ci</code></li>
 <li>Copy <code>.env.example</code> → <code>.env</code> (optional <code>GEMINI_API_KEY</code> for online tips).</li>
-<li><code>npm test</code> (45 suites, 307 tests verified on 2026-10-03)</li>
+<li><code>npm test</code> (52 suites, 347 tests verified on 2026-10-07)</li>
 <li>Start an emulator/device, then <code>npm run android</code> (dev client required — <strong>Expo Go unsupported</strong> because of SQLCipher).</li>
 </ol>
 <h3>Android Studio run button</h3>
@@ -149,6 +150,7 @@ Full walkthrough (Windows / macOS / Linux): <strong><a href="https://github.com/
 <h2>Architecture (short)</h2>
 <ul>
 <li>Screens → Zustand stores → repositories → SQLCipher</li>
+<li>First-class account transfers move value between owned accounts without inflating income, expenses, or budgets</li>
 <li>Money is always <strong>integer minor units</strong> (<code>src/domain/services/money.js</code>)</li>
 <li>Theme tokens only (<code>src/theme/tokens.js</code>) — no hardcoded hex in screens</li>
 <li>Bare <code>useTheme()</code> reads <code>themePreference</code> from <code>uiStore</code> (shared components stay dark-mode correct)</li>

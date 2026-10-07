@@ -23,7 +23,7 @@
 | App lock | expo-local-authentication | Expo 54-compatible | Biometrics with PIN fallback |
 | Import | papaparse / xlsx / expo-document-picker / expo-file-system | `xlsx@0.20.3` from integrity-pinned SheetJS CDN tarball; other versions in `package.json` | CSV + Excel migration import; vendor-CDN dependency is not comprehensively assessed by npm audit |
 | Optional HTTPS | `src/remote/smartTipsClient.js`, `placesClient.js`, `eatsTipsClient.js` | Key via `app.config.js` / EAS for Gemini paths | Offline finance tips always remain available; Student Eats searches online around fixed TIP QC |
-| Tests | Jest Expo / RNTL / better-sqlite3 | `~54.0.18` / `^14.0.1` / `^12.11.1` | 45 suites / 307 tests on 2026-10-03: SQL, money, tips, import, lock, store, UI, and integration |
+| Tests | Jest Expo / RNTL / better-sqlite3 | `~54.0.18` / `^14.0.1` / `^12.11.1` | 52 suites / 347 tests on 2026-10-07: SQL, transfers, money, tips, import, lock, store, UI, and integration |
 | Package manager | npm | 10 or newer (verified `10.9.8`) | Dependency installation and scripts |
 | Android tooling | Android SDK cmdline-tools / Studio, JDK | SDK platform 35, build-tools 35, NDK 27.1, Emulator, JDK 21 | API 26+ emulator/device builds; Java 25+ is unsupported by this Gradle stack |
 
@@ -78,7 +78,7 @@ sequenceDiagram
   Store->>DB: Open encrypted moneymap.sqlite
   DB->>DB: Apply migration 1 in a transaction
   DB->>DB: Seed accounts and categories
-  Store->>DB: Load accounts categories transactions budgets recurring
+  Store->>DB: Load accounts categories transactions transfers budgets recurring goals
   Store-->>Gate: Ready snapshot
 ```
 
@@ -90,7 +90,7 @@ sequenceDiagram
 4. Copy `.env.example` to `.env`. Optional `GEMINI_API_KEY` enables online Smart Tips after in-app consent; offline tips work without it.
 5. Run `npm ci` (preferred with lockfile) or `npm install`.
 6. Run `npm run asset:splash` only after changing the source Home SVG or launch color; identical input produces an identical PNG hash.
-7. Run `npm test` (45 suites / 307 tests verified on 2026-10-03).
+7. Run `npm test` (52 suites / 347 tests verified on 2026-10-07).
 8. Run `npx expo-doctor` and optionally `npx expo export --platform android --clear`.
 9. Start an emulator or connect an Android device with USB debugging, then run `npm run android` (first run performs a native dev-client build).
 

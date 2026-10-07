@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { useMemo, useState } from "react";
+import { Alert, Pressable, TextInput, View } from "react-native";
+import { BottomSheet } from "../components/BottomSheet";
 import { AppText as Text } from "../components/AppText";
 import { Chip } from "../components/Chip";
 import { PrimaryButton } from "../components/Buttons";
@@ -7,7 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
-import { accountChipLabel } from "../domain/services/financeView";
+import { accountChipLabel, computeAccountBalances } from "../domain/services/financeView";
 import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -28,6 +29,9 @@ export function ManageAccountsScreen({ navigation }) {
   const deleteAccount = useFinanceStore((state) => state.deleteAccount);
   const archiveAccount = useFinanceStore((state) => state.archiveAccount);
   const unarchiveAccount = useFinanceStore((state) => state.unarchiveAccount);
+  const transactions = useFinanceStore((state) => state.transactions);
+  const transfers = useFinanceStore((state) => state.transfers);
+  const addTransaction = useFinanceStore((state) => state.addTransaction);
 
   const [renameId, setRenameId] = useState(null);
   const [balanceId, setBalanceId] = useState(null);
@@ -35,9 +39,34 @@ export function ManageAccountsScreen({ navigation }) {
   const [draftName, setDraftName] = useState("");
   const [draftType, setDraftType] = useState("CASH");
   const [busy, setBusy] = useState(false);
+  const [selectedDetailAccountId, setSelectedDetailAccountId] = useState(null);
+  const [statementBalanceInput, setStatementBalanceInput] = useState("");
+  const [statementDate, setStatementDate] = useState(() => new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }));
+  const [clearedTxIds, setClearedTxIds] = useState(new Set());
+  const [lastReconciled, setLastReconciled] = useState({});
 
   const active = accounts.filter((account) => !account.isArchived);
   const archived = accounts.filter((account) => account.isArchived);
+
+  const calculatedAccounts = useMemo(
+    () => computeAccountBalances(accounts, transactions, transfers),
+    [accounts, transactions, transfers],
+  );
+  const selectedDetailAccount = accounts.find((a) => a.id === selectedDetailAccountId);
+  const detailAccountCalculated = calculatedAccounts.find((a) => a.id === selectedDetailAccountId);
+
+  const parsedStatementMinor = useMemo(() => {
+    try {
+      return parseDecimalToMinor(statementBalanceInput.replace(/[₱$,\s]/g, "") || "0", { allowNegative: true });
+    } catch {
+      return null;
+    }
+  }, [statementBalanceInput]);
+
+  const reconciliationMatches =
+    parsedStatementMinor !== null &&
+    statementBalanceInput.trim().length > 0 &&
+    parsedStatementMinor === (detailAccountCalculated?.balanceMinor ?? selectedDetailAccount?.startingBalanceMinor);
 
   const handleArchive = (account) => {
     Alert.alert(
@@ -159,6 +188,20 @@ export function ManageAccountsScreen({ navigation }) {
                 </Text>
               </View>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md }}>
+                <Pressable
+                  accessibilityLabel="Details & Reconcile"
+                  accessibilityRole="button"
+                  hitSlop={theme.spacing.sm}
+                  onPress={() => {
+                    setSelectedDetailAccountId(account.id);
+                    setStatementBalanceInput("");
+                  }}
+                  style={{ justifyContent: "center", minHeight: 44 }}
+                >
+                  <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
+                    Details & Reconcile
+                  </Text>
+                </Pressable>
                 <Pressable
                   accessibilityRole="button"
                   hitSlop={theme.spacing.sm}
@@ -314,6 +357,88 @@ export function ManageAccountsScreen({ navigation }) {
         title="New account name"
         visible={createStep === "name"}
       />
+
+      {selectedDetailAccount ? (
+        <BottomSheet
+          onClose={() => setSelectedDetailAccountId(null)}
+          title={`${selectedDetailAccount.name} · Details & Reconcile`}
+          visible={selectedDetailAccountId !== null}
+        >
+          <View style={{ gap: theme.spacing.md, paddingBottom: theme.spacing.lg }}>
+            <View style={{ backgroundColor: theme.colors.bg, borderRadius: theme.radii.row, padding: theme.spacing.md }}>
+              <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small, fontFamily: theme.fonts.bold }}>
+                Working Balance
+              </Text>
+              <Text style={{ color: theme.colors.text, fontSize: 24, fontFamily: theme.fonts.bold }}>
+                {formatMinor(detailAccountCalculated?.balanceMinor ?? selectedDetailAccount.startingBalanceMinor, { currencySymbol })}
+              </Text>
+              <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
+                Starting balance {formatMinor(selectedDetailAccount.startingBalanceMinor, { currencySymbol })} + transactions & transfers
+              </Text>
+            </View>
+
+            <View style={{ gap: theme.spacing.xs }}>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                Reconciliation Check
+              </Text>
+              <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
+                Compare your actual bank / e-wallet statement to MoneyMap's working balance.
+              </Text>
+              <TextInput
+                accessibilityLabel="Statement balance"
+                keyboardType="decimal-pad"
+                onChangeText={setStatementBalanceInput}
+                placeholder="0.00"
+                placeholderTextColor={theme.colors.sub}
+                style={{
+                  backgroundColor: theme.colors.bg,
+                  borderRadius: theme.radii.row,
+                  color: theme.colors.text,
+                  fontFamily: theme.fonts.medium,
+                  fontSize: theme.typeScale.body,
+                  height: 48,
+                  paddingHorizontal: theme.spacing.lg,
+                }}
+                value={statementBalanceInput}
+              />
+            </View>
+
+            {reconciliationMatches ? (
+              <View style={{ gap: theme.spacing.sm }}>
+                <View style={{ backgroundColor: theme.colors.tint, borderRadius: theme.radii.chip, padding: theme.spacing.md }}>
+                  <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold }}>
+                    ✅ Statement matches working balance!
+                  </Text>
+                </View>
+                <PrimaryButton
+                  accessibilityLabel="Finish & Save Reconciliation"
+                  onPress={() => {
+                    setLastReconciled((prev) => ({ ...prev, [selectedDetailAccount.id]: new Date().toISOString() }));
+                    setSelectedDetailAccountId(null);
+                    Alert.alert("Reconciled", `${selectedDetailAccount.name} balance successfully reconciled.`);
+                  }}
+                >
+                  Finish & Save Reconciliation
+                </PrimaryButton>
+              </View>
+            ) : statementBalanceInput.trim().length > 0 ? (
+              <View style={{ backgroundColor: theme.colors.amberBg, borderRadius: theme.radii.chip, padding: theme.spacing.md }}>
+                <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                  Discrepancy: Difference of {formatMinor(Math.abs((detailAccountCalculated?.balanceMinor ?? 0) - (parsedStatementMinor ?? 0)), { currencySymbol })}
+                </Text>
+              </View>
+            ) : null}
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setSelectedDetailAccountId(null)}
+              style={{ alignItems: "center", justifyContent: "center", minHeight: 44 }}
+            >
+              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium }}>Close</Text>
+            </Pressable>
+          </View>
+        </BottomSheet>
+      ) : null}
     </ScreenContainer>
   );
 }

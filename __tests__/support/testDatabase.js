@@ -71,9 +71,6 @@ export class TestSqliteDatabase {
   }
 
   async execute(query, parameters = []) {
-    if (this.inTransaction) {
-      return this.executeDirect(query, parameters);
-    }
     const pending = this.transactionTail.then(() => this.executeDirect(query, parameters));
     this.transactionTail = pending.catch(() => {});
     return pending;
@@ -84,16 +81,15 @@ export class TestSqliteDatabase {
       // Assignment must occur before BEGIN, since SQLite ignores it inside a transaction.
       this.database.pragma("foreign_keys = ON");
       this.database.exec("BEGIN IMMEDIATE");
-      this.inTransaction = true;
       try {
-        // Match src/db/sql.js rather than granting nested transactions to tests.
-        await work({ execute: this.execute.bind(this) });
+        // Only this scoped executor may join the open transaction; unrelated calls stay queued.
+        await work({
+          execute: async (query, parameters = []) => this.executeDirect(query, parameters),
+        });
         this.database.exec("COMMIT");
       } catch (error) {
         this.database.exec("ROLLBACK");
         throw error;
-      } finally {
-        this.inTransaction = false;
       }
     });
     this.transactionTail = pending.catch(() => {});

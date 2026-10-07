@@ -25,7 +25,7 @@ export function formatTransactionAmount(amountMinor, type, showCents = true, cur
     if (amountMinor < 0) {
         throw new RangeError("Stored transaction amounts must always be positive.");
     }
-    const sign = type === "EXPENSE" ? "-" : "+";
+    const sign = type === "EXPENSE" ? "-" : type === "INCOME" ? "+" : "";
     return `${sign}${formatMinor(amountMinor, { currencySymbol, showCents, sign: "never" })}`;
 }
 // Decimal keypad text is parsed without floating-point currency arithmetic.

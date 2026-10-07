@@ -1,12 +1,13 @@
 # Backend Functionalities
 
-Updated: 2026-10-03
+Updated: 2026-10-07
 
 ## Status
 
-Not applicable: MoneyMap v0.1.0 has no owned backend, server database, login, or server-side API. The app is
-offline-first and stores finance data in SQLCipher-configured on-device SQLite; native at-rest behavior
-still requires an installed development build to verify.
+MoneyMap's backend is an on-device service/repository layer over SQLCipher-configured SQLite. It has no
+owned application server, server database, login, or sync API. This is an intentional privacy/offline
+boundary—not an absent persistence architecture. Native at-rest behavior still requires installed-build
+verification.
 
 ## Local service boundaries
 
@@ -14,10 +15,11 @@ still requires an installed development build to verify.
 |---|---|---|
 | First-run onboarding | Root navigation → versioned SecureStore draft → finance/UI stores | Account, optional first expense, and optional lock steps resume after interruption; completion clears the draft only after the splash-complete marker persists |
 | Finance persistence | Zustand → repositories → SQLCipher | Error remains on the current form; no false success navigation |
+| Account transfer | Store mutation lock → transaction-scoped `TransferRepository` → one `account_transfers` row | Same-account, missing/archived endpoint, invalid amount/date, and conflicting retry key fail before a second financial effect; account deletion remains blocked while referenced |
 | Import | Local file/paste parser → account resolution → one DB transaction | Invalid file rows are excluded with reasons; partial pasted imports need confirmation; transaction failure rolls back; stable keys reconcile unchanged rows and skip edited rows while accepting new ones |
 | Recurring catch-up | Pure planner → idempotent repository writes | Existing scheduled posts are skipped; next run advances after processing |
 | Reminders | Expo local notifications | Permission/scheduling failure is surfaced locally; finance data remains intact |
-| Backup/export | Local file/share services | Export failure does not mutate the database; restore validates first and captures one pre-restore snapshot in the database for a single-use undo |
+| Backup/export | Local file/share services | Export failure does not mutate the database; backup v3 includes transfers, reads legacy v2, and restore validates first before capturing one pre-restore snapshot for single-use undo |
 | App Lock and recovery | SecureStore preference/PIN result + native device authentication → locked-only root | Missing, invalid, or unreadable lock state fails closed. A short-lived native-auth grant can replace only the app PIN; destructive fallback uses a pending marker and never unlocks the old ledger |
 
 Onboarding draft data is deliberately small and contains unfinished form state only. Authoritative accounts
@@ -33,9 +35,15 @@ different financial effect still fails. A post-commit refresh error uses
 `IMPORT_COMMITTED_REFRESH_FAILED` so the UI does not mislabel durable writes as a rolled-back failure.
 
 Restore validates identities, enum/format fields, references, safe integers, recurring provenance, and
-source-key uniqueness before replacing data. The singleton recovery snapshot stays in the configured
+source-key uniqueness before replacing data. Transfer restore also validates distinct account endpoints and
+remaps both references inside the same replacement transaction. The singleton recovery snapshot stays in the configured
 SQLCipher database, not plaintext preferences. Undo consumes it in the same replacement transaction;
 it is a one-use local safety net, not a versioned backup service. Native encryption remains unverified.
+
+Transfers are deliberately separate from `transactions`. They change per-account balances but do not create
+income, spending, or category-budget activity. A retry key is immutable and may produce exactly one effect;
+an attempted reuse with different amount/accounts/date/note fails closed. Only a transaction-scoped executor
+may run inside an open write transaction, so unrelated database calls wait for commit or rollback.
 
 ## Optional external clients
 
@@ -51,6 +59,15 @@ QA update (2026-09-28): Overpass and its single Nominatim fallback share the sam
 
 Live Gemini, Overpass, and Nominatim behavior remains **UNVERIFIED** in this implementation pass. Provider
 credentials, rate limits, network variability, and production responses were not exercised.
+
+## Hosted-service decision gate
+
+A general hosted ledger is not justified by the current product evidence. Core finance must remain usable
+offline with no account. Reconsider sync/recovery/collaboration only after at least 50 target-user interviews
+and both conditions hold: at least 30% rank it in their top three needs, and a candidate provider demonstrates
+at least 80% coverage of the target Philippine institutions/e-wallets. A stateless Gemini proxy may be assessed
+separately before public production to keep provider credentials off distributed clients and enforce quotas;
+it must not become a remote finance source of truth.
 
 ## Authentication and authorization
 

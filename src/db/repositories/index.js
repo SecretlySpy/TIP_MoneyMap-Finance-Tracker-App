@@ -4,3 +4,4 @@ export { CategoryRepository } from "./categoryRepository";
 export { GoalRepository } from "./goalRepository";
 export { RecurringRepository } from "./recurringRepository";
 export { TransactionRepository } from "./transactionRepository";
+export { TransferRepository } from "./transferRepository";

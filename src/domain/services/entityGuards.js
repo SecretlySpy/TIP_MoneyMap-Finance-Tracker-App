@@ -26,7 +26,7 @@ export function canDeleteCategory(categoryId, refs = {}) {
 
 /**
  * @param {number} accountId
- * @param {{ accounts?: object[], transactions?: object[], recurringRules?: object[] }} refs
+ * @param {{ accounts?: object[], transactions?: object[], recurringRules?: object[], transfers?: object[] }} refs
  * @returns {{ ok: true } | { ok: false, reason: string }}
  */
 export function canDeleteAccount(accountId, refs = {}) {
@@ -39,12 +39,16 @@ export function canDeleteAccount(accountId, refs = {}) {
   }
   const txCount = (refs.transactions ?? []).filter((tx) => tx.accountId === accountId).length;
   const ruleCount = (refs.recurringRules ?? []).filter((r) => r.accountId === accountId).length;
-  if (txCount + ruleCount === 0) {
+  const transferCount = (refs.transfers ?? []).filter(
+    (transfer) => transfer.fromAccountId === accountId || transfer.toAccountId === accountId,
+  ).length;
+  if (txCount + ruleCount + transferCount === 0) {
     return { ok: true };
   }
   const parts = [];
   if (txCount > 0) parts.push(`${txCount} transaction${txCount === 1 ? "" : "s"}`);
   if (ruleCount > 0) parts.push(`${ruleCount} recurring rule${ruleCount === 1 ? "" : "s"}`);
+  if (transferCount > 0) parts.push(`${transferCount} transfer${transferCount === 1 ? "" : "s"}`);
   return {
     ok: false,
     reason: `Cannot delete: still used by ${parts.join(", ")}.`,

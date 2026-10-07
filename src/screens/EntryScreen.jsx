@@ -7,7 +7,7 @@ import { Chip } from "../components/Chip";
 import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { TextPromptModal } from "../components/TextPromptModal";
-import { categoriesForType, toMonthYear, } from "../domain/services/financeView";
+import { accountChipLabel, categoriesForType, computeAccountBalances, toMonthYear } from "../domain/services/financeView";
 import { resolveDisplayEmoji } from "../domain/services/emoji";
 import { formatMinor, parseDecimalToMinor, updateMoneyInput } from "../domain/services/money";
 import { listAccountChips, useFinanceStore } from "../store/financeStore";
@@ -50,12 +50,15 @@ export function EntryScreen({ navigation }) {
     const accounts = useFinanceStore((state) => state.accounts);
     const categories = useFinanceStore((state) => state.categories);
     const addTransaction = useFinanceStore((state) => state.addTransaction);
+    const addAccountTransfer = useFinanceStore((state) => state.addAccountTransfer);
+    const transfers = useFinanceStore((state) => state.transfers);
     const addCategory = useFinanceStore((state) => state.addCategory);
     const setSelectedMonthYear = useFinanceStore((state) => state.setSelectedMonthYear);
     const [transactionType, setTransactionType] = useState("EXPENSE");
     const [amountInput, setAmountInput] = useState("0");
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedAccountId, setSelectedAccountId] = useState(null);
+    const [selectedToAccountId, setSelectedToAccountId] = useState(null);
     const [saving, setSaving] = useState(false);
     const [showNewCategory, setShowNewCategory] = useState(false);
     const [note, setNote] = useState("");
@@ -65,8 +68,30 @@ export function EntryScreen({ navigation }) {
     const sourceKeyRef = useRef(createManualSourceKey());
     const transactions = useFinanceStore((state) => state.transactions);
     const accountChips = useMemo(() => listAccountChips(accounts), [accounts]);
+    const activeAccounts = useMemo(() => accounts.filter((account) => !account.isArchived), [accounts]);
+    const calculatedAccounts = useMemo(
+        () => computeAccountBalances(accounts, transactions, transfers),
+        [accounts, transactions, transfers],
+    );
+    useEffect(() => {
+        const fromId = selectedAccountId ?? activeAccounts[0]?.id ?? null;
+        if (selectedAccountId === null && fromId !== null) {
+            setSelectedAccountId(fromId);
+        }
+        if ((selectedToAccountId === null || selectedToAccountId === fromId) && activeAccounts.length > 1) {
+            const second = activeAccounts.find((a) => a.id !== fromId);
+            if (second) {
+                setSelectedToAccountId(second.id);
+            }
+        }
+    }, [activeAccounts, selectedAccountId, selectedToAccountId]);
+
+    const fromAccountObj = activeAccounts.find((a) => a.id === selectedAccountId);
+    const toAccountObj = activeAccounts.find((a) => a.id === selectedToAccountId);
+    const fromBalanceMinor = calculatedAccounts.find((a) => a.id === selectedAccountId)?.balanceMinor ?? fromAccountObj?.startingBalanceMinor ?? 0;
+    const toBalanceMinor = calculatedAccounts.find((a) => a.id === selectedToAccountId)?.balanceMinor ?? toAccountObj?.startingBalanceMinor ?? 0;
+
     const typeCategories = useMemo(() => categoriesForType(categories, transactionType), [categories, transactionType]);
-    // Recent expense categories from history (for quick re-pick).
     const recentCategoryChips = useMemo(() => {
         const names = [];
         const seen = new Set();
@@ -88,7 +113,6 @@ export function EntryScreen({ navigation }) {
                 { label: `Part-time ${currencySymbol}3,000`, amount: "3000", note: "Shift pay", category: "Part-time" },
             ];
         }
-        // Labels follow the chosen currency symbol instead of a hardcoded peso sign.
         return [
             { name: "Lunch", amount: "80", note: "Lunch", category: "Food" },
             { name: "Jeep", amount: "15", note: "Commute", category: "Transport" },
@@ -99,12 +123,6 @@ export function EntryScreen({ navigation }) {
             label: `${template.name} ${currencySymbol}${template.amount}`,
         }));
     }, [transactionType, currencySymbol]);
-    useEffect(() => {
-        if (accountChips.some((account) => account.id === selectedAccountId)) {
-            return;
-        }
-        setSelectedAccountId(accountChips[0]?.id ?? null);
-    }, [accountChips, selectedAccountId]);
     const applyTemplate = (template) => {
         setAmountInput(template.amount);
         if (template.note) setNote(template.note);
@@ -149,24 +167,37 @@ export function EntryScreen({ navigation }) {
             return 0;
         }
     }, [amountInput]);
-    const amountColor = transactionType === "EXPENSE" ? theme.colors.expense : theme.colors.income;
+    const amountColor = transactionType === "EXPENSE" ? theme.colors.expense : transactionType === "INCOME" ? theme.colors.income : theme.colors.text;
     const selectedAccountLabel = accountChips.find((account) => account.id === selectedAccountId)?.label.replace(/^\S+\s/, "") ?? "Choose account";
-    const canSave = amountMinor > 0 && selectedCategory !== "" && selectedCategory !== "New" && selectedAccountId !== null && !saving;
+    const canSave = transactionType === "TRANSFER"
+        ? amountMinor > 0 && selectedAccountId !== null && selectedToAccountId !== null && selectedAccountId !== selectedToAccountId && !saving
+        : amountMinor > 0 && selectedCategory !== "" && selectedCategory !== "New" && selectedAccountId !== null && !saving;
+
     const handleSave = async () => {
         if (!canSave) {
             return;
         }
         setSaving(true);
         try {
-            await addTransaction({
-                accountId: selectedAccountId,
-                amountMinor,
-                categoryName: selectedCategory,
-                note: note.trim() ? note.trim() : null,
-                type: transactionType,
-                dateEpochMillis: selectedDateEpochMillis,
-                sourceKey: sourceKeyRef.current,
-            });
+            if (transactionType === "TRANSFER") {
+                await addAccountTransfer({
+                    fromAccountId: selectedAccountId,
+                    toAccountId: selectedToAccountId,
+                    amountMinor,
+                    note: note.trim() ? note.trim() : null,
+                    dateEpochMillis: selectedDateEpochMillis,
+                });
+            } else {
+                await addTransaction({
+                    accountId: selectedAccountId,
+                    amountMinor,
+                    categoryName: selectedCategory,
+                    note: note.trim() ? note.trim() : null,
+                    type: transactionType,
+                    dateEpochMillis: selectedDateEpochMillis,
+                    sourceKey: sourceKeyRef.current,
+                });
+            }
             // A mounted Entry route may be revisited after switching tabs. Retire the
             // completed mutation key while preserving it across any failed/uncertain retry.
             sourceKeyRef.current = createManualSourceKey();
@@ -206,7 +237,7 @@ export function EntryScreen({ navigation }) {
             height: theme.sizes.entryToggle,
             padding: theme.spacing.xs,
         }}>
-        {["EXPENSE", "INCOME"].map((type) => {
+        {["EXPENSE", "INCOME", "TRANSFER"].map((type) => {
             const selected = transactionType === type;
             return (<Pressable accessibilityRole="tab" accessibilityState={{ selected }} key={type} onPress={() => setTransactionType(type)} style={{
                     alignItems: "center",
@@ -223,7 +254,7 @@ export function EntryScreen({ navigation }) {
                     fontFamily: selected ? theme.fonts.bold : theme.fonts.medium,
                     fontSize: theme.typeScale.body,
                 }}>
-                {type === "EXPENSE" ? "Expense" : "Income"}
+                {type === "EXPENSE" ? "Expense" : type === "INCOME" ? "Income" : "Transfer"}
               </Text>
             </Pressable>);
         })}
@@ -246,107 +277,215 @@ export function EntryScreen({ navigation }) {
         </Pressable>
       </View>
 
-      {recentCategoryChips.length > 0 ? (
-        <View style={{ gap: theme.spacing.sm }}>
-          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
-            RECENT CATEGORIES
-          </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm }}>
-            {recentCategoryChips.map((name) => (
-              <Chip
-                key={`recent-${name}`}
-                onPress={() => setSelectedCategory(name)}
-                selected={selectedCategory === name}
-                style={{ height: theme.sizes.filterChip }}
-              >
-                {name}
-              </Chip>
-            ))}
+      {transactionType === "TRANSFER" ? (
+        <View style={{ gap: theme.spacing.md }}>
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+              From Account
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.keyGap }}>
+              {activeAccounts.map((account) => (
+                <Chip
+                  key={`from-${account.id}`}
+                  onPress={() => setSelectedAccountId(account.id)}
+                  selected={selectedAccountId === account.id}
+                  style={{ height: theme.sizes.accountChip }}
+                >
+                  {accountChipLabel(account.type)} · {account.name}
+                </Chip>
+              ))}
+            </View>
+          </View>
+
+          <View style={{ alignItems: "center", marginVertical: theme.spacing.xs }}>
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={theme.spacing.sm}
+              onPress={() => {
+                const temp = selectedAccountId;
+                setSelectedAccountId(selectedToAccountId);
+                setSelectedToAccountId(temp);
+              }}
+              style={{
+                alignItems: "center",
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.outline,
+                borderRadius: theme.radii.round,
+                borderWidth: 1,
+                flexDirection: "row",
+                gap: theme.spacing.xs,
+                paddingHorizontal: theme.spacing.lg,
+                paddingVertical: theme.spacing.xs,
+              }}
+            >
+              <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                Swap accounts
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={{ gap: theme.spacing.xs }}>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+              To Account
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.keyGap }}>
+              {activeAccounts.map((account) => (
+                <Chip
+                  key={`to-${account.id}`}
+                  onPress={() => setSelectedToAccountId(account.id)}
+                  selected={selectedToAccountId === account.id}
+                  style={{ height: theme.sizes.accountChip }}
+                >
+                  {accountChipLabel(account.type)} · {account.name}
+                </Chip>
+              ))}
+            </View>
+          </View>
+
+          <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
+              {note.trim() ? `Note: ${note.trim()}` : "No note added"}
+            </Text>
+            <Pressable accessibilityRole="button" onPress={() => setShowNotePrompt(true)}>
+              <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
+                {note.trim() ? "Edit note" : "+ Add note"}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View
+            style={{
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.outline,
+              borderRadius: theme.radii.card,
+              borderWidth: 1,
+              gap: theme.spacing.xs,
+              padding: theme.spacing.md,
+            }}
+          >
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny }}>
+              POST-TRANSFER BALANCE PREVIEW
+            </Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ color: theme.colors.text, fontSize: theme.typeScale.small }}>
+                {fromAccountObj?.name ?? "From"}: {formatMinor(fromBalanceMinor, { currencySymbol })} → {formatMinor(fromBalanceMinor - amountMinor, { currencySymbol })}
+              </Text>
+              <Text style={{ color: theme.colors.text, fontSize: theme.typeScale.small }}>
+                {toAccountObj?.name ?? "To"}: {formatMinor(toBalanceMinor, { currencySymbol })} → {formatMinor(toBalanceMinor + amountMinor, { currencySymbol })}
+              </Text>
+            </View>
+            {fromBalanceMinor - amountMinor < 0 ? (
+              <Text style={{ color: theme.colors.expense, fontSize: theme.typeScale.tiny, fontFamily: theme.fonts.bold }}>
+                ⚠️ Overdraft warning: from account balance will be negative.
+              </Text>
+            ) : null}
           </View>
         </View>
-      ) : null}
+      ) : (
+        <>
+          {recentCategoryChips.length > 0 ? (
+            <View style={{ gap: theme.spacing.sm }}>
+              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                RECENT CATEGORIES
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm }}>
+                {recentCategoryChips.map((name) => (
+                  <Chip
+                    key={`recent-${name}`}
+                    onPress={() => setSelectedCategory(name)}
+                    selected={selectedCategory === name}
+                    style={{ height: theme.sizes.filterChip }}
+                  >
+                    {name}
+                  </Chip>
+                ))}
+              </View>
+            </View>
+          ) : null}
 
-      <View style={{ gap: theme.spacing.sm }}>
-        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
-          QUICK TEMPLATES
-        </Text>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm }}>
-          {quickTemplates.map((template) => (
-            <Chip
-              key={template.label}
-              onPress={() => applyTemplate(template)}
-              style={{ height: theme.sizes.filterChip }}
-            >
-              {template.label}
-            </Chip>
-          ))}
-        </View>
-      </View>
-
-      <View style={{ gap: theme.spacing.md }}>
-        <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
-          Category
-        </Text>
-        {categoryRows.map((row, rowIndex) => (<View key={`category-row-${rowIndex}`} style={{ flexDirection: "row", gap: theme.spacing.md }}>
-            {row.map((category, cellIndex) => {
-                if (category.label === "") {
-                    return <View key={`empty-${rowIndex}-${cellIndex}`} style={{ flex: 1 }}/>;
-                }
-                const selected = selectedCategory === category.label;
-                return (<Pressable accessibilityRole="button" accessibilityState={{ selected }} key={category.label} onPress={() => {
-                        if (category.label === "New") {
-                            setShowNewCategory(true);
-                            return;
-                        }
-                        setSelectedCategory(category.label);
-                    }} style={{
-                        alignItems: "center",
-                        backgroundColor: selected ? theme.colors.tint : theme.colors.surface,
-                        borderColor: selected ? theme.colors.primary : theme.colors.outline,
-                        borderRadius: theme.radii.row,
-                        borderWidth: selected ? 1.5 : theme.spacing.hairline,
-                        flex: 1,
-                        height: theme.sizes.categoryCell,
-                        justifyContent: "center",
-                    }}>
-                  <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.regular, fontSize: 20 }}>
-                    {category.emoji}
-                  </Text>
-                  <Text style={{
-                        color: selected ? theme.colors.primary : theme.colors.sub,
-                        fontFamily: selected ? theme.fonts.bold : theme.fonts.medium,
-                        fontSize: theme.typeScale.small,
-                        marginTop: theme.spacing.xs,
-                    }}>
-                    {category.label}
-                  </Text>
-                </Pressable>);
-            })}
-          </View>))}
-      </View>
-
-      <View style={{ gap: theme.spacing.keyGap }}>
-        <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
-          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
-            Account
-          </Text>
-          <Pressable accessibilityRole="button" onPress={() => setShowNotePrompt(true)}>
-            <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
-              {note.trim() ? "Edit note" : "+ Add note"}
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+              QUICK TEMPLATES
             </Text>
-          </Pressable>
-        </View>
-        {note.trim() ? (
-          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
-            {note.trim()}
-          </Text>
-        ) : null}
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.keyGap }}>
-          {accountChips.map((account) => (<Chip key={account.id} onPress={() => setSelectedAccountId(account.id)} selected={selectedAccountId === account.id} style={{ height: theme.sizes.accountChip }}>
-              {account.label}
-            </Chip>))}
-        </View>
-      </View>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm }}>
+              {quickTemplates.map((template) => (
+                <Chip
+                  key={template.label}
+                  onPress={() => applyTemplate(template)}
+                  style={{ height: theme.sizes.filterChip }}
+                >
+                  {template.label}
+                </Chip>
+              ))}
+            </View>
+          </View>
+
+          <View style={{ gap: theme.spacing.md }}>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+              Category
+            </Text>
+            {categoryRows.map((row, rowIndex) => (<View key={`category-row-${rowIndex}`} style={{ flexDirection: "row", gap: theme.spacing.md }}>
+                {row.map((category, cellIndex) => {
+                    if (category.label === "") {
+                        return <View key={`empty-${rowIndex}-${cellIndex}`} style={{ flex: 1 }}/>;
+                    }
+                    const selected = selectedCategory === category.label;
+                    return (<Pressable accessibilityRole="button" accessibilityState={{ selected }} key={category.label} onPress={() => {
+                            if (category.label === "New") {
+                                setShowNewCategory(true);
+                                return;
+                            }
+                            setSelectedCategory(category.label);
+                        }} style={{
+                            alignItems: "center",
+                            backgroundColor: selected ? theme.colors.tint : theme.colors.surface,
+                            borderColor: selected ? theme.colors.primary : theme.colors.outline,
+                            borderRadius: theme.radii.row,
+                            borderWidth: selected ? 1.5 : theme.spacing.hairline,
+                            flex: 1,
+                            height: theme.sizes.categoryCell,
+                            justifyContent: "center",
+                        }}>
+                      <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.regular, fontSize: 20 }}>
+                        {category.emoji}
+                      </Text>
+                      <Text style={{
+                            color: selected ? theme.colors.primary : theme.colors.sub,
+                            fontFamily: selected ? theme.fonts.bold : theme.fonts.medium,
+                            fontSize: theme.typeScale.small,
+                            marginTop: theme.spacing.xs,
+                        }}>
+                        {category.label}
+                      </Text>
+                    </Pressable>);
+                })}
+              </View>))}
+          </View>
+
+          <View style={{ gap: theme.spacing.keyGap }}>
+            <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                Account
+              </Text>
+              <Pressable accessibilityRole="button" onPress={() => setShowNotePrompt(true)}>
+                <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
+                  {note.trim() ? "Edit note" : "+ Add note"}
+                </Text>
+              </Pressable>
+            </View>
+            {note.trim() ? (
+              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
+                {note.trim()}
+              </Text>
+            ) : null}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.keyGap }}>
+              {accountChips.map((account) => (<Chip key={account.id} onPress={() => setSelectedAccountId(account.id)} selected={selectedAccountId === account.id} style={{ height: theme.sizes.accountChip }}>
+                  {account.label}
+                </Chip>))}
+            </View>
+          </View>
+        </>
+      )}
 
       <View style={{ gap: theme.spacing.keyGap }}>
         {keypadRows.map((row, rowIndex) => (<View key={`keypad-row-${rowIndex}`} style={{ flexDirection: "row", gap: theme.spacing.keyGap }}>
@@ -368,7 +507,7 @@ export function EntryScreen({ navigation }) {
       </View>
 
       <PrimaryButton disabled={!canSave} onPress={() => void handleSave()}>
-        {saving ? "Saving…" : "Save Transaction"}
+        {saving ? "Saving…" : transactionType === "TRANSFER" ? "Save Transfer" : "Save Transaction"}
       </PrimaryButton>
       <CalendarPickerSheet
         onClose={() => setDatePickerVisible(false)}

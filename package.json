@@ -26,7 +26,8 @@
     "sqlcipher": true
   },
   "overrides": {
-    "postcss": "8.5.25"
+    "postcss": "8.5.25",
+    "shell-quote": "1.12.0"
   },
   "dependencies": {
     "@expo-google-fonts/roboto": "^0.4.3",

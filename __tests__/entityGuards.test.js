@@ -65,6 +65,15 @@ describe("entityGuards", () => {
         accounts,
         transactions: [],
         recurringRules: [],
+        transfers: [{ fromAccountId: 1, toAccountId: 2 }],
+      }).reason,
+    ).toMatch(/1 transfer/);
+    expect(
+      canDeleteAccount(1, {
+        accounts,
+        transactions: [],
+        recurringRules: [],
+        transfers: [],
       }),
     ).toEqual({ ok: true });
   });

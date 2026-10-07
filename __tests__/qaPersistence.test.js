@@ -35,6 +35,40 @@ describe("QA persistence and concurrent-operation contracts", () => {
     expect(await new TransactionRepository(database).list()).toHaveLength(0);
   });
 
+  it("queues unrelated database work until the active transaction commits", async () => {
+    let releaseTransaction;
+    let markTransactionOpen;
+    const holdTransaction = new Promise((resolve) => { releaseTransaction = resolve; });
+    const transactionOpen = new Promise((resolve) => { markTransactionOpen = resolve; });
+    const transaction = database.transaction(async (tx) => {
+      await new AccountRepository(tx).create({
+        name: "Isolated",
+        type: "CASH",
+        startingBalanceMinor: 0,
+        isArchived: false,
+      });
+      markTransactionOpen();
+      await holdTransaction;
+    });
+    await transactionOpen;
+
+    let outsideResolved = false;
+    const outsideRead = database.execute("SELECT COUNT(*) AS count FROM accounts")
+      .then((result) => {
+        outsideResolved = true;
+        return result;
+      });
+    await new Promise((resolve) => setImmediate(resolve));
+    try {
+      expect(outsideResolved).toBe(false);
+    } finally {
+      releaseTransaction();
+    }
+
+    await transaction;
+    expect((await outsideRead).rows[0].count).toBe(2);
+  });
+
   it("retains all 32 simultaneous goal contributions", async () => {
     const goals = new GoalRepository(database);
     const goal = await goals.create({ name: "Concurrent savings", targetMinor: 100_000 });
@@ -105,7 +139,7 @@ describe("QA persistence and concurrent-operation contracts", () => {
     await database.execute("ALTER TABLE recurring_rules DROP COLUMN icon");
     await database.execute("ALTER TABLE recurring_rules DROP COLUMN anchor_day");
     await database.execute("PRAGMA user_version = 2");
-    expect((await migrateDatabase(database)).appliedVersions).toEqual([3, 4, 5, 6, 7]);
+    expect((await migrateDatabase(database)).appliedVersions).toEqual([3, 4, 5, 6, 7, 8]);
     const columns = (await database.execute("PRAGMA table_info(recurring_rules)")).rows.map((row) => row.name);
     expect(columns).toEqual(expect.arrayContaining(["icon", "anchor_day"]));
     expect((await migrateDatabase(database)).appliedVersions).toEqual([]);

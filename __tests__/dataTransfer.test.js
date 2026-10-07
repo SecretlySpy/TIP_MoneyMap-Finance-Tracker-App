@@ -1,5 +1,5 @@
 import { MAX_CELL_LENGTH, MAX_IMPORT_ROWS } from "../src/domain/services/importParser";
-import { BACKUP_FORMAT, buildBackup, buildTransactionsCsv, parseBackup, parsePastedTransactionsCsv, parseTransactionsCsv, serializeBackup, } from "../src/services/dataTransfer";
+import { BACKUP_FORMAT, BACKUP_VERSION, buildBackup, buildTransactionsCsv, parseBackup, parsePastedTransactionsCsv, parseTransactionsCsv, serializeBackup, } from "../src/services/dataTransfer";
 const accounts = [
     { id: 1, name: "Cash", type: "CASH", startingBalanceMinor: 0, isArchived: false },
 ];
@@ -21,18 +21,48 @@ const transactions = [
 ];
 describe("dataTransfer", () => {
     it("round-trips a MoneyMap backup payload", () => {
+        const accountsWithCard = [
+            ...accounts,
+            { id: 2, name: "Card", type: "CARD", startingBalanceMinor: -50_000, isArchived: false },
+        ];
         const backup = buildBackup({
+            accounts: accountsWithCard,
+            categories,
+            transactions,
+            transfers: [{
+                id: 1,
+                amountMinor: 10_000,
+                fromAccountId: 1,
+                toAccountId: 2,
+                dateEpochMillis: new Date(2026, 7, 2, 12).getTime(),
+                note: "Card payment",
+                sourceKey: "manual-transfer:v1:backup-roundtrip",
+            }],
+            budgets: [],
+            recurringRules: [],
+        });
+        expect(backup.format).toBe(BACKUP_FORMAT);
+        expect(backup.version).toBe(BACKUP_VERSION);
+        const restored = parseBackup(serializeBackup(backup));
+        expect(restored.transactions).toHaveLength(1);
+        expect(restored.transfers).toEqual([expect.objectContaining({ amountMinor: 10_000, toAccountId: 2 })]);
+        expect(restored.transactions[0]?.sourceKey).toBe("manual:v1:backup-roundtrip");
+        expect(restored.accounts[0]?.name).toBe("Cash");
+    });
+    it("upgrades a legacy v2 backup by adding an empty transfer collection", () => {
+        const legacy = buildBackup({
             accounts,
             categories,
             transactions,
             budgets: [],
             recurringRules: [],
         });
-        expect(backup.format).toBe(BACKUP_FORMAT);
-        const restored = parseBackup(serializeBackup(backup));
-        expect(restored.transactions).toHaveLength(1);
-        expect(restored.transactions[0]?.sourceKey).toBe("manual:v1:backup-roundtrip");
-        expect(restored.accounts[0]?.name).toBe("Cash");
+        legacy.version = 2;
+        delete legacy.transfers;
+        expect(parseBackup(serializeBackup(legacy))).toMatchObject({
+            version: BACKUP_VERSION,
+            transfers: [],
+        });
     });
     it("builds and parses transaction CSV with quoted notes", () => {
         const csv = buildTransactionsCsv(transactions, new Map(categories.map((category) => [category.id, category])), new Map(accounts.map((account) => [account.id, account])));
@@ -83,6 +113,34 @@ describe("dataTransfer", () => {
             recurringRules: [],
         });
         expect(() => parseBackup(serializeBackup(backup))).toThrow("duplicate source keys");
+    });
+    it("rejects invalid or duplicate transfer effects before restore replacement", () => {
+        const accountsWithCard = [
+            ...accounts,
+            { id: 2, name: "Card", type: "CARD", startingBalanceMinor: 0, isArchived: false },
+        ];
+        const transfer = {
+            id: 1,
+            amountMinor: 10_000,
+            fromAccountId: 1,
+            toAccountId: 2,
+            dateEpochMillis: new Date(2026, 7, 2, 12).getTime(),
+            note: null,
+            sourceKey: "manual-transfer:v1:duplicate",
+        };
+        const backup = buildBackup({
+            accounts: accountsWithCard,
+            categories,
+            transactions,
+            transfers: [transfer, { ...transfer, id: 2 }],
+            budgets: [],
+            recurringRules: [],
+        });
+        expect(() => parseBackup(serializeBackup(backup))).toThrow("duplicate source keys");
+        expect(() => parseBackup(serializeBackup({
+            ...backup,
+            transfers: [{ ...transfer, toAccountId: 1 }],
+        }))).toThrow("two different accounts");
     });
     it("rejects invalid enum and format fields before a restore transaction", () => {
         const backup = buildBackup({

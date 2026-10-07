@@ -9,13 +9,15 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { initializeDatabase } from "../src/db/client";
 import { migrateDatabase } from "../src/db/schema";
 import { OpSqliteDatabase } from "../src/db/sql";
-import { AccountRepository, GoalRepository, TransactionRepository } from "../src/db/repositories";
+import { AccountRepository, GoalRepository, TransactionRepository, TransferRepository } from "../src/db/repositories";
 import { buildBackup, parseBackup, serializeBackup } from "../src/services/dataTransfer";
 import { EntryScreen } from "../src/screens/EntryScreen";
 import { useFinanceStore } from "../src/store/financeStore";
 import { importAccountKey } from "../src/domain/services/importParser";
 import { ONBOARDING_FIRST_TRANSACTION_SOURCE_KEY } from "../src/services/onboarding";
 import { TestSqliteDatabase } from "./support/testDatabase";
+
+jest.setTimeout(15_000);
 
 describe("QA screen/store/repository flows on real SQLite", () => {
   let database;
@@ -136,6 +138,37 @@ describe("QA screen/store/repository flows on real SQLite", () => {
     await useFinanceStore.getState().restoreBackup(backup);
     expect(useFinanceStore.getState().transactions).toEqual([expect.objectContaining({ amountMinor: 500, note: "Synthetic" })]);
     expect(useFinanceStore.getState().goals).toEqual([expect.objectContaining({ name: "QA goal", currentMinor: 2_000 })]);
+  });
+
+  it("records an idempotent account transfer and preserves it through backup restore", async () => {
+    const [fromAccount, toAccount] = useFinanceStore.getState().accounts.filter((account) => !account.isArchived);
+    const input = {
+      amountMinor: 25_000,
+      fromAccountId: fromAccount.id,
+      toAccountId: toAccount.id,
+      note: "Move to card",
+      sourceKey: "manual-transfer:v1:store-retry",
+    };
+    const first = await useFinanceStore.getState().addAccountTransfer(input);
+    const retried = await useFinanceStore.getState().addAccountTransfer(input);
+    expect(retried.id).toBe(first.id);
+    expect(await new TransferRepository(database).list()).toHaveLength(1);
+
+    await new AccountRepository(database).update(toAccount.id, { isArchived: true });
+    await useFinanceStore.getState().refresh();
+    await expect(useFinanceStore.getState().addAccountTransfer(input)).resolves.toMatchObject({ id: first.id });
+
+    const backup = parseBackup(serializeBackup(buildBackup(useFinanceStore.getState())));
+    await useFinanceStore.getState().restoreBackup(backup);
+    expect(useFinanceStore.getState().transfers).toEqual([
+      expect.objectContaining({
+        amountMinor: 25_000,
+        fromAccountId: expect.any(Number),
+        toAccountId: expect.any(Number),
+        sourceKey: "manual-transfer:v1:store-retry",
+      }),
+    ]);
+    expect(useFinanceStore.getState().transactions).toHaveLength(0);
   });
 
   it("keeps an edited imported row while importing new rows from the same file", async () => {

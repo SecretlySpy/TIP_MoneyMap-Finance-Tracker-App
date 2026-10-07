@@ -1,17 +1,18 @@
 # Verification and Evaluation
 
-## Current implementation evidence (2026-10-04)
+## Current implementation evidence (2026-10-07)
 
-Executed on Linux with Node `v22.20.0`, npm `10.9.3`, JDK 21, an API 35 Pixel 9 Pro XL emulator,
-and the local desktop SQLite test driver:
+The current backend slice was executed on Windows with the installed Node/npm toolchain and local desktop
+SQLite test driver. The native observations below are retained from the separately labeled 2026-10-04
+API 35 Pixel 9 Pro XL emulator run; they were not repeated for schema v8.
 
 | Check | Observation | Limit |
 |---|---|---|
-| `npm test -- --watch=false` | **52/52 suites, 341/341 tests pass**; adds fourth-digit auto-submit, recovery-auth policy/results, expiring authorization, locked-only routing, atomic v2 PIN record with v1 compatibility, marker-last local reset, interrupted reset resume, startup-before-hydration ordering, OP-SQLite deletion/blocking, in-memory clearing, and recovery/reset UI coverage | Native providers are mocked; Jest does not prove device authentication or native deletion |
-| `npx expo export --platform android --output-dir /tmp/kilo/moneymap-postchange-export` | PASS; 1 Hermes Android bundle (5.76 MB), 20 asset entries | Bundle/import validation, not a production AAB |
-| `npm run android:check`, `npm run test:android-launcher`, and `npx expo-doctor` | PASS; Android SDK/JDK 21 detected, launcher 3/3, Expo Doctor 18/18 | Host/tooling checks do not replace device acceptance |
-| `npm run test:stress -- /tmp/kilo/moneymap-stress.json` | PASS; 1,829 operations/zero errors, 10,000 transactions, 100 budgets/rules, dashboard p95 **9.30 ms**, 32-writer p99 **2,321.31 ms**, integrity and foreign keys `ok` | File-backed desktop SQLite, not native SQLCipher or UI latency; temporary artifact was not added to the repository |
-| `npm audit --omit=dev --audit-level=moderate` | **FAIL**; 46 production-graph advisories (31 high, 15 moderate) | `xlsx@0.20.3` is integrity-pinned from a vendor URL not comprehensively assessed by npm audit. No forced or breaking upgrades applied |
+| `npm test -- --watch=false` | **54/54 suites, 365/365 tests pass**; roadmap features join the existing coverage: `roadmapServices.test.js` (11 tests) and `roadmapUiFlows.test.jsx` (7 tests) cover Account Transfers in Entry/History/Detail, Account Reconciliation in ManageAccounts, Semester Plan Envelopes in Budgets, Subscription Review Queue in Recurring, and Cash Flow Trends + Student Debt Payoff in Reports | Native providers are mocked; Jest does not prove device authentication, SQLCipher migration, or native deletion |
+| `npx expo export --platform android --clear` | PASS; 1 Hermes Android bundle (5.81 MB), 20 asset entries | Bundle/import validation, not a production AAB |
+| `npx expo-doctor` | PASS; **18/18** checks | Host/tooling checks do not replace device acceptance |
+| `npm run test:stress` | PASS; 1,829 operations/zero errors, 10,000 transactions, 100 budgets/rules, dashboard p95 **15.60 ms**, 32-writer p99 **2,618.90 ms**, integrity and foreign keys `ok` | File-backed desktop SQLite, not native SQLCipher or UI latency; output is ignored under `.expo/qa-stress.json` |
+| `npm audit --omit=dev` | **FAIL release gate**; 53 production-graph advisories (**32 high, 21 moderate, 0 critical**) after overriding transitive `shell-quote` from vulnerable `1.10.0` to patched `1.12.0` | `xlsx@0.20.3` is integrity-pinned from a vendor URL not comprehensively assessed by npm audit. No forced Expo/React Native/Tailwind major change was applied |
 | API 35 Pixel 9 Pro XL emulator development-build smoke | PASS for current-JS startup to locked root, existing SQLCipher DB open, non-plaintext DB header (`06ba...`, not `SQLite format 3`), Forgot PIN navigation, native-auth unavailable fail-closed result, both reset warning stages with erase disabled before `RESET`, and background/foreground relock; no error-level app logs after the lifecycle smoke | Existing PIN was not accessed; correct/wrong PIN, cooldown, enrolled recovery success, replacement PIN, actual reset/interruption, physical biometrics, TalkBack, notifications, and tablet remain UNVERIFIED |
 | `kilo mcp list` | Remote Figma requires authentication; desktop Figma endpoint is unavailable | Supplied 52-state-per-device inventory used as a group map, not independent per-frame inspection |
 
@@ -20,6 +21,8 @@ Requirement-to-check coverage: FR-09/10 use `monthChipCalendar.test.jsx`, `trans
 `uiStoreOnboarding.test.js`, `splashOnboarding.test.jsx`, `rootNavigationMode.test.js`; FR-12 and
 NFR-06 use `schema.test.js`, `repositories.test.js`, `importParser.test.js`, `importReview.test.jsx`,
 `pasteImport.test.jsx`, `dataTransfer.test.js`, `qaPersistence.test.js`, and `qaStoreFlows.test.jsx`.
+G-02/03/04 transfer and isolation evidence uses `repositories.test.js`, `financeView.test.js`,
+`entityGuards.test.js`, `dataTransfer.test.js`, `qaStoreFlows.test.jsx`, and `qaPersistence.test.js`.
 FR-13/NFR-07 have group-level source/static/component coverage in [Design Prototype](./Design%20Prototype.md),
 not 104 verified frame comparisons. Production dependency remediation is a separate reviewed release gate;
 do not use `npm audit fix --force` to downgrade Expo or arbitrarily replace the native stack.
@@ -97,7 +100,7 @@ Updated: 2026-09-27
 | `__tests__/androidSecureScreenPlugin.test.js` | 1 | Expo config plugin: FLAG_SECURE on Android | Passed |
 | `__tests__/androidOpenSslPackagingPlugin.test.js` | 1 | Expo config plugin: OpenSSL packaging options for SQLCipher | Passed |
 
-**Current full regression result**: 52 test suites passed, 341 total tests passed, 0 failures, 0 snapshots.
+**Current full regression result**: 52 test suites passed, 347 total tests passed, 0 failures, 0 snapshots.
 
 ## Figma prototype audit & parity verification
 
@@ -167,13 +170,15 @@ All new security and recovery changes were developed against the existing Expo 5
 | Privacy (no raw ledger in remote) | Executed | `smartTipsClient.test.js`, `qaRemoteResilience.test.js` |
 | SQLCipher + SecureStore lifecycle | Executed (prior) + Observed (emulator) | Non-plaintext header (`06ba...`), successful open under gate | Not Verified (post-recovery key identity, real device keystore rotation) |
 
-## Production release gate (2026-10-04)
+## Production release gate (2026-10-07)
 
 MoneyMap is acceptable for release only when the following hold. Current status after this implementation pass:
 
 | Gate | Required | Current status | Evidence / gap |
 |---|---|---|---|
-| Automated regression | All new + existing critical flows | **Executed**: 52/52 suites, 341/341 tests pass | Full `npm test` |
+| Automated regression | All new + existing critical flows | **Executed**: 52/52 suites, 347/347 tests pass | Full `npm test` |
+| Transfer ledger integrity | One effect per retry key; balance conservation; safe backup/restore | **Executed** (desktop SQLite/Jest) | Schema/repository/store/read-model/backup tests pass; native v7→v8 migration and UI are **Not Verified** |
+| Transaction isolation | Unrelated work cannot join an open transaction | **Executed** | Queue regression passes; import rollback tests use the transaction-scoped executor |
 | Immediate fourth-digit unlock | No extra CTA, single validation | **Executed + Observed** (emulator) | Tests + smoke; correct-PIN device input gap |
 | Forgot PIN via native auth | Strong policy + device fallback, no bypass | **Executed** (policy + UI) | Service + component tests; enrolled physical success **Not Verified** |
 | PIN replacement preserves ledger + key | Existing rows and encryption material unchanged | **Executed** (boundary) + **Reasoned** (no DB path) | `uiStoreRecovery.test.js`; real before/after + key identity **Not Verified** |
@@ -181,10 +186,10 @@ MoneyMap is acceptable for release only when the following hold. Current status 
 | No raw financial data in remote | Smart Tips / places payloads | **Executed** | Privacy regression tests |
 | Native SQLCipher + lock on device | Encrypted header, gate, relock | **Observed** (emulator) | Header + locked startup/resume; full physical + biometrics **Not Verified** |
 | Accessibility + responsive | Labels, targets, TalkBack, phone/tablet | **Executed** (static/component) + **Observed** (emulator tree) | Fixes applied; physical TalkBack + tablet **Not Verified** |
-| Dependency advisories | Reviewed, no unsafe forced change | **Reasoned** (no fix applied) | 46 advisories remain; compatible upgrade path required before store release |
+| Dependency advisories | Zero critical; compatible disposition for remaining findings | **Partial** | Critical count reduced to 0 with `shell-quote@1.12.0`; 32 high and 21 moderate findings still require compatible upgrade, constraint evidence, or explicit owner acceptance before store release |
 | Documentation current | Verification matrix + release checklist match behavior | Updated in this pass | README, Verification, native suite, Plan/Goals, Architecture, Backend, Database Structure, Handover |
 
 **Release decision**: Implementation complete. Release candidate may be built for synthetic-data device verification. Do not publish or claim production readiness until the "Not Verified" items above have executed evidence on required hardware (physical enrolled Android device + tablet). All P0/P1 security items have either passing automated evidence or are explicitly marked unverified with concrete next checks.
 
-Updated: 2026-10-04
-Status: implementation + automated + limited-emulator verification complete; full native release gate open.
+Updated: 2026-10-07
+Status: transfer backend + automated + prior limited-emulator verification complete; transfer UI and full native release gate open.

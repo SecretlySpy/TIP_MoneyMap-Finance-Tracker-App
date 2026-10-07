@@ -13,7 +13,7 @@ The Pages site is the polished setup guide: root [`index.html`](./index.html) (s
 | Tasks 1–9 core product | Done |
 | Task 10 recurring catch-up | Done |
 | Task 11 bill reminders (local notifications) | Done |
-| Task 12 CSV export + backup | Done — file-based share; backup now includes savings goals (QA 2026-08-31) |
+| Task 12 CSV export + backup | Done — file-based share; backup v3 includes savings goals and account transfers, while the reader remains compatible with v2 |
 | Task 13 CSV + Excel import | Done |
 | Task 14 app lock (PIN + biometrics) | Implemented — attempt lockout plus device-authenticated PIN replacement and an explicit local-reset fallback; enrolled-device recovery remains release-gated |
 | Task 15 Smart Tips offline rules | Done |
@@ -25,10 +25,11 @@ The Pages site is the polished setup guide: root [`index.html`](./index.html) (s
 | Settings pickers + Dashboard polish | Done (theme/currency chips, empties, tips teaser) |
 | Safe-to-Spend + Savings Goals | Done (pure calc + schema v2 + Goals screen); goal deadlines added |
 | Entry quick chips + MoM trend | Done |
+| Account-transfer backend | Done (schema v8, repository/store actions, balance semantics, delete guards, retry keys, backup/restore); visual flow is design-gated |
 
 **v0.1.0** — Core complete + Student Eats + Goals / Safe-to-Spend.
 
-### Current limits (reviewed 2026-10-03)
+### Current limits (reviewed 2026-10-07)
 
 The current verification matrix is in [Verification and Evaluation.md](./Project%20Guidelines/Verification%20and%20Evaluation.md).
 "Done" above describes implemented code, not a verified native release. Transaction backdating,
@@ -39,8 +40,8 @@ SQLite; live Figma and Android device acceptance remain separate.
 |---|---|
 | Native SQLCipher key/storage, PIN/biometric and notification lifecycles, phone/tablet layout and accessibility | API 35 emulator smoke verified encrypted-file header, locked startup/resume, Forgot PIN unavailable behavior, and reset confirmation UI. Enrolled recovery success, real deletion/interruption, physical phone/tablet, notifications, and assistive-technology acceptance remain **UNVERIFIED** |
 | Current 52 mobile + 52 tablet state frames | Figma connector requires authentication; six feature groups are mapped to code, individual visual parity is **UNVERIFIED** |
-| Dependency advisories | `npm audit --omit=dev` reported 46 advisories (31 high, 15 moderate) on 2026-10-04. `xlsx@0.20.3` is integrity-pinned from the vendor CDN; audit coverage of this tarball is incomplete. Review compatible updates before release |
-| Account transfers and budget rollover | Still outside the current product scope; imported rows edited since an earlier import are reported as skipped rather than overwritten |
+| Dependency advisories | `npm audit --omit=dev` reports 53 advisories (32 high, 21 moderate, **0 critical**) on 2026-10-07 after overriding transitive `shell-quote` to patched `1.12.0`. `xlsx@0.20.3` is integrity-pinned from the vendor CDN; audit coverage of this tarball is incomplete. Review Expo-compatible updates before release |
+| Transfer UI, reconciliation, and budget rollover | The transfer persistence/read-model backend is implemented, but no new visual flow was added before design review. Reconciliation and rollover remain planned; transaction CSV intentionally remains transaction-only while JSON backup v3 includes transfers |
 
 The Jest suite covers domain, data-transfer, store, component, and static UI contracts. Native
 device behavior still requires the Android verification path below.
@@ -50,7 +51,7 @@ device behavior still requires the Android verification path below.
 1. Install **Node.js 22 LTS**, **JDK 21**, Android SDK (API 35 recommended).
 2. `npm ci`
 3. Copy `.env.example` → `.env` (optional `GEMINI_API_KEY` for online tips).
-4. `npm test` (45 suites, 307 tests verified on 2026-10-03)
+4. `npm test` (52 suites, 347 tests verified on 2026-10-07)
 5. Start an emulator/device, then `npm run android` (dev client required — **Expo Go unsupported** because of SQLCipher).
 
 ### Android Studio run button
@@ -69,6 +70,7 @@ Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or th
 ## Architecture (short)
 
 - Screens → Zustand stores → repositories → SQLCipher
+- First-class account transfers move value between owned accounts without inflating income, expenses, or budgets
 - Money is always **integer minor units** (`src/domain/services/money.js`)
 - Theme tokens only (`src/theme/tokens.js`) — no hardcoded hex in screens
 - Bare `useTheme()` reads `themePreference` from `uiStore` (shared components stay dark-mode correct)

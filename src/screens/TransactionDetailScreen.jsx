@@ -6,7 +6,8 @@ import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { categoryEmoji, resolveDisplayEmoji } from "../domain/services/emoji";
-import { formatTransactionAmount } from "../domain/services/money";
+import { formatMinor, formatTransactionAmount } from "../domain/services/money";
+import { accountChipLabel } from "../domain/services/financeView";
 import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -19,12 +20,175 @@ export function TransactionDetailScreen({ navigation, route }) {
   const accounts = useFinanceStore((state) => state.accounts);
   const recurringRules = useFinanceStore((state) => state.recurringRules);
   const deleteTransactionById = useFinanceStore((state) => state.deleteTransactionById);
+  const transfers = useFinanceStore((state) => state.transfers);
+  const deleteAccountTransferById = useFinanceStore((state) => state.deleteAccountTransferById);
 
   const [deleteSheetVisible, setDeleteSheetVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const transactionId = Number(route?.params?.transactionId);
   const transaction = transactions.find((item) => item.id === transactionId);
+
+  const isTransfer = Boolean(route?.params?.isTransfer || route?.params?.transferId);
+  const transferId = Number(route?.params?.transferId ?? route?.params?.transactionId);
+  const transfer = isTransfer ? transfers.find((item) => item.id === transferId) : null;
+
+  if (isTransfer && transfer) {
+    const fromAccount = accounts.find((a) => a.id === transfer.fromAccountId);
+    const toAccount = accounts.find((a) => a.id === transfer.toAccountId);
+    const formattedAmount = formatMinor(transfer.amountMinor, { currencySymbol });
+    const formattedDate = new Date(transfer.dateEpochMillis).toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    return (
+      <ScreenContainer contentContainerStyle={{ flexGrow: 1, gap: theme.spacing.xl }} testID="transfer-detail-screen">
+        <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+          <Pressable
+            accessibilityLabel="Back to History"
+            accessibilityRole="button"
+            hitSlop={theme.spacing.md}
+            onPress={() => navigation.goBack()}
+            style={{
+              alignItems: "center",
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.outline,
+              borderRadius: theme.radii.round,
+              borderWidth: 1,
+              height: 40,
+              justifyContent: "center",
+              width: 40,
+            }}
+          >
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: 18 }}>‹</Text>
+          </Pressable>
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.screenTitle }}>
+            Account Transfer
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <SectionCard style={{ alignItems: "center", gap: theme.spacing.md, paddingVertical: theme.spacing.xl }}>
+          <View
+            style={{
+              alignItems: "center",
+              backgroundColor: theme.colors.avatarBg,
+              borderRadius: theme.radii.round,
+              height: 64,
+              justifyContent: "center",
+              width: 64,
+            }}
+          >
+            <Text style={{ fontSize: 32 }}>⇄</Text>
+          </View>
+          <Text
+            numberOfLines={2}
+            style={{
+              color: theme.colors.text,
+              fontFamily: theme.fonts.bold,
+              fontSize: theme.typeScale.subScreenTitle,
+              textAlign: "center",
+            }}
+          >
+            {transfer.note?.trim() || "Account Transfer"}
+          </Text>
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: 32 }}>
+            {formattedAmount}
+          </Text>
+          <View
+            style={{
+              backgroundColor: theme.colors.tint,
+              borderRadius: theme.radii.round,
+              paddingHorizontal: theme.spacing.md,
+              paddingVertical: theme.spacing.xs,
+            }}
+          >
+            <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+              Transfer · Neutral Ledger
+            </Text>
+          </View>
+        </SectionCard>
+
+        <SectionCard style={{ gap: theme.spacing.md, padding: theme.spacing.lg }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.body }}>From</Text>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold }}>{fromAccount?.name ?? "Account"}</Text>
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.body }}>To</Text>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold }}>{toAccount?.name ?? "Account"}</Text>
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.body }}>Date</Text>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium }}>{formattedDate}</Text>
+          </View>
+        </SectionCard>
+
+        <Pressable
+          accessibilityLabel="Delete Transfer"
+          accessibilityRole="button"
+          onPress={() => setDeleteSheetVisible(true)}
+          style={{
+            alignItems: "center",
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.expense,
+            borderRadius: theme.radii.button,
+            borderWidth: 1,
+            height: theme.sizes.primaryButton,
+            justifyContent: "center",
+            width: "100%",
+          }}
+        >
+          <Text
+            onPress={() => setDeleteSheetVisible(true)}
+            style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}
+          >
+            Delete Transfer
+          </Text>
+        </Pressable>
+
+        <BottomSheet
+          onClose={() => setDeleteSheetVisible(false)}
+          title="Delete this transfer?"
+          visible={deleteSheetVisible}
+        >
+          <View style={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.md }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body }}>
+              Balances will be reverted across both accounts. This cannot be undone.
+            </Text>
+            <PrimaryButton
+              accessibilityLabel="Confirm Delete"
+              disabled={isDeleting}
+              onPress={async () => {
+                try {
+                  setIsDeleting(true);
+                  await deleteAccountTransferById(transfer.id);
+                  setDeleteSheetVisible(false);
+                  navigation.goBack();
+                } catch (error) {
+                  Alert.alert("Delete failed", error instanceof Error ? error.message : "Could not delete transfer.");
+                } finally {
+                  setIsDeleting(false);
+                }
+              }}
+              style={{ backgroundColor: theme.colors.expense }}
+            >
+              {isDeleting ? "Deleting…" : "Confirm Delete"}
+            </PrimaryButton>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setDeleteSheetVisible(false)}
+              style={{ alignItems: "center", justifyContent: "center", minHeight: 44 }}
+            >
+              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </BottomSheet>
+      </ScreenContainer>
+    );
+  }
 
   if (!transaction) {
     return (
