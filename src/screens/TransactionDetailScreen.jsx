@@ -157,7 +157,6 @@ export function TransactionDetailScreen({ navigation, route }) {
           }}
         >
           <Text
-            onPress={() => setDeleteSheetVisible(true)}
             style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}
           >
             Delete Transfer

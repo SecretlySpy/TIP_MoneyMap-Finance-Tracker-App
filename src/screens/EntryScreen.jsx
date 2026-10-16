@@ -70,6 +70,13 @@ export function EntryScreen({ navigation }) {
     const [datePickerVisible, setDatePickerVisible] = useState(false);
     const [selectedDateEpochMillis, setSelectedDateEpochMillis] = useState(() => localNoonToday());
     const sourceKeyRef = useRef(createManualSourceKey());
+    const isMountedRef = useRef(true);
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
     const noteTags = useMemo(() => extractTags(note), [note]);
     const transactions = useFinanceStore((state) => state.transactions);
     const accountChips = useMemo(() => listAccountChips(accounts), [accounts]);
@@ -234,11 +241,13 @@ export function EntryScreen({ navigation }) {
             // completed mutation key while preserving it across any failed/uncertain retry.
             sourceKeyRef.current = createManualSourceKey();
             setSelectedMonthYear(toMonthYear(new Date(selectedDateEpochMillis)));
-            setAmountInput("");
-            setNote("");
-            setIsSplitMode(false);
-            setSplits([]);
-            setSelectedDateEpochMillis(localNoonToday());
+            if (isMountedRef.current) {
+                setAmountInput("");
+                setNote("");
+                setIsSplitMode(false);
+                setSplits([]);
+                setSelectedDateEpochMillis(localNoonToday());
+            }
             if (typeof navigation?.canGoBack === "function" && navigation.canGoBack()) {
                 navigation.goBack();
             }
@@ -249,7 +258,9 @@ export function EntryScreen({ navigation }) {
             Alert.alert("Save failed", message);
         }
         finally {
-            setSaving(false);
+            if (isMountedRef.current) {
+                setSaving(false);
+            }
         }
     };
     return (<ScreenContainer contentContainerStyle={{ gap: theme.spacing.card }} safeBottom testID="entry-screen">
