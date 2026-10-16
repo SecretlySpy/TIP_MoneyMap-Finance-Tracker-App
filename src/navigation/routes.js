@@ -24,20 +24,20 @@ export function selectRootNavigationMode({ preferencesReady, hasSeenSplash, onbo
  * @property {undefined} SmartTips
  * @property {undefined} StudentEats
  * @property {undefined} Reports
- * @property {{ transactionId: number }} TransactionDetail
- * @property {{ transactionId: number }} EditTransaction
+ * @property {{ transactionId?: number, isTransfer?: boolean, transferId?: number }} TransactionDetail
+ * @property {{ transactionId?: number, isTransfer?: boolean, transferId?: number }} EditTransaction
  *
  * @typedef {Object} HistoryStackParamList
  * @property {undefined} HistoryList
- * @property {{ transactionId: number }} TransactionDetail
- * @property {{ transactionId: number }} EditTransaction
+ * @property {{ transactionId?: number, isTransfer?: boolean, transferId?: number }} TransactionDetail
+ * @property {{ transactionId?: number, isTransfer?: boolean, transferId?: number }} EditTransaction
  *
  * @typedef {Object} BudgetsStackParamList
  * @property {undefined} BudgetsOverview
  * @property {undefined} Recurring
  * @property {undefined} Import
- * @property {{ transactionId: number }} TransactionDetail
- * @property {{ transactionId: number }} EditTransaction
+ * @property {{ transactionId?: number, isTransfer?: boolean, transferId?: number }} TransactionDetail
+ * @property {{ transactionId?: number, isTransfer?: boolean, transferId?: number }} EditTransaction
  *
  * @typedef {Object} SettingsStackParamList
  * @property {undefined} SettingsOverview
@@ -47,8 +47,8 @@ export function selectRootNavigationMode({ preferencesReady, hasSeenSplash, onbo
  * @property {undefined} Import
  * @property {undefined} Reports
  * @property {{ mode: 'csv' | 'backup' }} PasteImport
- * @property {{ transactionId: number }} TransactionDetail
- * @property {{ transactionId: number }} EditTransaction
+ * @property {{ transactionId?: number, isTransfer?: boolean, transferId?: number }} TransactionDetail
+ * @property {{ transactionId?: number, isTransfer?: boolean, transferId?: number }} EditTransaction
  *
  * @typedef {Object} MainTabParamList
  * @property {import('@react-navigation/native').NavigatorScreenParams<HomeStackParamList> | undefined} Home

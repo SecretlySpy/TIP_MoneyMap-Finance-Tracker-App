@@ -10,6 +10,8 @@ import { TextPromptModal } from "../components/TextPromptModal";
 import { accountChipLabel, categoriesForType, computeAccountBalances, toMonthYear } from "../domain/services/financeView";
 import { resolveDisplayEmoji } from "../domain/services/emoji";
 import { formatMinor, parseDecimalToMinor, updateMoneyInput } from "../domain/services/money";
+import { buildSplitTransactions, formatSplitEquation, validateSplitSum } from "../domain/services/splits";
+import { extractTags } from "../domain/services/tags";
 import { listAccountChips, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -63,9 +65,12 @@ export function EntryScreen({ navigation }) {
     const [showNewCategory, setShowNewCategory] = useState(false);
     const [note, setNote] = useState("");
     const [showNotePrompt, setShowNotePrompt] = useState(false);
+    const [isSplitMode, setIsSplitMode] = useState(false);
+    const [splits, setSplits] = useState([]);
     const [datePickerVisible, setDatePickerVisible] = useState(false);
     const [selectedDateEpochMillis, setSelectedDateEpochMillis] = useState(() => localNoonToday());
     const sourceKeyRef = useRef(createManualSourceKey());
+    const noteTags = useMemo(() => extractTags(note), [note]);
     const transactions = useFinanceStore((state) => state.transactions);
     const accountChips = useMemo(() => listAccountChips(accounts), [accounts]);
     const activeAccounts = useMemo(() => accounts.filter((account) => !account.isArchived), [accounts]);
@@ -78,7 +83,7 @@ export function EntryScreen({ navigation }) {
         if (selectedAccountId === null && fromId !== null) {
             setSelectedAccountId(fromId);
         }
-        if ((selectedToAccountId === null || selectedToAccountId === fromId) && activeAccounts.length > 1) {
+        if (selectedToAccountId === null && activeAccounts.length > 1) {
             const second = activeAccounts.find((a) => a.id !== fromId);
             if (second) {
                 setSelectedToAccountId(second.id);
@@ -170,8 +175,10 @@ export function EntryScreen({ navigation }) {
     const amountColor = transactionType === "EXPENSE" ? theme.colors.expense : transactionType === "INCOME" ? theme.colors.income : theme.colors.text;
     const selectedAccountLabel = accountChips.find((account) => account.id === selectedAccountId)?.label.replace(/^\S+\s/, "") ?? "Choose account";
     const canSave = transactionType === "TRANSFER"
-        ? amountMinor > 0 && selectedAccountId !== null && selectedToAccountId !== null && selectedAccountId !== selectedToAccountId && !saving
-        : amountMinor > 0 && selectedCategory !== "" && selectedCategory !== "New" && selectedAccountId !== null && !saving;
+        ? amountMinor > 0 && selectedAccountId !== null && selectedToAccountId !== null && selectedAccountId !== selectedToAccountId && activeAccounts.length >= 2 && !saving
+        : isSplitMode
+            ? amountMinor > 0 && splits.length > 0 && validateSplitSum(splits, amountMinor).isValid && selectedAccountId !== null && !saving
+            : amountMinor > 0 && selectedCategory !== "" && selectedCategory !== "New" && selectedAccountId !== null && !saving;
 
     const handleSave = async () => {
         if (!canSave) {
@@ -186,7 +193,32 @@ export function EntryScreen({ navigation }) {
                     amountMinor,
                     note: note.trim() ? note.trim() : null,
                     dateEpochMillis: selectedDateEpochMillis,
+                    sourceKey: sourceKeyRef.current,
                 });
+            } else if (isSplitMode && splits.length > 0) {
+                const validation = validateSplitSum(splits, amountMinor);
+                if (!validation.isValid) {
+                    Alert.alert("Split Mismatch", validation.error || "Splits do not equal total.");
+                    return;
+                }
+                const splitTxs = buildSplitTransactions({
+                    parentTransaction: {
+                        type: "EXPENSE",
+                        accountId: selectedAccountId,
+                        amountMinor,
+                        note: note.trim() ? note.trim() : null,
+                        dateEpochMillis: selectedDateEpochMillis,
+                        sourceKey: sourceKeyRef.current,
+                    },
+                    splits: splits.map((s) => ({
+                        categoryId: categories.find((c) => c.name === s.categoryName)?.id || typeCategories[0]?.id || 1,
+                        amountMinor: s.amountMinor,
+                        note: s.categoryName,
+                    })),
+                });
+                for (const sTx of splitTxs) {
+                    await addTransaction(sTx);
+                }
             } else {
                 await addTransaction({
                     accountId: selectedAccountId,
@@ -204,6 +236,8 @@ export function EntryScreen({ navigation }) {
             setSelectedMonthYear(toMonthYear(new Date(selectedDateEpochMillis)));
             setAmountInput("");
             setNote("");
+            setIsSplitMode(false);
+            setSplits([]);
             setSelectedDateEpochMillis(localNoonToday());
             if (typeof navigation?.canGoBack === "function" && navigation.canGoBack()) {
                 navigation.goBack();
@@ -279,6 +313,70 @@ export function EntryScreen({ navigation }) {
 
       {transactionType === "TRANSFER" ? (
         <View style={{ gap: theme.spacing.md }}>
+          {/* Phase 2 Frame 299:2779: Transfer Flow Info */}
+          <View
+            testID="transfer-flow-info"
+            style={{
+              backgroundColor: theme.colors.tint,
+              borderColor: theme.colors.primary,
+              borderRadius: theme.radii.row,
+              borderWidth: 1,
+              gap: theme.spacing.xxs,
+              padding: theme.spacing.md,
+            }}
+          >
+            <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+              Transfer between accounts
+            </Text>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small, lineHeight: 18 }}>
+              From → To • Amount • Date • Note{"\n"}Does not count as income or expense.
+            </Text>
+          </View>
+
+          {/* Insufficient accounts warning */}
+          {activeAccounts.length < 2 ? (
+            <View
+              testID="insufficient-accounts-banner"
+              style={{
+                backgroundColor: theme.colors.amberBg,
+                borderColor: theme.colors.warning,
+                borderRadius: theme.radii.row,
+                borderWidth: 1,
+                gap: theme.spacing.xs,
+                padding: theme.spacing.md,
+              }}
+            >
+              <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                At least two accounts needed
+              </Text>
+              <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small, lineHeight: 18 }}>
+                Transfers require at least two active accounts. Create or unarchive another account to transfer funds.
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Phase 2 Frame 299:2782: Same Account Error Banner */}
+          {selectedAccountId !== null && selectedToAccountId !== null && selectedAccountId === selectedToAccountId ? (
+            <View
+              testID="same-account-error"
+              style={{
+                backgroundColor: theme.colors.avatarBg,
+                borderColor: theme.colors.expense,
+                borderRadius: theme.radii.row,
+                borderWidth: 1,
+                gap: theme.spacing.xs,
+                padding: theme.spacing.md,
+              }}
+            >
+              <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                Choose two different accounts
+              </Text>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small, lineHeight: 18 }}>
+                Same-account transfers are blocked. Negative balances are allowed and explained.
+              </Text>
+            </View>
+          ) : null}
+
           <View style={{ gap: theme.spacing.xs }}>
             <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
               From Account
@@ -290,6 +388,7 @@ export function EntryScreen({ navigation }) {
                   onPress={() => setSelectedAccountId(account.id)}
                   selected={selectedAccountId === account.id}
                   style={{ height: theme.sizes.accountChip }}
+                  testID={`from-account-${account.id}`}
                 >
                   {accountChipLabel(account.type)} · {account.name}
                 </Chip>
@@ -299,6 +398,7 @@ export function EntryScreen({ navigation }) {
 
           <View style={{ alignItems: "center", marginVertical: theme.spacing.xs }}>
             <Pressable
+              accessibilityLabel="Swap accounts"
               accessibilityRole="button"
               hitSlop={theme.spacing.sm}
               onPress={() => {
@@ -314,6 +414,7 @@ export function EntryScreen({ navigation }) {
                 borderWidth: 1,
                 flexDirection: "row",
                 gap: theme.spacing.xs,
+                minHeight: 44,
                 paddingHorizontal: theme.spacing.lg,
                 paddingVertical: theme.spacing.xs,
               }}
@@ -335,6 +436,7 @@ export function EntryScreen({ navigation }) {
                   onPress={() => setSelectedToAccountId(account.id)}
                   selected={selectedToAccountId === account.id}
                   style={{ height: theme.sizes.accountChip }}
+                  testID={`to-account-${account.id}`}
                 >
                   {accountChipLabel(account.type)} · {account.name}
                 </Chip>
@@ -346,7 +448,13 @@ export function EntryScreen({ navigation }) {
             <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
               {note.trim() ? `Note: ${note.trim()}` : "No note added"}
             </Text>
-            <Pressable accessibilityRole="button" onPress={() => setShowNotePrompt(true)}>
+            <Pressable
+              accessibilityLabel={note.trim() ? "Edit note" : "Add note"}
+              accessibilityRole="button"
+              hitSlop={theme.spacing.sm}
+              onPress={() => setShowNotePrompt(true)}
+              style={{ alignItems: "center", justifyContent: "center", minHeight: 44 }}
+            >
               <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
                 {note.trim() ? "Edit note" : "+ Add note"}
               </Text>
@@ -474,9 +582,22 @@ export function EntryScreen({ navigation }) {
               </Pressable>
             </View>
             {note.trim() ? (
-              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
-                {note.trim()}
-              </Text>
+              <View style={{ gap: theme.spacing.xxs }}>
+                <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>
+                  {note.trim()}
+                </Text>
+                {noteTags.length > 0 ? (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.xs }}>
+                    {noteTags.map((tag) => (
+                      <View key={tag} style={{ backgroundColor: theme.colors.tint, borderRadius: theme.radii.chip, paddingHorizontal: theme.spacing.sm, paddingVertical: 2 }}>
+                        <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.tiny }}>
+                          #{tag}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
             ) : null}
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.keyGap }}>
               {accountChips.map((account) => (<Chip key={account.id} onPress={() => setSelectedAccountId(account.id)} selected={selectedAccountId === account.id} style={{ height: theme.sizes.accountChip }}>
@@ -484,6 +605,85 @@ export function EntryScreen({ navigation }) {
                 </Chip>))}
             </View>
           </View>
+
+          {/* Power Tools: Split Transaction */}
+          {transactionType === "EXPENSE" && amountMinor > 0 ? (
+            <View style={{ gap: theme.spacing.sm }}>
+              <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny }}>
+                  POWER TOOLS
+                </Text>
+                <Pressable
+                  accessibilityLabel={isSplitMode ? "Cancel split" : "Split transaction"}
+                  accessibilityRole="button"
+                  onPress={() => {
+                    if (!isSplitMode) {
+                      const half = Math.floor(amountMinor / 2);
+                      setSplits([
+                        { categoryName: selectedCategory || typeCategories[0]?.name || "Expense", amountMinor: half },
+                        { categoryName: typeCategories[1]?.name || typeCategories[0]?.name || "Expense", amountMinor: amountMinor - half },
+                      ]);
+                      setIsSplitMode(true);
+                    } else {
+                      setIsSplitMode(false);
+                      setSplits([]);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: isSplitMode ? theme.colors.tint : theme.colors.surface,
+                    borderColor: isSplitMode ? theme.colors.primary : theme.colors.outline,
+                    borderRadius: theme.radii.chip,
+                    borderWidth: 1,
+                    justifyContent: "center",
+                    minHeight: 44,
+                    paddingHorizontal: theme.spacing.md,
+                  }}
+                >
+                  <Text style={{ color: isSplitMode ? theme.colors.primary : theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                    {isSplitMode ? "✓ Split Active" : "✂ Split Transaction"}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {isSplitMode ? (
+                <View
+                  style={{
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.primary,
+                    borderRadius: theme.radii.card,
+                    borderWidth: 1,
+                    gap: theme.spacing.xs,
+                    padding: theme.spacing.md,
+                  }}
+                >
+                  <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                    EXACT-SUM SPLIT BREAKDOWN
+                  </Text>
+                  <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                    {formatSplitEquation(splits, amountMinor, currencySymbol)}
+                  </Text>
+                  {splits.map((split, idx) => (
+                    <View key={idx} style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ color: theme.colors.text, fontSize: theme.typeScale.small }}>
+                        {idx + 1}. {split.categoryName}
+                      </Text>
+                      <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                        {formatMinor(split.amountMinor, { currencySymbol })}
+                      </Text>
+                    </View>
+                  ))}
+                  <View style={{ borderTopColor: theme.colors.outline, borderTopWidth: theme.spacing.hairline, flexDirection: "row", justifyContent: "space-between", paddingTop: 4 }}>
+                    <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
+                      {validateSplitSum(splits, amountMinor).isValid ? "✓ Exact sum verified" : "⚠️ Sum mismatch"}
+                    </Text>
+                    <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
+                      Total: {formatMinor(amountMinor, { currencySymbol })}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </>
       )}
 

@@ -67,7 +67,22 @@ export function TransactionDetailScreen({ navigation, route }) {
           <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.screenTitle }}>
             Account Transfer
           </Text>
-          <View style={{ width: 40 }} />
+          <Pressable
+            accessibilityLabel="Edit transfer"
+            accessibilityRole="button"
+            hitSlop={theme.spacing.md}
+            onPress={() => navigation.navigate("EditTransaction", { isTransfer: true, transferId: transfer.id })}
+          >
+            <Text
+              style={{
+                color: theme.colors.primary,
+                fontFamily: theme.fonts.bold,
+                fontSize: theme.typeScale.body,
+              }}
+            >
+              Edit
+            </Text>
+          </Pressable>
         </View>
 
         <SectionCard style={{ alignItems: "center", gap: theme.spacing.md, paddingVertical: theme.spacing.xl }}>

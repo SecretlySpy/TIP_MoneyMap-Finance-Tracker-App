@@ -55,6 +55,93 @@ export function ManageAccountsScreen({ navigation }) {
   const selectedDetailAccount = accounts.find((a) => a.id === selectedDetailAccountId);
   const detailAccountCalculated = calculatedAccounts.find((a) => a.id === selectedDetailAccountId);
 
+  const accountTransactions = useMemo(() => {
+    if (!selectedDetailAccountId) return [];
+    return transactions
+      .filter((t) => t.accountId === selectedDetailAccountId)
+      .sort((a, b) => b.dateEpochMillis - a.dateEpochMillis);
+  }, [transactions, selectedDetailAccountId]);
+
+  const accountTransfers = useMemo(() => {
+    if (!selectedDetailAccountId) return [];
+    return transfers
+      .filter(
+        (t) => t.fromAccountId === selectedDetailAccountId || t.toAccountId === selectedDetailAccountId
+      )
+      .sort((a, b) => b.dateEpochMillis - a.dateEpochMillis);
+  }, [transfers, selectedDetailAccountId]);
+
+  const workingBalanceMinor = detailAccountCalculated?.balanceMinor ?? (selectedDetailAccount?.startingBalanceMinor ?? 0);
+
+  const clearedBalanceMinor = useMemo(() => {
+    if (!selectedDetailAccount) return 0;
+    let total = selectedDetailAccount.startingBalanceMinor;
+    for (const tx of accountTransactions) {
+      if (clearedTxIds.has(`tx:${tx.id}`)) {
+        if (tx.type === "INCOME") total += tx.amountMinor;
+        else if (tx.type === "EXPENSE") total -= tx.amountMinor;
+      }
+    }
+    for (const tr of accountTransfers) {
+      if (clearedTxIds.has(`tr:${tr.id}`)) {
+        if (tr.toAccountId === selectedDetailAccount.id) total += tr.amountMinor;
+        if (tr.fromAccountId === selectedDetailAccount.id) total -= tr.amountMinor;
+      }
+    }
+    return total;
+  }, [selectedDetailAccount, accountTransactions, accountTransfers, clearedTxIds]);
+
+  const diffMinor = workingBalanceMinor - clearedBalanceMinor;
+
+  const toggleCleared = (key) => {
+    setClearedTxIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const handleCreateAdjustment = async () => {
+    if (!selectedDetailAccount || diffMinor === 0 || busy) return;
+    setBusy(true);
+    try {
+      const adjTx = await addTransaction({
+        accountId: selectedDetailAccount.id,
+        amountMinor: Math.abs(diffMinor),
+        type: diffMinor > 0 ? "EXPENSE" : "INCOME",
+        note: "Reconciliation adjustment",
+        dateEpochMillis: Date.now(),
+      });
+      if (adjTx?.id) {
+        setClearedTxIds((prev) => new Set(prev).add(`tx:${adjTx.id}`));
+      }
+      Alert.alert(
+        "Adjustment Created",
+        `Created explicit ${formatMinor(Math.abs(diffMinor), { currencySymbol })} adjustment transaction. Ledger is balanced.`
+      );
+    } catch (err) {
+      Alert.alert("Adjustment Failed", err instanceof Error ? err.message : "Could not create adjustment.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openDetailSheet = (account) => {
+    setSelectedDetailAccountId(account.id);
+    setStatementBalanceInput("");
+    const initialCleared = new Set();
+    for (const tx of transactions) {
+      if (tx.accountId === account.id) initialCleared.add(`tx:${tx.id}`);
+    }
+    for (const tr of transfers) {
+      if (tr.fromAccountId === account.id || tr.toAccountId === account.id) {
+        initialCleared.add(`tr:${tr.id}`);
+      }
+    }
+    setClearedTxIds(initialCleared);
+  };
+
   const parsedStatementMinor = useMemo(() => {
     try {
       return parseDecimalToMinor(statementBalanceInput.replace(/[₱$,\s]/g, "") || "0", { allowNegative: true });
@@ -64,9 +151,10 @@ export function ManageAccountsScreen({ navigation }) {
   }, [statementBalanceInput]);
 
   const reconciliationMatches =
-    parsedStatementMinor !== null &&
-    statementBalanceInput.trim().length > 0 &&
-    parsedStatementMinor === (detailAccountCalculated?.balanceMinor ?? selectedDetailAccount?.startingBalanceMinor);
+    (parsedStatementMinor !== null &&
+      statementBalanceInput.trim().length > 0 &&
+      parsedStatementMinor === (detailAccountCalculated?.balanceMinor ?? selectedDetailAccount?.startingBalanceMinor)) ||
+    (statementBalanceInput.trim().length === 0 && diffMinor === 0);
 
   const handleArchive = (account) => {
     Alert.alert(
@@ -192,10 +280,7 @@ export function ManageAccountsScreen({ navigation }) {
                   accessibilityLabel="Details & Reconcile"
                   accessibilityRole="button"
                   hitSlop={theme.spacing.sm}
-                  onPress={() => {
-                    setSelectedDetailAccountId(account.id);
-                    setStatementBalanceInput("");
-                  }}
+                  onPress={() => openDetailSheet(account)}
                   style={{ justifyContent: "center", minHeight: 44 }}
                 >
                   <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
@@ -365,6 +450,37 @@ export function ManageAccountsScreen({ navigation }) {
           visible={selectedDetailAccountId !== null}
         >
           <View style={{ gap: theme.spacing.md, paddingBottom: theme.spacing.lg }}>
+            {/* Frame 299:2785: Working vs Cleared banner */}
+            <View
+              style={{
+                backgroundColor: theme.colors.tint,
+                borderColor: theme.colors.primary,
+                borderRadius: theme.radii.row,
+                borderWidth: 1,
+                gap: theme.spacing.xxs,
+                padding: theme.spacing.md,
+              }}
+            >
+              <Text
+                style={{
+                  color: theme.colors.text,
+                  fontFamily: theme.fonts.bold,
+                  fontSize: theme.typeScale.body,
+                }}
+              >
+                {`Working: ${formatMinor(workingBalanceMinor, { currencySymbol, showCents: false })} • Cleared: ${formatMinor(clearedBalanceMinor, { currencySymbol, showCents: false })} • Diff: ${formatMinor(diffMinor, { currencySymbol, showCents: false })}`}
+              </Text>
+              <Text
+                style={{
+                  color: theme.colors.sub,
+                  fontFamily: theme.fonts.regular,
+                  fontSize: theme.typeScale.tiny,
+                }}
+              >
+                Mark transactions cleared. Explicit adjustment only.
+              </Text>
+            </View>
+
             <View style={{ backgroundColor: theme.colors.bg, borderRadius: theme.radii.row, padding: theme.spacing.md }}>
               <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small, fontFamily: theme.fonts.bold }}>
                 Working Balance
@@ -376,6 +492,137 @@ export function ManageAccountsScreen({ navigation }) {
                 Starting balance {formatMinor(selectedDetailAccount.startingBalanceMinor, { currencySymbol })} + transactions & transfers
               </Text>
             </View>
+
+            {/* Checklist of transactions for clearing */}
+            <View style={{ gap: theme.spacing.xs }}>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                Transactions Checklist
+              </Text>
+              <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
+                Mark transactions cleared. Explicit adjustment only.
+              </Text>
+              {accountTransactions.length === 0 && accountTransfers.length === 0 ? (
+                <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small, fontStyle: "italic", paddingVertical: theme.spacing.sm }}>
+                  No transactions recorded for this account yet.
+                </Text>
+              ) : (
+                accountTransactions.map((tx) => {
+                  const isCleared = clearedTxIds.has(`tx:${tx.id}`);
+                  return (
+                    <Pressable
+                      key={`tx:${tx.id}`}
+                      accessibilityLabel={`${tx.note || "Transaction"} ${isCleared ? "cleared" : "pending"}`}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: isCleared }}
+                      onPress={() => toggleCleared(`tx:${tx.id}`)}
+                      style={{
+                        alignItems: "center",
+                        backgroundColor: isCleared ? theme.colors.bg : theme.colors.surface,
+                        borderColor: isCleared ? theme.colors.primary : theme.colors.outline,
+                        borderRadius: theme.radii.row,
+                        borderWidth: 1,
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        minHeight: 44,
+                        paddingHorizontal: theme.spacing.md,
+                        paddingVertical: theme.spacing.sm,
+                      }}
+                    >
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: theme.spacing.sm, flex: 1 }}>
+                        <Text style={{ color: isCleared ? theme.colors.primary : theme.colors.sub, fontFamily: theme.fonts.bold }}>
+                          {isCleared ? "☑ Cleared" : "☐ Pending"}
+                        </Text>
+                        <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }} numberOfLines={1}>
+                          {tx.note || (tx.type === "INCOME" ? "Income" : "Expense")}
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          color: tx.type === "INCOME" ? theme.colors.income : theme.colors.text,
+                          fontFamily: theme.fonts.bold,
+                          fontSize: theme.typeScale.small,
+                        }}
+                      >
+                        {tx.type === "INCOME" ? "+" : "-"}{formatMinor(tx.amountMinor, { currencySymbol })}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              )}
+              {accountTransfers.map((tr) => {
+                const isCleared = clearedTxIds.has(`tr:${tr.id}`);
+                const isOutbound = tr.fromAccountId === selectedDetailAccount.id;
+                return (
+                  <Pressable
+                    key={`tr:${tr.id}`}
+                    accessibilityLabel={`Transfer ${tr.note || ""} ${isCleared ? "cleared" : "pending"}`}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isCleared }}
+                    onPress={() => toggleCleared(`tr:${tr.id}`)}
+                    style={{
+                      alignItems: "center",
+                      backgroundColor: isCleared ? theme.colors.bg : theme.colors.surface,
+                      borderColor: isCleared ? theme.colors.primary : theme.colors.outline,
+                      borderRadius: theme.radii.row,
+                      borderWidth: 1,
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      minHeight: 44,
+                      paddingHorizontal: theme.spacing.md,
+                      paddingVertical: theme.spacing.sm,
+                    }}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: theme.spacing.sm, flex: 1 }}>
+                      <Text style={{ color: isCleared ? theme.colors.primary : theme.colors.sub, fontFamily: theme.fonts.bold }}>
+                        {isCleared ? "☑ Cleared" : "☐ Pending"}
+                      </Text>
+                      <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }} numberOfLines={1}>
+                        Transfer: {tr.note || (isOutbound ? "Outbound" : "Inbound")}
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        color: isOutbound ? theme.colors.expense : theme.colors.income,
+                        fontFamily: theme.fonts.bold,
+                        fontSize: theme.typeScale.small,
+                      }}
+                    >
+                      {isOutbound ? "-" : "+"}{formatMinor(tr.amountMinor, { currencySymbol })}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Explicit adjustment only when diff !== 0 */}
+            {diffMinor !== 0 ? (
+              <View style={{ gap: theme.spacing.xs, marginTop: theme.spacing.xs }}>
+                <View style={{ backgroundColor: theme.colors.amberBg, borderRadius: theme.radii.chip, padding: theme.spacing.md }}>
+                  <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                    Ledger discrepancy: {formatMinor(Math.abs(diffMinor), { currencySymbol })} difference between working and cleared totals.
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityLabel="Create adjustment transaction"
+                  accessibilityRole="button"
+                  onPress={() => void handleCreateAdjustment()}
+                  style={{
+                    alignItems: "center",
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.primary,
+                    borderRadius: theme.radii.button,
+                    borderWidth: 1,
+                    height: theme.sizes.primaryButton,
+                    justifyContent: "center",
+                    minHeight: 44,
+                  }}
+                >
+                  <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
+                    + Create Adjustment Transaction
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             <View style={{ gap: theme.spacing.xs }}>
               <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>

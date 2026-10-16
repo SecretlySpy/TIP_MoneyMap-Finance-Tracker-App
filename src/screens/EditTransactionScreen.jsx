@@ -8,7 +8,7 @@ import { Chip } from "../components/Chip";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { categoryEmoji, resolveDisplayEmoji } from "../domain/services/emoji";
-import { categoriesForType } from "../domain/services/financeView";
+import { accountChipLabel, categoriesForType, computeAccountBalances } from "../domain/services/financeView";
 import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import { listAccountChips, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -59,16 +59,85 @@ function MissingTransactionView({ navigation, theme }) {
   );
 }
 
+function MissingTransferView({ navigation, theme }) {
+  return (
+    <ScreenContainer contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }} testID="edit-missing-transfer-screen">
+      <View style={{ alignItems: "center", gap: theme.spacing.lg, justifyContent: "center", paddingVertical: theme.spacing.xxl }}>
+        <View
+          style={{
+            alignItems: "center",
+            backgroundColor: theme.colors.avatarBg,
+            borderRadius: theme.radii.round,
+            height: 64,
+            justifyContent: "center",
+            width: 64,
+          }}
+        >
+          <Text style={{ fontSize: 32 }}>⚠️</Text>
+        </View>
+        <Text
+          style={{
+            color: theme.colors.text,
+            fontFamily: theme.fonts.bold,
+            fontSize: theme.typeScale.screenTitle,
+            textAlign: "center",
+          }}
+        >
+          Transfer unavailable
+        </Text>
+        <Text
+          style={{
+            color: theme.colors.sub,
+            fontFamily: theme.fonts.regular,
+            fontSize: theme.typeScale.body,
+            maxWidth: 320,
+            textAlign: "center",
+          }}
+        >
+          This transfer could not be found. It may have been deleted.
+        </Text>
+        <PrimaryButton onPress={() => navigation.goBack()} style={{ marginTop: theme.spacing.md }}>
+          Back to History
+        </PrimaryButton>
+      </View>
+    </ScreenContainer>
+  );
+}
+
 export function EditTransactionScreen({ navigation, route }) {
   const theme = useTheme(useUiStore((state) => state.themePreference));
   const currencySymbol = useUiStore((state) => state.currencySymbol);
   const transactions = useFinanceStore((state) => state.transactions);
+  const transfers = useFinanceStore((state) => state.transfers);
   const categories = useFinanceStore((state) => state.categories);
   const accounts = useFinanceStore((state) => state.accounts);
   const updateTransaction = useFinanceStore((state) => state.updateTransaction);
+  const updateAccountTransfer = useFinanceStore((state) => state.updateAccountTransfer);
+
+  const isTransfer = Boolean(route?.params?.isTransfer || route?.params?.transferId);
+  const transferId = Number(route?.params?.transferId ?? route?.params?.transactionId);
+  const transfer = isTransfer ? transfers.find((item) => item.id === transferId) : null;
 
   const transactionId = Number(route?.params?.transactionId);
-  const transaction = transactions.find((item) => item.id === transactionId);
+  const transaction = !isTransfer ? transactions.find((item) => item.id === transactionId) : null;
+
+  if (isTransfer) {
+    if (!transfer) {
+      return <MissingTransferView navigation={navigation} theme={theme} />;
+    }
+    return (
+      <EditTransferForm
+        accounts={accounts}
+        currencySymbol={currencySymbol}
+        navigation={navigation}
+        theme={theme}
+        transactions={transactions}
+        transfer={transfer}
+        transfers={transfers}
+        updateAccountTransfer={updateAccountTransfer}
+      />
+    );
+  }
 
   if (!transaction) {
     return <MissingTransactionView navigation={navigation} theme={theme} />;
@@ -618,6 +687,407 @@ function EditTransactionForm({
           })}
         </ScrollView>
       </BottomSheet>
+    </ScreenContainer>
+  );
+}
+
+function EditTransferForm({
+  accounts,
+  currencySymbol,
+  navigation,
+  theme,
+  transactions,
+  transfer,
+  transfers,
+  updateAccountTransfer,
+}) {
+  const [amountStr, setAmountStr] = useState(
+    (transfer.amountMinor / 100).toFixed(2).replace(/\.00$/, ""),
+  );
+  const [fromAccountId, setFromAccountId] = useState(transfer.fromAccountId);
+  const [toAccountId, setToAccountId] = useState(transfer.toAccountId);
+  const [dateEpochMillis, setDateEpochMillis] = useState(transfer.dateEpochMillis);
+  const [note, setNote] = useState(transfer.note ?? "");
+
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  const activeAccounts = useMemo(
+    () => accounts.filter((a) => !a.isArchived || a.id === fromAccountId || a.id === toAccountId),
+    [accounts, fromAccountId, toAccountId],
+  );
+
+  const parsedAmountMinor = useMemo(() => {
+    try {
+      const cleaned = amountStr.trim().replace(/[₱$,\s]/g, "");
+      return parseDecimalToMinor(cleaned);
+    } catch {
+      return 0;
+    }
+  }, [amountStr]);
+
+  const sameAccountError = fromAccountId === toAccountId;
+  const canSave = parsedAmountMinor > 0 && !sameAccountError && !isSaving && fromAccountId !== null && toAccountId !== null;
+
+  // Exact projected balance preview: exclude current transfer, then apply edited amounts
+  const baseBalances = useMemo(() => {
+    const transfersWithoutCurrent = transfers.filter((t) => t.id !== transfer.id);
+    return computeAccountBalances(accounts, transactions, transfersWithoutCurrent);
+  }, [accounts, transactions, transfers, transfer.id]);
+
+  const fromBaseBalance = baseBalances.find((a) => a.id === fromAccountId)?.balanceMinor ?? 0;
+  const toBaseBalance = baseBalances.find((a) => a.id === toAccountId)?.balanceMinor ?? 0;
+  const fromProjectedBalance = fromBaseBalance - parsedAmountMinor;
+  const toProjectedBalance = toBaseBalance + parsedAmountMinor;
+
+  const fromAccountObj = accounts.find((a) => a.id === fromAccountId);
+  const toAccountObj = accounts.find((a) => a.id === toAccountId);
+
+  const formattedDate = new Date(dateEpochMillis).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  const handleSave = async () => {
+    if (!canSave) {
+      if (sameAccountError) {
+        setSaveError("Choose two different accounts.");
+      } else if (parsedAmountMinor <= 0) {
+        setSaveError("Please enter a valid amount greater than zero.");
+      }
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setSaveError(null);
+      await updateAccountTransfer(transfer.id, {
+        amountMinor: parsedAmountMinor,
+        fromAccountId,
+        toAccountId,
+        dateEpochMillis,
+        note: note.trim() || null,
+      });
+      navigation.goBack();
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Could not save transfer changes.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <ScreenContainer contentContainerStyle={{ flexGrow: 1, gap: theme.spacing.xl }} testID="edit-transfer-screen">
+      {/* Header */}
+      <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+        <Pressable
+          accessibilityLabel="Cancel edit"
+          accessibilityRole="button"
+          hitSlop={theme.spacing.md}
+          onPress={() => navigation.goBack()}
+          style={{
+            alignItems: "center",
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.outline,
+            borderRadius: theme.radii.round,
+            borderWidth: 1,
+            height: 40,
+            justifyContent: "center",
+            width: 40,
+          }}
+        >
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: 18 }}>‹</Text>
+        </Pressable>
+        <Text
+          style={{
+            color: theme.colors.text,
+            fontFamily: theme.fonts.bold,
+            fontSize: theme.typeScale.screenTitle,
+          }}
+        >
+          Edit Transfer
+        </Text>
+        <Pressable
+          accessibilityLabel="Save transfer changes"
+          accessibilityRole="button"
+          disabled={!canSave}
+          hitSlop={theme.spacing.md}
+          onPress={handleSave}
+        >
+          <Text
+            style={{
+              color: canSave ? theme.colors.primary : theme.colors.sub,
+              fontFamily: theme.fonts.bold,
+              fontSize: theme.typeScale.body,
+            }}
+          >
+            {isSaving ? "Saving…" : "Save"}
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* Frame 18h: Retained Draft on Save Failure Alert */}
+      {saveError !== null ? (
+        <View
+          style={{
+            backgroundColor: theme.colors.amberBg,
+            borderColor: theme.colors.warning,
+            borderRadius: theme.radii.card,
+            borderWidth: 1,
+            gap: theme.spacing.xs,
+            padding: theme.spacing.md,
+          }}
+          testID="save-error-banner"
+        >
+          <View style={{ alignItems: "center", flexDirection: "row", gap: theme.spacing.xs }}>
+            <Text style={{ fontSize: 16 }}>⚠️</Text>
+            <Text
+              style={{
+                color: theme.colors.amberText,
+                fontFamily: theme.fonts.bold,
+                fontSize: theme.typeScale.body,
+              }}
+            >
+              Could not save changes
+            </Text>
+          </View>
+          <Text
+            style={{
+              color: theme.colors.amberText,
+              fontFamily: theme.fonts.regular,
+              fontSize: theme.typeScale.small,
+              lineHeight: 18,
+            }}
+          >
+            {saveError}. Your edits are still here. Review and try again.
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Phase 2 Frame 299:2782 / Transfer 01b: Same account error */}
+      {sameAccountError ? (
+        <View
+          testID="same-account-error"
+          style={{
+            backgroundColor: theme.colors.avatarBg,
+            borderColor: theme.colors.expense,
+            borderRadius: theme.radii.row,
+            borderWidth: 1,
+            gap: theme.spacing.xs,
+            padding: theme.spacing.md,
+          }}
+        >
+          <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+            Choose two different accounts
+          </Text>
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small, lineHeight: 18 }}>
+            Same-account transfers are blocked. Negative balances are allowed and explained.
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Amount Card */}
+      <SectionCard style={{ gap: theme.spacing.xs, padding: theme.spacing.lg }}>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
+          Transfer Amount
+        </Text>
+        <View style={{ alignItems: "center", flexDirection: "row", gap: theme.spacing.sm }}>
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: 32 }}>
+            {currencySymbol}
+          </Text>
+          <TextInput
+            accessibilityLabel="Transfer amount"
+            keyboardType="decimal-pad"
+            onChangeText={(val) => setAmountStr(val)}
+            placeholder="0.00"
+            placeholderTextColor={theme.colors.sub}
+            style={{
+              color: theme.colors.text,
+              flex: 1,
+              fontFamily: theme.fonts.bold,
+              fontSize: 32,
+              padding: 0,
+            }}
+            value={amountStr}
+          />
+        </View>
+      </SectionCard>
+
+      {/* From Account */}
+      <SectionCard style={{ gap: theme.spacing.sm, padding: theme.spacing.lg }}>
+        <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+          From Account
+        </Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.keyGap }}>
+          {activeAccounts.map((account) => (
+            <Chip
+              key={`from-${account.id}`}
+              onPress={() => setFromAccountId(account.id)}
+              selected={fromAccountId === account.id}
+              style={{ height: theme.sizes.accountChip }}
+              testID={`edit-from-account-${account.id}`}
+            >
+              {accountChipLabel(account.type)} · {account.name}
+            </Chip>
+          ))}
+        </View>
+      </SectionCard>
+
+      {/* Swap Button */}
+      <View style={{ alignItems: "center" }}>
+        <Pressable
+          accessibilityLabel="Swap accounts"
+          accessibilityRole="button"
+          hitSlop={theme.spacing.sm}
+          onPress={() => {
+            const temp = fromAccountId;
+            setFromAccountId(toAccountId);
+            setToAccountId(temp);
+          }}
+          style={{
+            alignItems: "center",
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.outline,
+            borderRadius: theme.radii.round,
+            borderWidth: 1,
+            flexDirection: "row",
+            gap: theme.spacing.xs,
+            minHeight: 44,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.xs,
+          }}
+        >
+          <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+            Swap accounts
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* To Account */}
+      <SectionCard style={{ gap: theme.spacing.sm, padding: theme.spacing.lg }}>
+        <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+          To Account
+        </Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.keyGap }}>
+          {activeAccounts.map((account) => (
+            <Chip
+              key={`to-${account.id}`}
+              onPress={() => setToAccountId(account.id)}
+              selected={toAccountId === account.id}
+              style={{ height: theme.sizes.accountChip }}
+              testID={`edit-to-account-${account.id}`}
+            >
+              {accountChipLabel(account.type)} · {account.name}
+            </Chip>
+          ))}
+        </View>
+      </SectionCard>
+
+      {/* Date */}
+      <SectionCard style={{ gap: theme.spacing.sm, padding: theme.spacing.lg }}>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+          Date
+        </Text>
+        <Pressable
+          accessibilityLabel={`Change date, currently ${formattedDate}`}
+          accessibilityRole="button"
+          onPress={() => setDatePickerVisible(true)}
+          style={{
+            alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            minHeight: 44,
+            paddingVertical: theme.spacing.xs,
+          }}
+        >
+          <View style={{ alignItems: "center", flexDirection: "row", gap: theme.spacing.sm }}>
+            <Text style={{ fontSize: 18 }}>📅</Text>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+              {formattedDate}
+            </Text>
+          </View>
+          <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+            Change ›
+          </Text>
+        </Pressable>
+      </SectionCard>
+
+      {/* Note */}
+      <SectionCard style={{ gap: theme.spacing.xs, padding: theme.spacing.lg }}>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.label }}>
+          Note (optional)
+        </Text>
+        <TextInput
+          accessibilityLabel="Transfer note"
+          maxLength={150}
+          multiline
+          numberOfLines={2}
+          onChangeText={(val) => setNote(val)}
+          placeholder="Add a note or memo…"
+          placeholderTextColor={theme.colors.sub}
+          style={{
+            color: theme.colors.text,
+            fontFamily: theme.fonts.regular,
+            fontSize: theme.typeScale.body,
+            minHeight: 48,
+            padding: 0,
+          }}
+          value={note}
+        />
+      </SectionCard>
+
+      {/* Balance Preview Card */}
+      <SectionCard
+        style={{
+          borderColor: theme.colors.outline,
+          borderWidth: 1,
+          gap: theme.spacing.xs,
+          padding: theme.spacing.md,
+        }}
+      >
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny }}>
+          POST-TRANSFER BALANCE PREVIEW
+        </Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: theme.colors.text, fontSize: theme.typeScale.small }}>
+            {fromAccountObj?.name ?? "From"}: {formatMinor(fromBaseBalance, { currencySymbol })} → {formatMinor(fromProjectedBalance, { currencySymbol })}
+          </Text>
+          <Text style={{ color: theme.colors.text, fontSize: theme.typeScale.small }}>
+            {toAccountObj?.name ?? "To"}: {formatMinor(toBaseBalance, { currencySymbol })} → {formatMinor(toProjectedBalance, { currencySymbol })}
+          </Text>
+        </View>
+        {fromProjectedBalance < 0 ? (
+          <Text style={{ color: theme.colors.expense, fontSize: theme.typeScale.tiny, fontFamily: theme.fonts.bold }}>
+            ⚠️ Overdraft warning: from account balance will be negative.
+          </Text>
+        ) : null}
+      </SectionCard>
+
+      {/* Save Button */}
+      <PrimaryButton
+        accessibilityLabel="Save changes"
+        disabled={!canSave}
+        onPress={handleSave}
+        style={{ marginBottom: theme.spacing.xxl, marginTop: theme.spacing.sm }}
+      >
+        {isSaving ? "Saving changes…" : "Save Changes"}
+      </PrimaryButton>
+
+      <CalendarPickerSheet
+        onClose={() => setDatePickerVisible(false)}
+        onConfirm={(epochMillis) => {
+          setDateEpochMillis(epochMillis);
+          setDatePickerVisible(false);
+        }}
+        selectedDateEpochMillis={dateEpochMillis}
+        testID="transfer-date-picker-sheet"
+        title="Select Date"
+        visible={datePickerVisible}
+      />
     </ScreenContainer>
   );
 }

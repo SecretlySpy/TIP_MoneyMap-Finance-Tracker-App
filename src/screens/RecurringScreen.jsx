@@ -141,6 +141,59 @@ export function RecurringScreen({ navigation }) {
     }
   };
 
+  const handleConfirmCandidate = async (candidate) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const expenseCategories = categoriesForType(categories, "EXPENSE");
+      const preferred =
+        expenseCategories.find((cat) => cat.id === candidate.categoryId) ||
+        expenseCategories.find((cat) => cat.name === "Bills") ||
+        expenseCategories[0];
+      await addRecurringBill({
+        accountId: candidate.accountId,
+        amountMinor: candidate.latestAmountMinor,
+        categoryName: preferred?.name || "Bills",
+        name: candidate.merchant,
+        icon: "🧾",
+        dueEpochMillis: candidate.nextExpectedEpochMillis,
+        frequency: candidate.frequency,
+        leadDays: draftLeadDays,
+      });
+      setDismissedKeys((prev) => [...prev, candidate.key]);
+      Alert.alert("Bill Confirmed", `“${candidate.merchant}” is now tracked as a recurring bill.`);
+    } catch (err) {
+      Alert.alert("Confirm failed", err instanceof Error ? err.message : "Could not track bill.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleToggleReminder = (candidate) => {
+    Alert.alert(
+      `Reminder for ${candidate.merchant}`,
+      `MoneyMap reminds you ${draftLeadDays} days before due date.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Set 3-day reminder",
+          onPress: () => {
+            setDraftLeadDays(3);
+            Alert.alert("Reminder Configured", "Local reminder set to 3 days prior.");
+          },
+        },
+      ]
+    );
+  };
+
+  const handleEditCandidate = (candidate) => {
+    setDraftName(candidate.merchant);
+    setDraftAmountText((candidate.latestAmountMinor / 100).toFixed(2));
+    setDraftFrequency(candidate.frequency);
+    if (candidate.accountId) setDraftAccountId(String(candidate.accountId));
+    setIsAddOpen(true);
+  };
+
   const handleRename = async (value) => {
     if (activeBillId === null || busy) return;
     const name = value.trim();
@@ -358,13 +411,24 @@ export function RecurringScreen({ navigation }) {
                     {c.merchant}
                   </Text>
                   <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
-                    {c.confidenceExplanation}
+                    {`Likely recurring (seen ${c.occurrenceCount} times). Confidence: high.`}
                   </Text>
                 </View>
                 <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
                   {formatMinor(c.latestAmountMinor, { currencySymbol })}
                 </Text>
               </View>
+
+              {/* Frame 299:2791 Invariant Notice */}
+              <View style={{ backgroundColor: theme.colors.bg, borderRadius: theme.radii.chip, gap: 2, padding: theme.spacing.xs }}>
+                <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.tiny }}>
+                  Confirm • Dismiss • Edit • Reminder
+                </Text>
+                <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny }}>
+                  Never auto-mutates ledger.
+                </Text>
+              </View>
+
               {c.hasPriceChange ? (
                 <View style={{ backgroundColor: theme.colors.tint, borderRadius: theme.radii.chip, padding: theme.spacing.xs }}>
                   <Text style={{ color: theme.colors.primary, fontSize: theme.typeScale.tiny, fontFamily: theme.fonts.bold }}>
@@ -372,32 +436,61 @@ export function RecurringScreen({ navigation }) {
                   </Text>
                 </View>
               ) : null}
-              <View style={{ flexDirection: "row", gap: theme.spacing.md, justifyContent: "flex-end", alignItems: "center" }}>
+
+              {/* Actions: Confirm • Dismiss • Edit • Reminder */}
+              <View style={{ alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm, justifyContent: "flex-end" }}>
                 <Pressable
+                  accessibilityLabel="Reminder"
+                  accessibilityRole="button"
+                  onPress={() => handleToggleReminder(c)}
+                  style={{ justifyContent: "center", minHeight: 44, paddingHorizontal: theme.spacing.sm }}
+                >
+                  <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                    Reminder
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Edit"
+                  accessibilityRole="button"
+                  onPress={() => handleEditCandidate(c)}
+                  style={{ justifyContent: "center", minHeight: 44, paddingHorizontal: theme.spacing.sm }}
+                >
+                  <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                    Edit
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Dismiss"
                   accessibilityRole="button"
                   onPress={() => setDismissedKeys((prev) => [...prev, c.key])}
-                  style={{ paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.xs }}
+                  style={{ justifyContent: "center", minHeight: 44, paddingHorizontal: theme.spacing.sm }}
                 >
                   <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
                     Dismiss
                   </Text>
                 </Pressable>
                 <Pressable
+                  accessibilityLabel="Confirm"
                   accessibilityRole="button"
-                  onPress={() => {
-                    setDraftName(c.merchant);
-                    setDraftAmountText((c.latestAmountMinor / 100).toFixed(2));
-                    setDraftFrequency(c.frequency);
-                    if (c.accountId) setDraftAccountId(String(c.accountId));
-                    setIsAddOpen(true);
-                  }}
+                  onPress={() => void handleConfirmCandidate(c)}
+                  style={{ justifyContent: "center", minHeight: 44, paddingHorizontal: theme.spacing.sm }}
+                >
+                  <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                    Confirm
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Track as Bill"
+                  accessibilityRole="button"
+                  onPress={() => handleEditCandidate(c)}
                   style={{
                     backgroundColor: theme.colors.tint,
                     borderColor: theme.colors.primary,
                     borderRadius: theme.radii.chip,
                     borderWidth: 1,
+                    justifyContent: "center",
+                    minHeight: 44,
                     paddingHorizontal: theme.spacing.md,
-                    paddingVertical: theme.spacing.xs,
                   }}
                 >
                   <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>

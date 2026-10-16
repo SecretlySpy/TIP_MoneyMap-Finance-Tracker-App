@@ -19,6 +19,7 @@ export function ReportsScreen({ navigation }) {
   const transfers = useFinanceStore((state) => state.transfers);
 
   const [activeTab, setActiveTab] = useState("CASH_FLOW"); // CASH_FLOW | DEBT_PLANNER
+  const [showTableView, setShowTableView] = useState(false);
 
   // Debt calculator state
   const [debtPrincipalInput, setDebtPrincipalInput] = useState("1200.00");
@@ -29,6 +30,11 @@ export function ReportsScreen({ navigation }) {
     () => computeCashFlowTrends({ transactions, months: 6 }),
     [transactions]
   );
+
+  const currentTrend = useMemo(() => {
+    if (cashFlowTrends.length === 0) return { incomeMinor: 0, expenseMinor: 0, netSavingsMinor: 0 };
+    return cashFlowTrends[cashFlowTrends.length - 1];
+  }, [cashFlowTrends]);
 
   const accountBalances = useMemo(
     () => computeAccountBalances(accounts, transactions, transfers),
@@ -151,6 +157,48 @@ export function ReportsScreen({ navigation }) {
             </Text>
           </SectionCard>
 
+          {/* Frame 299:2794: Cash Flow Summary Banner */}
+          <View
+            style={{
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.outline,
+              borderRadius: theme.radii.card,
+              borderWidth: 1,
+              gap: theme.spacing.xs,
+              padding: theme.spacing.md,
+            }}
+          >
+            <Text
+              style={{
+                color: theme.colors.text,
+                fontFamily: theme.fonts.bold,
+                fontSize: theme.typeScale.body,
+              }}
+            >
+              {`Income ${formatMinor(currentTrend.incomeMinor, { currencySymbol, showCents: false })} • Expenses ${formatMinor(currentTrend.expenseMinor, { currencySymbol, showCents: false })} • Net ${formatMinor(currentTrend.netSavingsMinor, { currencySymbol, showCents: false })}`}
+            </Text>
+            <Text
+              style={{
+                color: theme.colors.primary,
+                fontFamily: theme.fonts.medium,
+                fontSize: theme.typeScale.small,
+              }}
+            >
+              Transfers excluded from totals.
+            </Text>
+            <View style={{ alignSelf: "flex-start", backgroundColor: theme.colors.tint, borderRadius: theme.radii.chip, paddingHorizontal: theme.spacing.sm, paddingVertical: theme.spacing.xxs }}>
+              <Text
+                style={{
+                  color: theme.colors.primary,
+                  fontFamily: theme.fonts.medium,
+                  fontSize: theme.typeScale.tiny,
+                }}
+              >
+                Accessible table alternative available.
+              </Text>
+            </View>
+          </View>
+
           {/* Transfers Excluded Notice */}
           <View
             style={{
@@ -170,51 +218,146 @@ export function ReportsScreen({ navigation }) {
             </Text>
           </View>
 
-          {/* 6-Month Cash Flow Cards */}
+          {/* 6-Month Cash Flow Cards / Accessible Table */}
           <View style={{ gap: theme.spacing.sm }}>
-            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
-              Monthly Inflows vs Outflows
-            </Text>
-            {cashFlowTrends.map((trend) => (
-              <SectionCard key={trend.monthYear} padding={theme.spacing.md} style={{ gap: theme.spacing.xs }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
-                    {formatMonthChip(trend.monthYear)}
+            <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                Monthly Inflows vs Outflows
+              </Text>
+              <Pressable
+                accessibilityLabel={showTableView ? "Show card view" : "Accessible table alternative"}
+                accessibilityRole="button"
+                onPress={() => setShowTableView((v) => !v)}
+                style={{
+                  backgroundColor: showTableView ? theme.colors.tint : theme.colors.surface,
+                  borderColor: showTableView ? theme.colors.primary : theme.colors.outline,
+                  borderRadius: theme.radii.chip,
+                  borderWidth: 1,
+                  justifyContent: "center",
+                  minHeight: 44,
+                  paddingHorizontal: theme.spacing.md,
+                }}
+              >
+                <Text
+                  style={{
+                    color: showTableView ? theme.colors.primary : theme.colors.sub,
+                    fontFamily: theme.fonts.medium,
+                    fontSize: theme.typeScale.small,
+                  }}
+                >
+                  {showTableView ? "Card View" : "Accessible Table"}
+                </Text>
+              </Pressable>
+            </View>
+
+            {showTableView ? (
+              <View
+                accessibilityLabel="Monthly Cash Flow Table"
+                accessible
+                style={{
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.outline,
+                  borderRadius: theme.radii.card,
+                  borderWidth: 1,
+                  overflow: "hidden",
+                }}
+              >
+                {/* Table Header */}
+                <View
+                  accessibilityRole="row"
+                  style={{
+                    backgroundColor: theme.colors.bg,
+                    borderBottomColor: theme.colors.outline,
+                    borderBottomWidth: 1,
+                    flexDirection: "row",
+                    paddingHorizontal: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm,
+                  }}
+                >
+                  <Text style={{ color: theme.colors.sub, flex: 1.2, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny }}>
+                    MONTH
                   </Text>
+                  <Text style={{ color: theme.colors.sub, flex: 1, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny, textAlign: "right" }}>
+                    INCOME
+                  </Text>
+                  <Text style={{ color: theme.colors.sub, flex: 1, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny, textAlign: "right" }}>
+                    EXPENSES
+                  </Text>
+                  <Text style={{ color: theme.colors.sub, flex: 1, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny, textAlign: "right" }}>
+                    NET
+                  </Text>
+                </View>
+                {/* Table Rows */}
+                {cashFlowTrends.map((t) => (
                   <View
+                    key={t.monthYear}
+                    accessibilityLabel={`${formatMonthChip(t.monthYear)}: Income ${formatMinor(t.incomeMinor, { currencySymbol })}, Expenses ${formatMinor(t.expenseMinor, { currencySymbol })}, Net ${formatMinor(t.netSavingsMinor, { currencySymbol })}`}
+                    accessibilityRole="row"
                     style={{
-                      backgroundColor: trend.netSavingsMinor >= 0 ? theme.colors.track : theme.colors.tint,
-                      borderRadius: theme.radii.chip,
-                      paddingHorizontal: theme.spacing.sm,
-                      paddingVertical: 2,
+                      borderBottomColor: theme.colors.outline,
+                      borderBottomWidth: theme.spacing.hairline,
+                      flexDirection: "row",
+                      paddingHorizontal: theme.spacing.md,
+                      paddingVertical: theme.spacing.sm,
                     }}
                   >
-                    <Text
-                      style={{
-                        color: trend.netSavingsMinor >= 0 ? theme.colors.income : theme.colors.expense,
-                        fontFamily: theme.fonts.bold,
-                        fontSize: theme.typeScale.small,
-                      }}
-                    >
-                      {trend.netSavingsMinor >= 0 ? "+" : ""}{formatMinor(trend.netSavingsMinor, { currencySymbol })}
+                    <Text style={{ color: theme.colors.text, flex: 1.2, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+                      {formatMonthChip(t.monthYear)}
+                    </Text>
+                    <Text style={{ color: theme.colors.income, flex: 1, fontSize: theme.typeScale.small, textAlign: "right" }}>
+                      {formatMinor(t.incomeMinor, { currencySymbol, showCents: false })}
+                    </Text>
+                    <Text style={{ color: theme.colors.expense, flex: 1, fontSize: theme.typeScale.small, textAlign: "right" }}>
+                      {formatMinor(t.expenseMinor, { currencySymbol, showCents: false })}
+                    </Text>
+                    <Text style={{ color: t.netSavingsMinor >= 0 ? theme.colors.income : theme.colors.expense, flex: 1, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small, textAlign: "right" }}>
+                      {t.netSavingsMinor >= 0 ? "+" : ""}{formatMinor(t.netSavingsMinor, { currencySymbol, showCents: false })}
                     </Text>
                   </View>
-                </View>
-                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
-                    Income: {formatMinor(trend.incomeMinor, { currencySymbol })}
-                  </Text>
-                  <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
-                    Expenses: {formatMinor(trend.expenseMinor, { currencySymbol })}
-                  </Text>
-                </View>
-                {trend.incomeMinor > 0 ? (
-                  <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
-                    Savings Rate: {trend.savingsRatePercent}%
-                  </Text>
-                ) : null}
-              </SectionCard>
-            ))}
+                ))}
+              </View>
+            ) : (
+              cashFlowTrends.map((trend) => (
+                <SectionCard key={trend.monthYear} padding={theme.spacing.md} style={{ gap: theme.spacing.xs }}>
+                  <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                      {formatMonthChip(trend.monthYear)}
+                    </Text>
+                    <View
+                      style={{
+                        backgroundColor: trend.netSavingsMinor >= 0 ? theme.colors.track : theme.colors.tint,
+                        borderRadius: theme.radii.chip,
+                        paddingHorizontal: theme.spacing.sm,
+                        paddingVertical: 2,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: trend.netSavingsMinor >= 0 ? theme.colors.income : theme.colors.expense,
+                          fontFamily: theme.fonts.bold,
+                          fontSize: theme.typeScale.small,
+                        }}
+                      >
+                        {trend.netSavingsMinor >= 0 ? "+" : ""}{formatMinor(trend.netSavingsMinor, { currencySymbol })}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
+                      Income: {formatMinor(trend.incomeMinor, { currencySymbol })}
+                    </Text>
+                    <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
+                      Expenses: {formatMinor(trend.expenseMinor, { currencySymbol })}
+                    </Text>
+                  </View>
+                  {trend.incomeMinor > 0 ? (
+                    <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
+                      Savings Rate: {trend.savingsRatePercent}%
+                    </Text>
+                  ) : null}
+                </SectionCard>
+              ))
+            )}
           </View>
         </View>
       ) : (

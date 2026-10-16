@@ -11,7 +11,7 @@ import { ScreenContainer } from "../components/ScreenContainer";
 import { TextPromptModal } from "../components/TextPromptModal";
 import { BUDGET_BILL_EMOJI_PRESETS } from "../domain/services/emoji";
 import { budgetSummary, buildBudgetCards, formatMonthChip, shiftMonthYear } from "../domain/services/financeView";
-import { computeCategoryRollover, getBudgetsToCopy, SEMESTER_TEMPLATES } from "../domain/services/rollover";
+import { computeCategoryRollover, formatRolloverEquation, getBudgetsToCopy, SEMESTER_TEMPLATES } from "../domain/services/rollover";
 import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -39,6 +39,7 @@ export function BudgetsScreen({ navigation }) {
   const [editingLimitName, setEditingLimitName] = useState(null);
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [semesterSheetVisible, setSemesterSheetVisible] = useState(false);
+  const [selectedRolloverBudget, setSelectedRolloverBudget] = useState(null);
 
   const { categoriesById } = useMemo(
     () => mapsFromState({ accounts: [], categories }),
@@ -49,6 +50,21 @@ export function BudgetsScreen({ navigation }) {
     [budgets, transactions, categoriesById, selectedMonthYear, accounts],
   );
   const summary = useMemo(() => budgetSummary(cards), [cards]);
+
+  const selectedRolloverCategory = useMemo(() => {
+    if (!selectedRolloverBudget) return null;
+    return categories.find((c) => c.type === "EXPENSE" && c.name === selectedRolloverBudget.name);
+  }, [categories, selectedRolloverBudget]);
+
+  const rolloverData = useMemo(() => {
+    if (!selectedRolloverCategory) return null;
+    return computeCategoryRollover({
+      categoryId: selectedRolloverCategory.id,
+      monthYear: selectedMonthYear,
+      budgets,
+      transactions,
+    });
+  }, [selectedRolloverCategory, selectedMonthYear, budgets, transactions]);
 
   const beginAddBudget = () => {
     setPendingCategoryName("");
@@ -241,11 +257,12 @@ export function BudgetsScreen({ navigation }) {
         cards.map((budget) => (
           <Pressable
             key={budget.name}
-            accessibilityHint="Long press to edit limit, rename category, or delete"
+            accessibilityHint="Tap to view rollover breakdown. Long press to edit limit, rename category, or delete"
             accessibilityLabel={budget.name}
             accessibilityRole="button"
             delayLongPress={350}
             onLongPress={() => openBudgetActions(budget)}
+            onPress={() => setSelectedRolloverBudget(budget)}
           >
             <BudgetCard {...budget} currencySymbol={currencySymbol} />
           </Pressable>
@@ -464,6 +481,92 @@ export function BudgetsScreen({ navigation }) {
           </Pressable>
         </View>
       </BottomSheet>
+
+      {/* 08c Budget Rollover Sheet - Frame 299:2788 */}
+      {selectedRolloverBudget && rolloverData ? (
+        <BottomSheet
+          onClose={() => setSelectedRolloverBudget(null)}
+          testID="budget-rollover-sheet"
+          title={`${selectedRolloverBudget.name} · Budget Rollover`}
+          visible={selectedRolloverBudget !== null}
+        >
+          <View style={{ gap: theme.spacing.md, paddingBottom: theme.spacing.xl }}>
+            {/* Frame 299:2788 Equation Card */}
+            <View
+              style={{
+                backgroundColor: theme.colors.tint,
+                borderColor: theme.colors.primary,
+                borderRadius: theme.radii.card,
+                borderWidth: 1,
+                gap: theme.spacing.xs,
+                padding: theme.spacing.md,
+              }}
+            >
+              <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                {rolloverData.formulaDescription}
+              </Text>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.cardHeader }}>
+                {formatRolloverEquation(
+                  rolloverData.priorCarryMinor,
+                  rolloverData.planMinor,
+                  rolloverData.actualSpentMinor,
+                  rolloverData.nextCarryMinor,
+                  currencySymbol
+                )}
+              </Text>
+              <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radii.chip, padding: theme.spacing.xs, marginTop: theme.spacing.xxs }}>
+                <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny, fontFamily: theme.fonts.medium }}>
+                  {rolloverData.safeToSpendGuarantee}
+                </Text>
+              </View>
+            </View>
+
+            {/* Detailed Breakdown */}
+            <View style={{ backgroundColor: theme.colors.bg, borderRadius: theme.radii.row, padding: theme.spacing.md, gap: theme.spacing.sm }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
+                  Prior Carry ({rolloverData.priorMonthYear})
+                </Text>
+                <Text style={{ color: rolloverData.priorCarryMinor >= 0 ? theme.colors.income : theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                  {formatMinor(rolloverData.priorCarryMinor, { currencySymbol })}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
+                  This Month Plan ({selectedMonthYear})
+                </Text>
+                <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                  {formatMinor(rolloverData.planMinor, { currencySymbol })}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
+                  Actual Spent
+                </Text>
+                <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                  -{formatMinor(rolloverData.actualSpentMinor, { currencySymbol })}
+                </Text>
+              </View>
+              <View style={{ borderTopColor: theme.colors.outline, borderTopWidth: theme.spacing.hairline, paddingTop: theme.spacing.xs, flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                  Next Carry-forward
+                </Text>
+                <Text style={{ color: rolloverData.nextCarryMinor >= 0 ? theme.colors.income : theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                  {formatMinor(rolloverData.nextCarryMinor, { currencySymbol })}
+                </Text>
+              </View>
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setSelectedRolloverBudget(null)}
+              style={{ alignItems: "center", justifyContent: "center", minHeight: 44 }}
+            >
+              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium }}>Close</Text>
+            </Pressable>
+          </View>
+        </BottomSheet>
+      ) : null}
     </ScreenContainer>
   );
 }
