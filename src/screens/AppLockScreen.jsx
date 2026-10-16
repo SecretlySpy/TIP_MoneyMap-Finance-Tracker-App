@@ -37,6 +37,7 @@ export function AppLockScreen({ navigation }) {
     const [mode, setMode] = useState(hasPin ? "unlock" : "create");
     const [pin, setPin] = useState("");
     const [pendingPin, setPendingPin] = useState("");
+    const pendingPinRef = useRef("");
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
     const [biometricsAvailable, setBiometricsAvailable] = useState(false);
@@ -51,6 +52,7 @@ export function AppLockScreen({ navigation }) {
         setMode(hasPin ? "unlock" : "create");
         setPin("");
         setPendingPin("");
+        pendingPinRef.current = "";
         setError(null);
         autoBiometricAttempted.current = false;
     }, [hasPin]);
@@ -86,6 +88,7 @@ export function AppLockScreen({ navigation }) {
     const title = mode === "create" ? "Optional app lock — create a 4-digit PIN" : mode === "confirm" ? "Confirm your PIN" : "Enter your PIN to unlock";
     const canLeaveWithoutUnlock = !isLocked || !appLockEnabled || !hasPin;
     const finishUnlock = useCallback(() => {
+        setPin("");
         if (navigation.canGoBack()) {
             navigation.goBack();
         }
@@ -132,20 +135,25 @@ export function AppLockScreen({ navigation }) {
         setError(null);
         try {
             if (mode === "create") {
+                pendingPinRef.current = nextPin;
                 setPendingPin(nextPin);
                 setPin("");
                 setMode("confirm");
                 return;
             }
             if (mode === "confirm") {
-                if (nextPin !== pendingPin) {
+                const expectedPin = pendingPinRef.current || pendingPin;
+                if (nextPin !== expectedPin) {
                     setError("PINs did not match. Try again.");
+                    pendingPinRef.current = "";
                     setPendingPin("");
                     setPin("");
                     setMode("create");
                     return;
                 }
                 await setupPin(nextPin);
+                pendingPinRef.current = "";
+                setPendingPin("");
                 setPin("");
                 finishUnlock();
                 return;
@@ -173,10 +181,10 @@ export function AppLockScreen({ navigation }) {
         }
     }, [finishUnlock, mode, pendingPin, setBusySafe, setupPin, unlockWithPin]);
     useEffect(() => {
-        if (pin.length === 4 && isValidPin(pin)) {
+        if (pin.length === 4 && isValidPin(pin) && !busy) {
             void handleCompletePin(pin);
         }
-    }, [handleCompletePin, pin]);
+    }, [busy, handleCompletePin, pin]);
     const handleKey = (key) => {
         if (busyRef.current || lockedForSeconds > 0) {
             return;
@@ -204,11 +212,11 @@ export function AppLockScreen({ navigation }) {
     return (<ScreenContainer contentContainerStyle={{
             alignItems: "center",
             paddingHorizontal: theme.spacing.xxl,
-            paddingTop: theme.sizes.lockTopInset,
-        }} safeBottom scroll={false} testID="app-lock-screen">
+            paddingTop: theme.spacing.lg,
+        }} safeBottom scroll={true} testID="app-lock-screen">
       <DonutMark animating={busy} size={theme.sizes.lockCircle} />
 
-      <View style={{ alignItems: "center", gap: theme.spacing.xxs, marginTop: theme.spacing.xxl }}>
+      <View style={{ alignItems: "center", gap: theme.spacing.xxs, marginTop: theme.spacing.lg }}>
         <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.lockTitle }}>
           MoneyMap
         </Text>
@@ -226,7 +234,7 @@ export function AppLockScreen({ navigation }) {
           </Text>) : null}
       </View>
 
-      <View accessible accessibilityLabel={`${pin.length} of 4 PIN digits entered`} accessibilityRole="text" style={{ flexDirection: "row", gap: theme.spacing.card, marginTop: theme.spacing.xxl }}>
+      <View accessible accessibilityLabel={`${pin.length} of 4 PIN digits entered`} accessibilityRole="text" style={{ flexDirection: "row", gap: theme.spacing.card, marginTop: theme.spacing.lg }}>
         {[0, 1, 2, 3].map((index) => (<View key={index} style={{
                 backgroundColor: index < pin.length ? theme.colors.primary : theme.colors.outline,
                 borderRadius: theme.radii.round,
@@ -235,7 +243,7 @@ export function AppLockScreen({ navigation }) {
             }}/>))}
       </View>
 
-      <View style={{ gap: theme.spacing.lg, marginTop: theme.spacing.xxl, width: theme.sizes.lockContentWidth }}>
+      <View style={{ gap: theme.spacing.lg, marginTop: theme.spacing.lg, width: theme.sizes.lockContentWidth }}>
         {lockKeypad.map((row, rowIndex) => (<View key={`lock-row-${rowIndex}`} style={{ flexDirection: "row", gap: theme.spacing.lg }}>
             {row.map((key) => (<Pressable accessibilityLabel={key === "👆" ? "Use biometrics" : key === "⌫" ? "Delete PIN digit" : key} accessibilityRole="button" accessibilityState={{ disabled: busy || lockedForSeconds > 0 }} disabled={busy || lockedForSeconds > 0} key={key} onPress={() => handleKey(key)} style={{
                     alignItems: "center",
@@ -254,7 +262,7 @@ export function AppLockScreen({ navigation }) {
           </View>))}
       </View>
 
-      {hasPin && biometricsAvailable ? (<Pressable accessibilityRole="button" hitSlop={theme.spacing.md} onPress={() => void handleBiometric()} style={{ justifyContent: "center", marginTop: theme.spacing.xxl, minHeight: theme.sizes.minTouchTarget }}>
+      {hasPin && biometricsAvailable ? (<Pressable accessibilityRole="button" hitSlop={theme.spacing.md} onPress={() => void handleBiometric()} style={{ justifyContent: "center", marginTop: theme.spacing.lg, minHeight: theme.sizes.minTouchTarget }}>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
             Use biometrics instead
           </Text>
@@ -263,12 +271,12 @@ export function AppLockScreen({ navigation }) {
                 if (navigation.canGoBack()) {
                   navigation.goBack();
                 }
-            }} style={{ justifyContent: "center", marginTop: theme.spacing.xxl, minHeight: theme.sizes.minTouchTarget }}>
+            }} style={{ justifyContent: "center", marginTop: theme.spacing.lg, minHeight: theme.sizes.minTouchTarget }}>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
             Cancel setup
           </Text>
         </Pressable>) : null}
-      {mode === "unlock" && hasPin && isLocked ? (<Pressable accessibilityRole="button" hitSlop={theme.spacing.md} onPress={() => navigation.navigate("PinRecovery")} style={{ justifyContent: "center", marginTop: theme.spacing.xl, minHeight: theme.sizes.minTouchTarget }}>
+      {mode === "unlock" && hasPin && isLocked ? (<Pressable accessibilityRole="button" hitSlop={theme.spacing.md} onPress={() => navigation.navigate("PinRecovery")} style={{ justifyContent: "center", marginTop: theme.spacing.lg, minHeight: theme.sizes.minTouchTarget }}>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
             Forgot PIN?
           </Text>

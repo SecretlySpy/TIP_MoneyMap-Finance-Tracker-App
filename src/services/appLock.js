@@ -186,7 +186,7 @@ export async function verifyPinWithLockout(pin, now = Date.now()) {
     return { ok: false, lockedForSeconds: 0, failures: state.failures };
   }
   const candidate = await hashPin(pin, material.salt);
-  if (candidate === material.hash) {
+  if (typeof candidate === "string" && typeof material.hash === "string" && candidate.toLowerCase() === material.hash.toLowerCase()) {
     await resetPinAttempts();
     return { ok: true, lockedForSeconds: 0, failures: 0 };
   }

@@ -197,6 +197,7 @@ export function RootNavigator() {
             <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
             <RootStack.Screen name="Main" component={MainTabs} />
             <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
+            <RootStack.Screen name="PinRecovery" component={PinRecoveryScreen} options={{ animation: "slide_from_right" }} />
           </RootStack.Navigator>
         );
     }
@@ -215,6 +216,7 @@ export function RootNavigator() {
     return (<RootStack.Navigator key="root-main" screenOptions={{ headerShown: false }}>
       <RootStack.Screen name="Main" component={MainTabs} />
       <RootStack.Screen name="AppLock" component={AppLockScreen} options={{ animation: "fade" }} />
+      <RootStack.Screen name="PinRecovery" component={PinRecoveryScreen} options={{ animation: "slide_from_right" }} />
       <RootStack.Screen name="Splash" component={SplashScreen} />
     </RootStack.Navigator>);
 }
