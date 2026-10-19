@@ -15,9 +15,11 @@ describe("QA remote boundary and deadline resilience", () => {
   beforeEach(() => { clearPlacesCache(); clearSmartTipsCache(); clearEatsTipsCache(); });
   afterEach(() => jest.useRealTimers());
 
-  it("returns a controlled places error when both HTTP providers fail", async () => {
+  it("returns the bundled campus catalog when both HTTP providers fail", async () => {
     const fetchImpl = jest.fn(async () => unavailable());
-    await expect(fetchNearbyEats({ fetchImpl })).resolves.toMatchObject({ source: "error", places: [] });
+    const result = await fetchNearbyEats({ fetchImpl });
+    expect(result).toMatchObject({ source: "bundled", fromCache: false });
+    expect(result.places.length).toBeGreaterThan(0);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
@@ -27,13 +29,21 @@ describe("QA remote boundary and deadline resilience", () => {
     const result = fetchNearbyEats({ fetchImpl });
     await jest.advanceTimersByTimeAsync(18_000);
     expect(fetchImpl.mock.calls[1][1].signal?.aborted).toBe(true);
-    await expect(result).resolves.toMatchObject({ source: "error" });
+    await expect(result).resolves.toMatchObject({ source: "bundled" });
     expect(jest.getTimerCount()).toBe(0);
   });
 
   it("falls back after malformed Overpass JSON and releases its timer", async () => {
     jest.useFakeTimers();
-    const fetchImpl = jest.fn().mockResolvedValueOnce({ ok: true, json: async () => { throw new SyntaxError("invalid JSON"); } }).mockResolvedValueOnce({ ok: true, json: async () => [] });
+    const fetchImpl = jest.fn().mockResolvedValueOnce({ ok: true, json: async () => { throw new SyntaxError("invalid JSON"); } }).mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{
+        place_id: 7,
+        lat: "14.62648",
+        lon: "121.06135",
+        display_name: "Fallback Rice Bowl, Quezon City",
+      }],
+    });
     await expect(fetchNearbyEats({ fetchImpl })).resolves.toMatchObject({ source: "nominatim" });
     expect(jest.getTimerCount()).toBe(0);
   });

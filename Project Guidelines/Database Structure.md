@@ -1,6 +1,6 @@
 # Database Structure
 
-Updated: 2026-10-07
+Updated: 2026-10-19
 Engine: SQLite via OP-SQLite with SQLCipher; schema version 8
 
 ## Data model
@@ -33,7 +33,7 @@ erDiagram
 | `budgets` | One positive limit per category/month | Unique `(category_id,month_year)` |
 | `savings_goals` | Positive target, nonnegative current amount, optional deadline, archive flag | Active/deadline |
 | `restore_recovery_snapshot` | One bounded pre-restore backup (`id = 1`) stored inside the encrypted database | Primary key constrained to `1` |
-| `app_metadata` | Local application lifecycle markers; currently records completion of the one-time default-data bootstrap | Text primary key |
+| `app_metadata` | Local application lifecycle markers: one-time default-data bootstrap, plus optional Student Eats last-live cache (`eats-places-cache-v1`) | Text primary key |
 
 ## Schema 5–8 reconciliation
 
@@ -61,6 +61,9 @@ erDiagram
 - JSON backup version 3 includes transfers and validates identities, account references, dates, amounts, and
   unique source keys before replacement. Version 2 remains readable and normalizes to an empty transfer list.
   Transaction CSV remains transaction-only by design.
+- Optional Student Eats live results may be stored under `app_metadata` key `eats-places-cache-v1`. This is
+  not a schema version bump. The bundled campus catalog does not depend on that row. Local reset deletes it
+  with the database.
 
 ## Lifecycle, privacy, and recovery
 

@@ -1,12 +1,12 @@
 # MoneyMap Privacy Policy
 
-**Last updated:** 2026-08-03  
+**Last updated:** 2026-10-19  
 **App:** MoneyMap Finance Tracker  
 **Audience:** Students (personal finance, single-device)
 
 ## Summary
 
-MoneyMap is **offline-first**. Your financial records stay on your device. The only optional network use is **Smart Tips** (budget suggestions), and only after you turn the feature on and accept a clear consent notice.
+MoneyMap is **offline-first**. Your financial records stay on your device. Optional network use is **Smart Tips** (budget suggestions after you turn the feature on and accept consent) and an optional **Student Eats** live refresh of campus food listings. Core finance and Student Eats listings remain available offline.
 
 ## Data we store on your device
 
@@ -21,18 +21,18 @@ We do **not** operate a MoneyMap account server. There is no cloud sync of your 
 
 | Permission | Why |
 |---|---|
-| Internet | Optional Smart Tips (Gemini), Student Eats place search (OpenStreetMap Overpass/Nominatim), and optional AI meal tips. Core finance features work offline. |
+| Internet | Optional Smart Tips (Gemini), optional Student Eats live refresh (OpenStreetMap Overpass/Nominatim), and optional AI meal tips. Core finance features and the bundled Student Eats catalog work offline. |
 | Notifications | Local bill reminders only (not push/FCM marketing). |
 | Biometric / fingerprint | Optional app unlock. |
-| Location (when in use) | **Only** while using **Student Eats Near Me**. Used ephemerally to rank nearby meals. **Never stored** on device or sent as precise coordinates to AI. Denied permission falls back to TIP Quezon City campus area. |
+| Location | **Not requested.** Student Eats ranks meals around the fixed TIP Quezon City campus origin. Device GPS is unused. |
 
 ## Student Eats Near Me
 
-- Opened from the Dashboard. Location permission is requested **only when you enter this screen**.
-- Place data comes from free OpenStreetMap services (Overpass, with Nominatim fallback).
+- Opened from the Dashboard. **No location permission is requested.**
+- Core place data is a bundled TIP Quezon City campus catalog stored in the app. Optional live refresh uses OpenStreetMap Overpass, with Nominatim as a last online fallback.
 - Ranking (distance, price level, rating, student heuristics) runs on-device.
 - Optional AI meal tips use the same Smart Tips consent gate and send only an **anonymized** list (place names, distance bands like “near/walkable”, price levels, cuisine labels, optional daily food budget minor units). **Never** latitude/longitude.
-- Short-lived in-memory cache only; no permanent location history.
+- Device coordinates are never stored. Optional last-live place results may be saved in the encrypted local database so the screen still has a previous live snapshot after restart.
 
 ## Smart Tips (optional, opt-in)
 

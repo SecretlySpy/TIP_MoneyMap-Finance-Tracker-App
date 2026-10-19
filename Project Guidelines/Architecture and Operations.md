@@ -1,6 +1,6 @@
 # Architecture and Operations
 
-Updated: 2026-10-07
+Updated: 2026-10-19
 
 ## Runtime context
 
@@ -16,7 +16,8 @@ flowchart LR
   SS --> O[Onboarding / preferences / PIN]
   UI --> N[Local notifications]
   UI -. optional HTTPS .-> G[Gemini]
-  UI -. Student Eats search .-> P[Overpass / Nominatim]
+  UI --> CATALOG[Bundled TIP QC eats catalog]
+  UI -. optional live refresh .-> P[Overpass / Nominatim]
 ```
 
 ## Boundaries and decisions
@@ -40,8 +41,8 @@ flowchart LR
   not overwritten or double-posted. Direct conflicting repository mutations fail.
 - Recurring occurrence provenance lives on the transaction as a scheduled timestamp, so deleting a template
   does not make a historical occurrence appear manual.
-- Student Eats uses a deterministic campus origin. Removing GPS reduces permissions and prevents the UI
-  from implying user-relative results.
+- Student Eats uses a deterministic campus origin and a bundled catalog. Removing GPS reduces permissions
+  and keeps the feature usable with no network. Optional Overpass/Nominatim refresh is not required for demo.
 - Import account resolution is explicit and atomic. It does not silently coerce unknown labels to Cash.
 - The public database executor serializes unrelated work. Code already inside a transaction must use the
   callback's scoped executor; it is the only path allowed to join that open transaction.
@@ -53,10 +54,33 @@ flowchart LR
 - `app.config.js` extends Expo's normalized config; `app.json` contains no location permission request.
 - Secrets belong in local/EAS secret storage. Never commit `.env`, keystores, database keys, PIN material,
   or Gemini credentials.
+- `app.json` package is `com.moneymap.financetracker`. The checked-in `android/` project and
+  `scripts/run-android.mjs` still target `com.example.financetracker`. Local launcher/data-clear use the
+  native project ID until a coordinated prebuild.
+
+## Mapping and Student Eats research (2026-10-19)
+
+Google Maps is **not required** for this academic demo. Rankings are campus-relative, the mini-map is a local
+plot, and a bundled catalog covers offline use.
+
+| Option | Current free/trial terms | Billing/key | Limits/restrictions | Offline fit | Source |
+|---|---|---|---|---|---|
+| Google Maps Platform pay-as-you-go | Since 2025-03-01, monthly free billable events per SKU replace the old USD $200 credit: typically 10,000 Essentials / 5,000 Pro / 1,000 Enterprise. Maps SDK mobile is a no-cost SKU. Nearby Search is a Pro SKU. | Billing account required; API key | Pay-as-you-go after the free cap; prices change | Live network only | [Pricing overview](https://developers.google.com/maps/billing-and-pricing/overview), [pricing page](https://mapsplatform.google.com/pricing/). Accessed 2026-10-19. |
+| Google Cloud new-customer trial | $300 credit for new customers; not charged until a full paid account is activated | Cloud billing/account | Trial credit is not Maps-specific; activating a paid account can incur later charges | Live network only | [Google Cloud free](https://cloud.google.com/free/). Accessed 2026-10-19. |
+| Google Maps public/academic credits | Faculty and university-affiliated researchers may apply for teaching credits. Students can ask faculty to apply. Nonprofit/startup/news/crisis programs exist. **No general guaranteed student Maps grant was verified.** | Application + billing | Eligibility review; not automatic for a student demo app | Live network only | [Public programs](https://developers.google.com/maps/billing-and-pricing/public-programs). Accessed 2026-10-19. |
+| Public Nominatim | No fee | No key | Max 1 req/s; valid User-Agent; ODbL attribution; apps must be able to switch providers; periodic app requests are discouraged | Live network only | [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/). Accessed 2026-10-19. |
+| Bundled TIP QC catalog + optional Overpass | No paid service | No Maps key | Catalog is approximate demo data, not a live directory. Overpass is optional and community-hosted. | **Primary offline path** | `src/data/tipCampusEatsCatalog.js`, `src/remote/placesClient.js` |
+
+**Recommendation:** keep the bundled campus catalog as the demo default. Do not add Google Maps, Places,
+Geocoding, Routes, MapLibre, or `expo-location`. Recheck Google pricing before any future paid activation.
 
 ## Reliability and observability
 
-QA update (2026-10-07): schema version 8 adds account transfers. The full suite is 52/52 suites and 347/347 tests. An isolated synthetic file-backed SQLite workload completed 1,829 operations with zero errors, dashboard p95 7.66 ms and 32-writer p99 4,146.24 ms; both remain inside the documented local budgets. Android export and Expo Doctor 18/18 pass. Earlier API 35 emulator evidence remains valid but was not repeated for schema v8; native migration/transfer persistence is therefore still unverified. See [Verification and Evaluation](./Verification%20and%20Evaluation.md).
+QA update (2026-10-19): Student Eats is offline-first via `src/data/tipCampusEatsCatalog.js`, with optional live
+OpenStreetMap refresh and best-effort encrypted `app_metadata` persistence of last live results. Executed
+`npm test` on this pass: **58/58 suites, 402/402 tests**. Historical 2026-10-07 desktop stress, Android export,
+and Expo Doctor evidence was not repeated here. Native SQLCipher/device acceptance remains unverified. See
+[Verification and Evaluation](./Verification%20and%20Evaluation.md).
 
 - Database migrations and imports run transactionally; foreign keys and a five-second busy timeout are on.
 - Recurring catch-up is idempotent for a rule/scheduled timestamp and preserves the monthly anchor day.

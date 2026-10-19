@@ -10,7 +10,7 @@ Use this when filling Play Console. Match the live app behavior.
 | Financial summary for tips | Only if Smart Tips on + consent | Yes → Google Gemini | App functionality | Anonymized ratios/totals only |
 | App interactions / diagnostics | No | No | — | No analytics SDK |
 | Personal identifiers / account | No | No | — | No user accounts |
-| Location | Yes (ephemeral, feature-only) | No precise coords shared | App functionality (Student Eats) | Not stored; AI gets distance bands only |
+| Location | No | No | — | Student Eats uses a fixed campus origin and a bundled catalog; no GPS permission |
 | Contacts / photos | No | No | — | Import is user-picked files |
 
 ## Security practices

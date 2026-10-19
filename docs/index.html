@@ -95,7 +95,7 @@ The Pages site is the polished setup guide: root <a href="https://github.com/Sec
 | Task 17 polish | Done |
 | Task 18 release prep docs | Done (EAS project ID still placeholder until <code>eas init</code>) |
 | Dark-mode theme consistency | Done (<code>useTheme</code> reads <code>themePreference</code>) |
-| Student Eats Near Me | Done (Overpass/Nominatim + ranking + optional AI) |
+| Student Eats Near Me | Done (bundled TIP QC catalog offline; optional Overpass/Nominatim refresh + ranking + optional AI) |
 | Settings pickers + Dashboard polish | Done (theme/currency chips, empties, tips teaser) |
 | Safe-to-Spend + Savings Goals | Done (pure calc + schema v2 + Goals screen); goal deadlines added |
 | Entry quick chips + MoM trend | Done |
@@ -128,8 +128,8 @@ device behavior still requires the Android verification path below.
 <li>Install <strong>Node.js 22 LTS</strong>, <strong>JDK 21</strong>, Android SDK (API 35 recommended).</li>
 <li><code>npm ci</code></li>
 <li>Copy <code>.env.example</code> → <code>.env</code> (optional <code>GEMINI_API_KEY</code> for online tips).</li>
-<li><code>npm test</code> (52 suites, 347 tests verified on 2026-10-07)</li>
-<li>Start an emulator/device, then <code>npm run android</code> (dev client required — <strong>Expo Go unsupported</strong> because of SQLCipher).</li>
+<li><code>npm test</code> (58 suites, 402 tests verified on 2026-10-19)</li>
+<li>Start an emulator/device, then <code>npm run android</code> (dev client required — <strong>Expo Go unsupported</strong> because of SQLCipher). Default <code>npm run android</code> clears app data on the first active device (<code>com.example.financetracker</code> in the checked-in native project). Use <code>npm run android:preserve</code> to keep the local ledger across launches.</li>
 </ol>
 <h3>Android Studio run button</h3>
 <p>
@@ -154,7 +154,7 @@ Full walkthrough (Windows / macOS / Linux): <strong><a href="https://github.com/
 <li>Money is always <strong>integer minor units</strong> (<code>src/domain/services/money.js</code>)</li>
 <li>Theme tokens only (<code>src/theme/tokens.js</code>) — no hardcoded hex in screens</li>
 <li>Bare <code>useTheme()</code> reads <code>themePreference</code> from <code>uiStore</code> (shared components stay dark-mode correct)</li>
-<li>Outbound HTTPS only from <code>src/remote/*</code> (<code>smartTipsClient</code>, <code>placesClient</code>, <code>eatsTipsClient</code>)</li>
+<li>Outbound HTTPS only from <code>src/remote/*</code> (<code>smartTipsClient</code>, <code>placesClient</code>, <code>eatsTipsClient</code>); Student Eats listings also ship in <code>src/data/tipCampusEatsCatalog.js</code></li>
 </ul>
 <h2>Smart Tips privacy</h2>
 <ul>
@@ -165,9 +165,10 @@ Full walkthrough (Windows / macOS / Linux): <strong><a href="https://github.com/
 </ul>
 <h2>Student Eats Near Me</h2>
 <ul>
-<li>Dashboard → <strong>Student Eats</strong>; searches use the fixed TIP Quezon City campus origin and request no location permission.</li>
-<li>Places via Overpass (Nominatim fallback); ranked by distance + price + rating + student heuristics.</li>
-<li>Mini-map is on-device relative plot (no map SDK).</li>
+<li>Dashboard → <strong>Student Eats</strong>; rankings use the fixed TIP Quezon City campus origin and request no location permission.</li>
+<li>Core listings ship in the bundled campus catalog and work with no network. Google Maps is not used.</li>
+<li>Optional live refresh uses OpenStreetMap Overpass (Nominatim fallback). Last successful live results can be stored in encrypted <code>app_metadata</code> for a later offline session.</li>
+<li>Mini-map is an on-device relative plot (no map SDK).</li>
 <li>Origin: TIP Quezon City campus. The app does not read or persist device coordinates.</li>
 <li>Optional AI tips reuse Smart Tips consent; payload uses distance <strong>bands</strong> only (no lat/lon).</li>
 </ul>

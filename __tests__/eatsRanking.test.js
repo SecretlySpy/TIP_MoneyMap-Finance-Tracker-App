@@ -1,3 +1,4 @@
+import { getBundledCampusPlaces, TIP_CAMPUS_EATS_ELEMENTS } from "../src/data/tipCampusEatsCatalog";
 import {
   TIP_QC_CAMPUS,
   assertAnonymizedEatsPayload,
@@ -109,5 +110,14 @@ describe("eatsRanking pure helpers", () => {
     expect(payload).not.toHaveProperty("latitude");
     expect(JSON.stringify(payload)).not.toMatch(/14\.62|121\.06/);
     expect(assertAnonymizedEatsPayload({ ...payload, latitude: 1 }).ok).toBe(false);
+  });
+
+  it("ranks the bundled TIP QC catalog for offline Student Eats", () => {
+    const ranked = getBundledCampusPlaces(TIP_QC_CAMPUS, { maxDistanceM: 1500, limit: 25 });
+    expect(TIP_CAMPUS_EATS_ELEMENTS.length).toBeGreaterThanOrEqual(8);
+    expect(ranked.length).toBe(TIP_CAMPUS_EATS_ELEMENTS.length);
+    expect(ranked[0].name).toBeTruthy();
+    expect(ranked.every((place) => place.distanceM <= 1500)).toBe(true);
+    expect(ranked.some((place) => /canteen|carinderia|silog|lugaw/i.test(place.name))).toBe(true);
   });
 });

@@ -81,7 +81,7 @@ Splash ──> Onboarding ──> Dashboard ──> Entry ──save──> Hist
               │               ├──────> History / Budgets / Recurring
               │               ├──────> Savings Goals
               │               ├──────> Smart Tips (offline; online optional)
-              │               └──────> Student Eats (fixed TIP QC; network search)
+              │               └──────> Student Eats (fixed TIP QC; offline catalog)
               └──resume/back/skip──> persisted first-run progress
 
 Budgets ──> Add Budget Sheet (Step 1: Category) ──> Set Limit Sheet (Step 2: Limit)
@@ -119,7 +119,7 @@ The following compact inventory supersedes the older “complete screen parity�
 6. `BudgetsScreen`: monthly overview, budget cards, recurring navigation, and the category/limit sheet flow.
 7. `RecurringScreen`: persisted recurring rules, reminders, frequency and lead-time controls, and add/edit flows.
 8. `GoalsScreen`: goal progress, contributions, targets, optional deadlines, and goal-management sheets.
-9. `SmartTipsScreen` and `StudentEatsScreen`: offline-first insights plus explicitly optional network-backed results.
+9. `SmartTipsScreen` and `StudentEatsScreen`: offline-first insights plus explicitly optional network-backed results. Student Eats opens from the bundled TIP QC catalog.
 10. `SettingsScreen`, `ManageCategoriesScreen`, and `ManageAccountsScreen`: persisted preferences, security and data tools, categories, account archive/revival, and balance-bearing account records.
 11. `ImportScreen` and `PasteImportScreen`: CSV/XLSX preview and mapping, account resolution, durable duplicate reconciliation, backup restore, and one-step restore undo.
 

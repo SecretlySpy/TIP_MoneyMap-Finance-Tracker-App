@@ -1,5 +1,22 @@
 # Decisions and Handover
 
+## Academic demo offline Student Eats (2026-10-19)
+
+**Outcome:** Student Eats no longer depends on a live map API for an academic demonstration. The screen
+opens from a bundled TIP Quezon City campus catalog, ranks on-device, and optionally refreshes from
+OpenStreetMap. Last successful live results can be stored in encrypted `app_metadata`.
+
+**Decision D-11:** Do not integrate Google Maps Platform, Places Nearby Search, Geocoding, Routes,
+MapLibre, or `expo-location` for v0.1.0 demo use. Official Maps free usage still requires a billing
+account; academic Maps credits are faculty-application programs, not a guaranteed student grant.
+Public Nominatim is unsuitable as a required app backend.
+
+**Evidence:** `npm test` on 2026-10-19: **58/58 suites, 402/402 tests**. Native device/offline airplane-mode
+smoke was not executed in this pass.
+
+**Next check:** On an Android development build, open Student Eats with no network and confirm the bundled
+catalog, then use `npm run android:preserve` if demonstrating ledger persistence across launches.
+
 ## Full roadmap & UI implementation handover (2026-10-07)
 
 **Outcome:** Delivery moved from an **81/100 baseline to 88/100** on the established delivery rubric. Following the

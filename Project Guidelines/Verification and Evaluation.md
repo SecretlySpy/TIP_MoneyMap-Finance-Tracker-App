@@ -1,6 +1,22 @@
 # Verification and Evaluation
 
-## Current implementation evidence (2026-10-07)
+## Current implementation evidence (2026-10-19)
+
+Executed on Linux with the repository Jest runner. This pass implemented offline-first Student Eats
+(bundled TIP QC catalog, optional OSM refresh, encrypted last-live cache) and did not repeat native
+device, Expo export, Expo Doctor, or stress workloads.
+
+| Check | Observation | Limit |
+|---|---|---|
+| `npm test -- --runInBand __tests__/placesClient.test.js __tests__/eatsRanking.test.js __tests__/eatsPlacesCache.test.js __tests__/qaRemoteResilience.test.js` | **4/4 suites, 28/28 tests pass** | Injected fetch/SQLite doubles; not live Overpass/Nominatim |
+| `npm test` | **58/58 suites, 402/402 tests pass** | Native providers mocked; Jest does not prove device GPS, SQLCipher on phone, or airplane-mode UI |
+| Live Google Maps / Places | Not integrated; research-only | See Architecture mapping table |
+| Android airplane-mode Student Eats smoke | **UNVERIFIED** | No device/AVD run in this pass |
+| `npx expo export` / `npx expo-doctor` / `npm run test:stress` | **NOT_RUN** this pass | Historical 2026-10-07 results remain below |
+
+New/updated automated coverage: `__tests__/placesClient.test.js` (bundled catalog, persisted restart cache, Overpass persist), `__tests__/eatsRanking.test.js` (catalog ranking), `__tests__/eatsPlacesCache.test.js` (`app_metadata` round-trip), `__tests__/qaRemoteResilience.test.js` (provider failure returns bundled listings).
+
+## Previous implementation evidence (2026-10-07)
 
 The current backend slice was executed on Windows with the installed Node/npm toolchain and local desktop
 SQLite test driver. The native observations below are retained from the separately labeled 2026-10-04
@@ -89,8 +105,9 @@ Updated: 2026-09-27
 | `__tests__/dataTransfer.test.js` | 6 | CSV export serialization, JSON backup creation, and atomic restore verification | Passed |
 | `__tests__/smartTipsClient.test.js` | 4 | Google Gemini API request sanitization, privacy anonymization, error handling | Passed |
 | `__tests__/tips.test.js` | 8 | Offline heuristic rules: daily allowance, food pace, small repeats, period comparison | Passed |
-| `__tests__/placesClient.test.js` | 5 | Overpass API querying with Nominatim fallback for student food spots | Passed |
-| `__tests__/eatsRanking.test.js` | 6 | Haversine distance, price level inference, student heuristic scoring, ranking | Passed |
+| `__tests__/placesClient.test.js` | 5 | Overpass querying, Nominatim fallback, bundled offline catalog, persisted live cache | Passed |
+| `__tests__/eatsRanking.test.js` | 7 | Haversine distance, price level inference, student heuristic scoring, ranking, bundled catalog | Passed |
+| `__tests__/eatsPlacesCache.test.js` | 2 | Durable Student Eats cache in `app_metadata` through desktop SQLite | Passed |
 | `__tests__/preferences.test.js` | 5 | User preference store persistence, currency symbol selection, theme preference | Passed |
 | `__tests__/theme.test.js` | 4 | Color token consistency, light/dark mode contrast compliance | Passed |
 | `__tests__/qaRegressions.test.js` | 10 | QA audit regressions: "Other" category double-count, safe-to-spend floor, lockout cooldown | Passed |
@@ -100,7 +117,7 @@ Updated: 2026-09-27
 | `__tests__/androidSecureScreenPlugin.test.js` | 1 | Expo config plugin: FLAG_SECURE on Android | Passed |
 | `__tests__/androidOpenSslPackagingPlugin.test.js` | 1 | Expo config plugin: OpenSSL packaging options for SQLCipher | Passed |
 
-**Current full regression result**: 52 test suites passed, 347 total tests passed, 0 failures, 0 snapshots.
+**Current full regression result (2026-10-19)**: 58 test suites passed, 402 total tests passed, 0 failures, 0 snapshots. Historical 2026-10-07 count of 54/365 is superseded.
 
 ## Figma prototype audit & parity verification
 
@@ -116,7 +133,7 @@ Updated: 2026-09-27
   - `09 Recurring & Reminders` & `09b Add Recurring Bill`: Active reminder card, bills list, bottom sheet modal with name, amount, due date, frequency/reminder chips, and `EmojiGrid` (`RecurringScreen.jsx`).
   - `10 Savings Goals` & `10b Add Savings Goal`: Goal cards with progress bars and contribute dialog, bottom sheet modal with name, target, deadline, and `EmojiGrid` (`GoalsScreen.jsx`).
   - `11 Smart Tips`: Offline heuristics + opt-in Gemini tips (`SmartTipsScreen.jsx`).
-  - `12 Student Eats`: Near TIP Quezon City food spots, price filters, distance, ranking (`StudentEatsScreen.jsx`).
+  - `12 Student Eats`: Near TIP Quezon City food spots from the bundled offline catalog, optional live refresh, distance, ranking (`StudentEatsScreen.jsx`).
   - `13 Settings`: Security, Data, Preferences, Smart Features sections with row dividers and Splash replay (`SettingsScreen.jsx`).
   - `14 Manage Categories` & `15 Manage Accounts`: Complete custom category and account management.
   - `16 Import Data` & `16b Import Data — Resolve Accounts`: PreviewTable (Date, Amount, Type), mapping card with cycling pills, ReadyBanner, and account resolution flow with atomic transaction confirmation (`ImportScreen.jsx`).
@@ -176,7 +193,7 @@ MoneyMap is acceptable for release only when the following hold. Current status 
 
 | Gate | Required | Current status | Evidence / gap |
 |---|---|---|---|
-| Automated regression | All new + existing critical flows | **Executed**: 52/52 suites, 347/347 tests pass | Full `npm test` |
+| Automated regression | All new + existing critical flows | **Executed (2026-10-19)**: 58/58 suites, 402/402 tests pass | Full `npm test` |
 | Transfer ledger integrity | One effect per retry key; balance conservation; safe backup/restore | **Executed** (desktop SQLite/Jest) | Schema/repository/store/read-model/backup tests pass; native v7→v8 migration and UI are **Not Verified** |
 | Transaction isolation | Unrelated work cannot join an open transaction | **Executed** | Queue regression passes; import rollback tests use the transaction-scoped executor |
 | Immediate fourth-digit unlock | No extra CTA, single validation | **Executed + Observed** (emulator) | Tests + smoke; correct-PIN device input gap |

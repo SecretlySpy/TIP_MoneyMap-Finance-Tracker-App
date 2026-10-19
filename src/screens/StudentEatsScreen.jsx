@@ -4,6 +4,7 @@ import { AppText as Text } from "../components/AppText";
 import { EmptyState } from "../components/EmptyState";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
+import { getBundledCampusPlaces } from "../data/tipCampusEatsCatalog";
 import {
   formatDistance,
   TIP_QC_CAMPUS,
@@ -12,6 +13,7 @@ import { formatMinor } from "../domain/services/money";
 import { deriveSmartTips } from "../domain/services/tips";
 import { fetchEatsAiTips } from "../remote/eatsTipsClient";
 import { fetchNearbyEats } from "../remote/placesClient";
+import { eatsPlacesPersistentCache } from "../services/eatsPlacesCache";
 import { resolveEatsOrigin } from "../services/locationService";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -20,6 +22,13 @@ import { useTheme } from "../theme/tokens";
 function getPriceLabel(priceLevel, currencySymbol = "₱") {
   const count = Math.min(Math.max(priceLevel ?? 2, 1), 4);
   return (currencySymbol || "₱").repeat(count);
+}
+
+function sourceLabel(source) {
+  if (source === "cache") return "cached results";
+  if (source === "persisted") return "saved results";
+  if (source === "overpass" || source === "nominatim") return "online results";
+  return "offline campus catalog";
 }
 
 /**
@@ -140,10 +149,10 @@ export function StudentEatsScreen({ navigation }) {
   const transactions = useFinanceStore((state) => state.transactions);
   const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
 
-  const [status, setStatus] = useState("loading"); // loading | ready | error
+  const [status, setStatus] = useState("ready"); // loading | ready | error
   const [origin, setOrigin] = useState({ ...TIP_QC_CAMPUS, isFallback: true, permission: "undetermined" });
-  const [places, setPlaces] = useState([]);
-  const [source, setSource] = useState("");
+  const [places, setPlaces] = useState(() => getBundledCampusPlaces(TIP_QC_CAMPUS, { maxDistanceM: 1500, limit: 25 }));
+  const [source, setSource] = useState("bundled");
   const [errorMessage, setErrorMessage] = useState(null);
   const [aiTips, setAiTips] = useState(null);
   const [aiStatus, setAiStatus] = useState("idle");
@@ -168,7 +177,6 @@ export function StudentEatsScreen({ navigation }) {
   }, [budgets, transactions, categoriesById, selectedMonthYear]);
 
   const load = useCallback(async () => {
-    setStatus("loading");
     setErrorMessage(null);
     setAiTips(null);
     setAiStatus("idle");
@@ -183,6 +191,7 @@ export function StudentEatsScreen({ navigation }) {
         label: nextOrigin.label,
       },
       radiusM: 1500,
+      persistentCache: eatsPlacesPersistentCache,
     });
     setPlaces(result.places);
     setSource(result.source);
@@ -234,7 +243,7 @@ export function StudentEatsScreen({ navigation }) {
             Student Eats near TIP QC
           </Text>
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-            Fixed TIP Quezon City search origin
+            Offline TIP Quezon City campus catalog
           </Text>
         </View>
         <Pressable
@@ -279,7 +288,7 @@ export function StudentEatsScreen({ navigation }) {
         <>
           <EatsMiniMap origin={origin} places={places} theme={theme} />
           <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.label }}>
-            Top picks · {source === "cache" ? "cached results" : "online results"}
+            Top picks · {sourceLabel(source)}
           </Text>
           {places.map((place, index) => (
             <SectionCard
@@ -339,7 +348,7 @@ export function StudentEatsScreen({ navigation }) {
           emoji="🍜"
           message={
             errorMessage
-              ?? "No places loaded. Connect to the internet and try again; a recent in-session result may still be available from cache."
+              ?? "The offline campus catalog was empty. Try refresh; a saved or live result may still be available."
           }
           onAction={() => void load()}
           title="No eats found"
@@ -383,8 +392,9 @@ export function StudentEatsScreen({ navigation }) {
         }}
       >
         <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-          Uses TIP Quezon City as the fixed search origin. Places need a network connection; no location
-          permission is requested or saved.
+          Uses TIP Quezon City as the fixed search origin. Listings come from the bundled campus catalog
+          and work offline. Optional live refresh uses OpenStreetMap when a network is available. No
+          location permission is requested or saved.
           {smartTipsEnabled && smartTipsConsentAccepted
             ? " Optional AI receives place names, distance bands, and price levels — never coordinates."
             : ""}

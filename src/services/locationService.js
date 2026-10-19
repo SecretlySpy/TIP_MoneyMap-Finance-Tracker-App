@@ -1,6 +1,6 @@
 /**
  * Student Eats uses the deterministic TIP QC campus origin.
- * GPS is unavailable until a supported location dependency is approved.
+ * GPS is unused: recommendations stay campus-relative and work offline.
  */
 
 import { TIP_QC_CAMPUS } from "../domain/services/eatsRanking";

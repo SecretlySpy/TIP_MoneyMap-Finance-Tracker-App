@@ -226,7 +226,7 @@ offline-first architecture, persisted IDs, or v0.1.0 product boundary.
 | FR-02 | Account fidelity | Entry and History use named accounts; imports preserve each source label and require an existing/new-account resolution | Complete |
 | FR-03 | Atomic import | Invalid/unresolved input creates no accounts or transactions; success commits all changes together and opens History | Complete |
 | FR-04 | Optional lock | PIN/biometrics gate access only; PIN material never becomes the SQLCipher key | Complete |
-| FR-05 | Student Eats | Use fixed TIP Quezon City origin; request no device location; describe network/cache behavior truthfully | Complete |
+| FR-05 | Student Eats | Use fixed TIP Quezon City origin; request no device location; ship an offline campus catalog; optional live refresh; describe network/cache behavior truthfully | Complete |
 | FR-06 | Navigation | Successful entry/import opens History; failures remain in context | Complete |
 | FR-07 | Recurring defaults | New reminder lead time is 14 days; existing persisted values remain unchanged | Complete |
 | FR-08 | App/Figma parity | Approved templates, categories, copy, actions, forms, and prototype routes agree | Complete |

@@ -1,8 +1,9 @@
 /**
- * Free places data via OpenStreetMap Overpass API.
- * THE dedicated network client for place search (alongside smartTips / eats tips clients).
+ * Optional live places lookup via OpenStreetMap Overpass, with Nominatim fallback.
+ * Student Eats is offline-first: the bundled TIP QC campus catalog always remains available.
  */
 
+import { getBundledCampusPlaces } from "../data/tipCampusEatsCatalog";
 import {
   TIP_QC_CAMPUS,
   rankPlaces,
@@ -12,6 +13,8 @@ const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const FETCH_TIMEOUT_MS = 18_000;
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const PERSISTED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const USER_AGENT = "MoneyMap-StudentEats/0.1 (offline-first student finance app)";
 
 /** @type {Map<string, { expiresAt: number, places: object[] }>} */
 const cache = new Map();
@@ -33,7 +36,6 @@ export function clearPlacesCache() {
  */
 function buildOverpassQuery(origin, radiusM) {
   const { latitude, longitude } = origin;
-  // Food-related amenities around the origin.
   return `
 [out:json][timeout:25];
 (
@@ -45,12 +47,77 @@ out center tags 40;
 `.trim();
 }
 
+function bundledResult(origin, radiusM) {
+  return {
+    places: getBundledCampusPlaces(origin, { maxDistanceM: radiusM, limit: 25 }),
+    origin: { ...origin, label: origin.label ?? TIP_QC_CAMPUS.label },
+    source: "bundled",
+    fromCache: false,
+    errorMessage: null,
+  };
+}
+
+async function readPersistentEntry(persistentCache, key) {
+  if (persistentCache === null || typeof persistentCache.get !== "function") {
+    return null;
+  }
+  try {
+    const entry = await persistentCache.get(key);
+    if (entry === null || typeof entry !== "object" || !Array.isArray(entry.places) || entry.places.length === 0) {
+      return null;
+    }
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+function persistedResult(entry, origin) {
+  return {
+    places: entry.places,
+    origin: entry.origin ?? { ...origin, label: origin.label ?? TIP_QC_CAMPUS.label },
+    source: "persisted",
+    fromCache: true,
+    errorMessage: null,
+  };
+}
+
+async function persistLiveResult(persistentCache, key, result, now) {
+  if (persistentCache === null || typeof persistentCache.set !== "function") {
+    return;
+  }
+  if (result.source === "bundled" || result.source === "persisted" || result.places.length === 0) {
+    return;
+  }
+  try {
+    await persistentCache.set(key, {
+      places: result.places,
+      origin: result.origin,
+      source: result.source,
+      expiresAt: now + PERSISTED_TTL_MS,
+    });
+  } catch {
+    // Persistence is best-effort; bundled catalog still works.
+  }
+}
+
+async function fallbackPlaces(origin, radiusM, persistentCache) {
+  const key = cacheKey(origin, radiusM);
+  const persisted = await readPersistentEntry(persistentCache, key);
+  if (persisted !== null) {
+    return persistedResult(persisted, origin);
+  }
+  return bundledResult(origin, radiusM);
+}
+
 /**
  * @param {{
- *   origin?: { latitude: number, longitude: number },
+ *   origin?: { latitude: number, longitude: number, label?: string },
  *   radiusM?: number,
  *   fetchImpl?: typeof fetch,
  *   now?: number,
+ *   skipNetwork?: boolean,
+ *   persistentCache?: { get: Function, set: Function } | null,
  * }} [options]
  * @returns {Promise<{ places: object[], origin: object, source: string, fromCache: boolean, errorMessage: string|null }>}
  */
@@ -58,6 +125,7 @@ export async function fetchNearbyEats(options = {}) {
   const origin = options.origin ?? TIP_QC_CAMPUS;
   const radiusM = options.radiusM ?? 1500;
   const now = options.now ?? Date.now();
+  const persistentCache = options.persistentCache ?? null;
   const key = cacheKey(origin, radiusM);
   const hit = cache.get(key);
   if (hit && hit.expiresAt > now) {
@@ -71,14 +139,8 @@ export async function fetchNearbyEats(options = {}) {
   }
 
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
-  if (typeof fetchImpl !== "function") {
-    return {
-      places: [],
-      origin,
-      source: "none",
-      fromCache: false,
-      errorMessage: "Network unavailable.",
-    };
+  if (options.skipNetwork === true || typeof fetchImpl !== "function") {
+    return fallbackPlaces(origin, radiusM, persistentCache);
   }
 
   const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -91,15 +153,13 @@ export async function fetchNearbyEats(options = {}) {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         Accept: "application/json",
-        // Identify the app politely for OSM usage policy.
-        "User-Agent": "MoneyMap-StudentEats/0.1 (offline-first student finance app)",
+        "User-Agent": USER_AGENT,
       },
       body: `data=${encodeURIComponent(query)}`,
       signal: controller?.signal,
     });
 
     if (!response.ok) {
-      // Route HTTP failures through the same single fallback as transport/JSON failures.
       throw new Error("Overpass request failed.");
     }
 
@@ -108,25 +168,29 @@ export async function fetchNearbyEats(options = {}) {
       maxDistanceM: radiusM,
       limit: 25,
     });
+    if (places.length === 0) {
+      throw new Error("Overpass returned no ranked places.");
+    }
     cache.set(key, { expiresAt: now + CACHE_TTL_MS, places });
-    return {
+    const result = {
       places,
       origin: { ...origin, label: origin.label ?? "Near you" },
       source: "overpass",
       fromCache: false,
-      errorMessage: places.length === 0 ? "No food places found in range. Try again later." : null,
+      errorMessage: null,
     };
+    await persistLiveResult(persistentCache, key, result, now);
+    return result;
   } catch {
     try {
-      return await fetchNominatimFallback(origin, radiusM, fetchImpl, now, controller?.signal);
+      const nominatim = await fetchNominatimFallback(origin, radiusM, fetchImpl, now, controller?.signal);
+      if (nominatim.places.length === 0) {
+        throw new Error("Nominatim returned no ranked places.");
+      }
+      await persistLiveResult(persistentCache, key, nominatim, now);
+      return nominatim;
     } catch {
-      return {
-        places: [],
-        origin,
-        source: "error",
-        fromCache: false,
-        errorMessage: "Could not load places. Connect to the internet and try again.",
-      };
+      return fallbackPlaces(origin, radiusM, persistentCache);
     }
   } finally {
     if (timer !== null) {
@@ -141,11 +205,10 @@ async function fetchNominatimFallback(origin, radiusM, fetchImpl, now, signal) {
     + `&viewbox=${origin.longitude - 0.02},${origin.latitude + 0.02},${origin.longitude + 0.02},${origin.latitude - 0.02}`
     + "&bounded=1";
   const response = await fetchImpl(url, {
-    // Both providers share the request deadline, including response-body parsing.
     signal,
     headers: {
       Accept: "application/json",
-      "User-Agent": "MoneyMap-StudentEats/0.1 (offline-first student finance app)",
+      "User-Agent": USER_AGENT,
     },
   });
   if (!response.ok) {
@@ -162,6 +225,9 @@ async function fetchNominatimFallback(origin, radiusM, fetchImpl, now, signal) {
     },
   }));
   const places = rankPlaces(elements, origin, { maxDistanceM: radiusM, limit: 20 });
+  if (places.length === 0) {
+    throw new Error("Nominatim returned no ranked places.");
+  }
   const key = cacheKey(origin, radiusM);
   cache.set(key, { expiresAt: now + CACHE_TTL_MS, places });
   return {
@@ -169,6 +235,6 @@ async function fetchNominatimFallback(origin, radiusM, fetchImpl, now, signal) {
     origin: { ...origin, label: origin.label ?? "Near TIP QC" },
     source: "nominatim",
     fromCache: false,
-    errorMessage: places.length === 0 ? "No places returned." : null,
+    errorMessage: null,
   };
 }

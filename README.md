@@ -21,7 +21,7 @@ The Pages site is the polished setup guide: root [`index.html`](./index.html) (s
 | Task 17 polish | Done |
 | Task 18 release prep docs | Done (EAS project ID still placeholder until `eas init`) |
 | Dark-mode theme consistency | Done (`useTheme` reads `themePreference`) |
-| Student Eats Near Me | Done (Overpass/Nominatim + ranking + optional AI) |
+| Student Eats Near Me | Done (bundled TIP QC catalog offline; optional Overpass/Nominatim refresh + ranking + optional AI) |
 | Settings pickers + Dashboard polish | Done (theme/currency chips, empties, tips teaser) |
 | Safe-to-Spend + Savings Goals | Done (pure calc + schema v2 + Goals screen); goal deadlines added |
 | Entry quick chips + MoM trend | Done |
@@ -51,8 +51,8 @@ device behavior still requires the Android verification path below.
 1. Install **Node.js 22 LTS**, **JDK 21**, Android SDK (API 35 recommended).
 2. `npm ci`
 3. Copy `.env.example` → `.env` (optional `GEMINI_API_KEY` for online tips).
-4. `npm test` (52 suites, 347 tests verified on 2026-10-07)
-5. Start an emulator/device, then `npm run android` (dev client required — **Expo Go unsupported** because of SQLCipher).
+4. `npm test` (58 suites, 402 tests verified on 2026-10-19)
+5. Start an emulator/device, then `npm run android` (dev client required — **Expo Go unsupported** because of SQLCipher). Default `npm run android` clears app data on the first active device (`com.example.financetracker` in the checked-in native project). Use `npm run android:preserve` to keep the local ledger across launches.
 
 ### Android Studio run button
 
@@ -74,7 +74,7 @@ Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or th
 - Money is always **integer minor units** (`src/domain/services/money.js`)
 - Theme tokens only (`src/theme/tokens.js`) — no hardcoded hex in screens
 - Bare `useTheme()` reads `themePreference` from `uiStore` (shared components stay dark-mode correct)
-- Outbound HTTPS only from `src/remote/*` (`smartTipsClient`, `placesClient`, `eatsTipsClient`)
+- Outbound HTTPS only from `src/remote/*` (`smartTipsClient`, `placesClient`, `eatsTipsClient`); Student Eats listings also ship in `src/data/tipCampusEatsCatalog.js`
 
 ## Smart Tips privacy
 
@@ -85,9 +85,10 @@ Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or th
 
 ## Student Eats Near Me
 
-- Dashboard → **Student Eats**; searches use the fixed TIP Quezon City campus origin and request no location permission.
-- Places via Overpass (Nominatim fallback); ranked by distance + price + rating + student heuristics.
-- Mini-map is on-device relative plot (no map SDK).
+- Dashboard → **Student Eats**; rankings use the fixed TIP Quezon City campus origin and request no location permission.
+- Core listings ship in the bundled campus catalog and work with no network. Google Maps is not used.
+- Optional live refresh uses OpenStreetMap Overpass (Nominatim fallback). Last successful live results can be stored in encrypted `app_metadata` for a later offline session.
+- Mini-map is an on-device relative plot (no map SDK).
 - Origin: TIP Quezon City campus. The app does not read or persist device coordinates.
 - Optional AI tips reuse Smart Tips consent; payload uses distance **bands** only (no lat/lon).
 
