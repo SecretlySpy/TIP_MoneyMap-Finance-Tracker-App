@@ -43,6 +43,7 @@ const uiFiles = [
   "src/screens/StudentEatsScreen.jsx",
   "src/screens/TransactionDetailScreen.jsx",
   "src/screens/EditTransactionScreen.jsx",
+  "src/screens/ExpoGoUnsupportedScreen.jsx",
 ];
 
 describe("static UI fidelity boundaries", () => {

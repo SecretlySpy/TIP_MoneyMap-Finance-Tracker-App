@@ -1,14 +1,24 @@
-import { isSQLCipher, open } from "@op-engineering/op-sqlite";
 import { loadDatabaseKey } from "./databaseKey";
 import { migrateDatabase } from "./schema";
 import { OpSqliteDatabase } from "./sql";
 import { isLocalResetPending } from "../services/localResetState";
 const DATABASE_NAME = "moneymap.sqlite";
+const SQLCIPHER_REQUIRED_MESSAGE = "MoneyMap requires an OP-SQLite development build compiled with SQLCipher.";
 let databasePromise = null;
 let databaseResetting = false;
+
+function loadOpSqlite() {
+    try {
+        return require("@op-engineering/op-sqlite");
+    } catch {
+        throw new Error(SQLCIPHER_REQUIRED_MESSAGE);
+    }
+}
+
 async function createInitializedDatabase() {
-    if (!isSQLCipher()) {
-        throw new Error("MoneyMap requires an OP-SQLite development build compiled with SQLCipher.");
+    const { isSQLCipher, open } = loadOpSqlite();
+    if (typeof isSQLCipher !== "function" || !isSQLCipher()) {
+        throw new Error(SQLCIPHER_REQUIRED_MESSAGE);
     }
     const encryptionKey = await loadDatabaseKey();
     const database = new OpSqliteDatabase(open({
@@ -81,6 +91,7 @@ export async function deleteFinanceDatabase({ keepResetGuard = false } = {}) {
             }
         }
         if (database === null) {
+            const { open } = loadOpSqlite();
             const encryptionKey = await loadDatabaseKey();
             database = new OpSqliteDatabase(open({
                 name: DATABASE_NAME,

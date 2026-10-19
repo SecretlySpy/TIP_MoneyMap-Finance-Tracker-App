@@ -52,7 +52,7 @@ device behavior still requires the Android verification path below.
 2. `npm ci`
 3. Copy `.env.example` → `.env` (optional `GEMINI_API_KEY` for online tips).
 4. `npm test` (58 suites, 402 tests verified on 2026-10-19)
-5. Start an emulator/device, then `npm run android` (dev client required — **Expo Go unsupported** because of SQLCipher). Default `npm run android` clears app data on the first active device (`com.example.financetracker` in the checked-in native project). Use `npm run android:preserve` to keep the local ledger across launches.
+5. Start an emulator/device, then `npm run android` (dev client required — **Expo Go unsupported** because of SQLCipher). Scanning the Metro QR code in Expo Go shows an in-app explanation instead of a native-module crash. Default `npm run android` clears app data on the first active device (`com.example.financetracker` in the checked-in native project). Use `npm run android:preserve` to keep the local ledger across launches.
 
 ### Android Studio run button
 

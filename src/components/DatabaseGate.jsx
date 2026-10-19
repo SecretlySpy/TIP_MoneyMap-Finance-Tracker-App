@@ -45,7 +45,7 @@ export function DatabaseGate({ children }) {
               MoneyMap could not open your encrypted data.
             </Text>
             <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.cardHeader, lineHeight: theme.spacing.top, textAlign: "center" }}>
-              MoneyMap kept the app closed to protect local data. Make sure this is a development build, then try again.
+              MoneyMap kept the app closed to protect local data. Expo Go cannot open SQLCipher. Use an Android development build (`npm run android`), then try again.
             </Text>
             <Pressable accessibilityRole="button" onPress={() => setAttempt((currentAttempt) => currentAttempt + 1)} style={{ alignItems: "center", backgroundColor: theme.colors.primary, borderRadius: theme.radii.button, justifyContent: "center", minHeight: 48, minWidth: 128, paddingHorizontal: theme.spacing.top, paddingVertical: theme.spacing.md }}>
               <Text style={{ color: theme.colors.onPrimary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>Retry</Text>
