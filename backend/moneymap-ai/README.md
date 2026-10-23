@@ -1,35 +1,117 @@
-# MoneyMap AI backend (staged integration)
+# MoneyMap AI Backend (Google Cloud Run + Firebase App Check)
 
-This Node.js Cloud Run service securely proxies opt-in Gemini requests. It is deliberately **not deployed** by this code commit.
-Gemini credentials belong only in Google Secret Manager, never in Expo, Android source, or this repository.
+This Node.js service securely proxies optional, opt-in Gemini AI requests for **Smart Tips** and **Student Eats**.
+No Gemini API credentials, private tokens, or transaction histories are shipped in the mobile application.
 
-## Project references
-- Cloud project ID: project-50d13184-689a-4396-ab2
-- Cloud Run service account: moneymap-ai-run@project-50d13184-689a-4396-ab2.iam.gserviceaccount.com
-- Secret Manager secret: moneymap-gemini-key (version 1)
-- The Gemini API key should belong to the separate unbilled Archim-Gemini-Default-Project.
+## 1. Cloud Architecture & Resource Mapping
 
-## Endpoints and privacy
-- GET /healthz returns only a health status.
-- POST /v1/smart-tips accepts month, currency, integer-budget totals, category spending ratios; never raw transaction rows.
-- POST /v1/eats-tips accepts up to eight place summaries with coarse distance bands; no coordinates.
-- Protected POST routes require X-MoneyMap-Consent: 1 and a verifiable X-Firebase-AppCheck token.
-- The server validates the summaries and returns only bounded AI tip fields; invalid/error responses fall back to offline tips in the Android application.
+| Component | Configuration | Notes |
+|---|---|---|
+| **Google Cloud Project** | `Google-Developer-Program-Trial` | Project ID: `project-50d13184-689a-4396-ab2` |
+| **Cloud Run Service** | `moneymap-ai-proxy` | Regional deployment (`asia-southeast1` recommended) |
+| **Runtime Service Account** | `moneymap-ai-run@project-50d13184-689a-4396-ab2.iam.gserviceaccount.com` | Minimum privilege: Secret Accessor only |
+| **Secret Manager Secret** | `moneymap-gemini-key` (version 1) | Gemini API key from Archim-Gemini-Default-Project |
+| **Gemini Tier & Model** | Free Tier only (`gemini-2.0-flash`) | Enforced by whitelist; paid models rejected |
+| **Verification Gate** | Firebase App Check (Admin SDK) | Attests genuine Android app before Gemini is called |
+| **Cost Control** | $1 monthly budget alert + max 1 instance | School project guardrails |
 
-## Development
-- Install Node.js 22 or newer.
-- Run: cd backend/moneymap-ai && npm install && npm test
-- Generate and review package-lock.json before any source deployment; do not commit node_modules.
-- Environment: FIREBASE_PROJECT_ID=<Firebase project registered with App Check>, GEMINI_MODEL=gemini-3.5-flash-lite.
-- Bind GEMINI_API_KEY from Secret Manager, not from checked-in source.
+---
 
-## Deployment gate: not ready for public access
-1. Register the Android app com.moneymap.financetracker in Firebase, configure Play Integrity (or approved development debug provider), then implement the native Firebase App Check token provider in MoneyMap.
-2. Configure Google Cloud Run to use the dedicated service identity and to read only moneymap-gemini-key:1.
-3. Privately test verification of valid and invalid App Check tokens, denied consent, malformed payloads, quota errors, and network timeouts.
-4. Only then consider allowing unauthenticated Cloud Run IAM invocation; the application-level App Check verification remains mandatory. A public endpoint without verified App Check would expose free AI quotas.
-5. Limit Cloud Run max instances to 1 for the school demo; monitor Gemini quotas and Cloud costs. The in-process limiter is not a distributed or guaranteed spending cap.
-6. The mobile client now uses the proxy path but intentionally fails closed until native Firebase App Check is registered and `EXPO_PUBLIC_MONEYMAP_AI_URL` points to a verified backend. No Firebase native SDK dependency or deployment was added in these commits.
+## 2. API Endpoints
 
-## Safety
-Do not use a static token inside the APK as a substitute for verified App Check. Do not commit Gemini keys, debug App Check tokens, service account key JSON, private transaction data, or signing credentials. Existing offline tips continue working until secure setup is complete.
+### `GET /healthz`
+- Returns HTTP 200 `{"status":"ok"}`. Used by Cloud Run readiness/liveness probes.
+
+### `POST /v1/smart-tips`
+- **Headers Required:**
+  - `Content-Type: application/json`
+  - `X-MoneyMap-Consent: 1`
+  - `X-Firebase-AppCheck: <valid-app-check-token>`
+- **Payload Schema:**
+  - `period`: string (`YYYY-MM`)
+  - `currencySymbol`: string (e.g., `₱`)
+  - `remainingBudgetMinor`: integer centavos
+  - `limitBudgetMinor`: integer centavos
+  - `spentBudgetMinor`: integer centavos
+  - `categorySpendRatios`: array of `{ category: string, ratio: number }` (max 16)
+  - **Strictly Forbidden:** transactions, notes, personal memos, accounts, rule IDs.
+
+### `POST /v1/eats-tips`
+- **Headers Required:**
+  - `Content-Type: application/json`
+  - `X-MoneyMap-Consent: 1`
+  - `X-Firebase-AppCheck: <valid-app-check-token>`
+- **Payload Schema:**
+  - `context`: `"student_eats_near_campus"`
+  - `areaHint`: `"TIP Quezon City vicinity"`
+  - `currencySymbol`: string
+  - `dailyFoodBudgetMinor`: integer centavos or null
+  - `places`: array of up to 8 places with coarse distance bands (`very_near`, `near`, `walkable`, `farther`).
+  - **Strictly Forbidden:** latitude, longitude, device coordinates.
+
+---
+
+## 3. Security, Rate Limiting & Abuse Prevention
+
+1. **Mandatory App Check Attestation:**
+   Requests without `X-Firebase-AppCheck` or with invalid tokens return HTTP 401 (`app_check_required` or `app_check_invalid`) and never touch the Gemini API.
+2. **Consent Gating:**
+   Requests without `X-MoneyMap-Consent: 1` return HTTP 403 (`consent_required`).
+3. **Payload Sanitization:**
+   Incoming JSON is size-limited (max 8 KB) and schema-validated. Any unexpected fields trigger HTTP 422 (`invalid_summary`).
+4. **Per-Instance Abuse Brake:**
+   In-memory rate limiter caps each verified application (`appId`) to at most 8 requests per minute to prevent quota exhaustion. Exceeding requests return HTTP 429 (`rate_limited`).
+5. **Quota & AI Error Handling:**
+   If Gemini returns HTTP 429, the proxy returns HTTP 429 `{"error":"quota_unavailable"}`. The mobile app cleanly falls back to offline rule-based tips.
+6. **No Remote Financial Ledger:**
+   The service is completely stateless; no user data is stored, cached on disk, or logged.
+
+---
+
+## 4. Local Testing & Verification
+
+```bash
+cd backend/moneymap-ai
+npm install
+npm test
+```
+
+All unit tests verify:
+- Health check endpoint
+- Rejection of unapproved paid models (e.g. `gemini-1.5-pro` returns 503)
+- Acceptance of Free Tier models (`gemini-2.0-flash`, `gemini-2.0-flash-lite`, `gemini-1.5-flash`)
+- App Check verification failure paths (401)
+- User consent enforcement (403)
+- Rate limiting and quota failure responses (429)
+
+---
+
+## 5. Deployment Commands (Cloud Run)
+
+To deploy to Cloud Run using Google Cloud SDK:
+
+```bash
+# 1. Authenticate with Google Cloud
+gcloud auth login
+gcloud config set project project-50d13184-689a-4396-ab2
+
+# 2. Deploy to Cloud Run from the backend/moneymap-ai directory
+gcloud run deploy moneymap-ai-proxy \
+  --source . \
+  --region asia-southeast1 \
+  --platform managed \
+  --allow-unauthenticated \
+  --service-account moneymap-ai-run@project-50d13184-689a-4396-ab2.iam.gserviceaccount.com \
+  --set-secrets="GEMINI_API_KEY=moneymap-gemini-key:1" \
+  --set-env-vars="FIREBASE_PROJECT_ID=project-50d13184-689a-4396-ab2,GEMINI_MODEL=gemini-2.0-flash" \
+  --max-instances 1 \
+  --memory 256Mi \
+  --cpu 1 \
+  --timeout 15s
+
+# 3. Copy the assigned Service URL and set it in your local mobile .env
+# EXPO_PUBLIC_MONEYMAP_AI_URL=https://moneymap-ai-proxy-<hash>-as.a.run.app
+```
+
+> [!IMPORTANT]
+> The service is protected at the application layer by Firebase App Check verification. Do NOT bypass App Check verification in production.

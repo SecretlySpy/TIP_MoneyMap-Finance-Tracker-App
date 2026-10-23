@@ -99,6 +99,49 @@ export function SmartTipsScreen({ navigation }) {
     categoriesById,
   ]);
 
+  const statusInfo = useMemo(() => {
+    if (aiStatus === "ready") {
+      return {
+        badge: "Online recommendations available",
+        emoji: "✨",
+        description: "Personalized suggestions when online · rules-based tips always available offline.",
+      };
+    }
+    if (aiStatus === "loading") {
+      return {
+        badge: "Connecting to online personalization",
+        emoji: "⏳",
+        description: "Connecting to secure online personalization…",
+      };
+    }
+    if (!smartTipsEnabled || !smartTipsConsentAccepted) {
+      return {
+        badge: "Online personalization disabled",
+        emoji: "📱",
+        description: "Tips are computed from your own spending and stay on-device. Online personalization is optional.",
+      };
+    }
+    if (!isAiProxyConfigured()) {
+      return {
+        badge: "Online personalization not configured",
+        emoji: "⚙️",
+        description: "Offline recommendations available. Secure online personalization is not configured yet.",
+      };
+    }
+    if (aiStatus === "offline") {
+      return {
+        badge: "Online service unavailable",
+        emoji: "⚠️",
+        description: "Online service unavailable. Offline recommendations available.",
+      };
+    }
+    return {
+      badge: "Offline recommendations available",
+      emoji: "📱",
+      description: "Tips are computed from your own spending and stay on-device.",
+    };
+  }, [aiStatus, smartTipsEnabled, smartTipsConsentAccepted]);
+
   const remainingMinor = offlineSnapshot.remainingMinor;
   const limitMinor = offlineSnapshot.limitMinor > 0 ? offlineSnapshot.limitMinor : Math.max(remainingMinor, 1);
   const spentMinor = offlineSnapshot.spentMinor;
@@ -145,6 +188,7 @@ export function SmartTipsScreen({ navigation }) {
         </Text>
         <View style={{ flex: 1 }} />
         <View
+          accessibilityLabel={`Status: ${statusInfo.badge}`}
           style={{
             backgroundColor: theme.colors.tint,
             borderRadius: theme.radii.chip,
@@ -154,9 +198,9 @@ export function SmartTipsScreen({ navigation }) {
             paddingVertical: theme.spacing.compact,
           }}
         >
-          <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>✨</Text>
+          <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>{statusInfo.emoji}</Text>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny }}>
-            {aiStatus === "ready" ? "Online + offline" : aiStatus === "loading" ? "Connecting" : smartTipsEnabled && smartTipsConsentAccepted ? (isAiProxyConfigured() ? "Service unavailable" : "Setup needed") : "Offline"}
+            {statusInfo.badge}
           </Text>
         </View>
       </View>
@@ -222,13 +266,7 @@ export function SmartTipsScreen({ navigation }) {
                 : "Set budgets to get a daily allowance"}
           </Text>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-            {aiStatus === "loading"
-              ? "Checking for personalized tips…"
-              : aiStatus === "ready"
-                ? "Personalized suggestions when online · rules-based tips always available offline."
-                : smartTipsEnabled && smartTipsConsentAccepted && !isAiProxyConfigured()
-                  ? "Offline tips are ready. Secure online personalization is not configured yet."
-                  : "Tips are computed from your own spending and stay on-device. Online personalization is optional."}
+            {statusInfo.description}
           </Text>
         </View>
         {aiStatus === "loading" ? (

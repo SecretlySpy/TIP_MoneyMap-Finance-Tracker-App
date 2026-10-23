@@ -80,7 +80,7 @@ Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or th
 
 - Default **off**. First enable shows a consent sheet.
 - Offline: `deriveSmartTips` from local budgets/transactions.
-- Online (after opt-in, Firebase App Check setup, and deployment): minimized summary only (period, totals, category ratios, currency) through the secured Cloud Run proxy to Gemini. Never send raw transactions. See [backend setup](./backend/moneymap-ai/README.md).
+- Online (after opt-in, Firebase App Check setup, and deployment): minimized summary only (period, totals, category ratios, currency) through the secured Cloud Run proxy to Gemini. Never send raw transactions. See [backend setup](./backend/moneymap-ai/README.md) and [Firebase App Check & Cloud Run Guide](./docs/firebase-app-check-cloud-run.md).
 - Never: raw transactions, notes, account names/IDs.
 
 ## Student Eats Near Me

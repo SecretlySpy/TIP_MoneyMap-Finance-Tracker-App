@@ -20,12 +20,19 @@ jest.mock("@react-native-firebase/app-check", () => ({
 }));
 
 describe("firebaseAppCheck", () => {
+  const originalEnv = process.env;
+
   beforeEach(() => {
     jest.clearAllMocks();
     jest.resetModules();
+    process.env = { ...originalEnv };
   });
 
-  it("initializes App Check with debug provider in dev environment and returns token", async () => {
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  it("initializes App Check with debug provider in dev environment and auto-refresh enabled", async () => {
     const { getMoneyMapAppCheckToken } = require("../src/remote/firebaseAppCheck");
 
     const token = await getMoneyMapAppCheckToken();
@@ -40,10 +47,33 @@ describe("firebaseAppCheck", () => {
     expect(mockInitializeAppCheck).toHaveBeenCalledWith(
       { name: "[DEFAULT]" },
       expect.objectContaining({
-        isTokenAutoRefreshEnabled: false,
+        isTokenAutoRefreshEnabled: true,
       })
     );
-    expect(mockGetToken).toHaveBeenCalledTimes(1);
+    expect(mockGetToken).toHaveBeenCalledWith(expect.anything(), false);
+  });
+
+  it("passes forceRefresh true when requested", async () => {
+    const { getMoneyMapAppCheckToken } = require("../src/remote/firebaseAppCheck");
+
+    const token = await getMoneyMapAppCheckToken(true);
+
+    expect(token).toBe("mock-app-check-token-123");
+    expect(mockGetToken).toHaveBeenCalledWith(expect.anything(), true);
+  });
+
+  it("supports configuring private debugToken from environment in dev", async () => {
+    process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN = "custom-debug-token-guid";
+    const { getMoneyMapAppCheckToken } = require("../src/remote/firebaseAppCheck");
+
+    await getMoneyMapAppCheckToken();
+
+    expect(mockConfigure).toHaveBeenCalledWith({
+      android: {
+        provider: "debug",
+        debugToken: "custom-debug-token-guid",
+      },
+    });
   });
 
   it("reuses initialized App Check promise across multiple token requests", async () => {
@@ -73,5 +103,19 @@ describe("firebaseAppCheck", () => {
     const token = await getMoneyMapAppCheckToken();
     expect(token).toBe("mock-app-check-token-123");
     expect(mockInitializeAppCheck).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries with forceRefresh if initial getToken returns invalid or throws", async () => {
+    mockGetToken
+      .mockRejectedValueOnce(new Error("Transient token error"))
+      .mockResolvedValueOnce({ token: "retried-valid-token-123" });
+
+    const { getMoneyMapAppCheckToken } = require("../src/remote/firebaseAppCheck");
+
+    const token = await getMoneyMapAppCheckToken(false);
+    expect(token).toBe("retried-valid-token-123");
+    expect(mockGetToken).toHaveBeenCalledTimes(2);
+    expect(mockGetToken).toHaveBeenNthCalledWith(1, expect.anything(), false);
+    expect(mockGetToken).toHaveBeenNthCalledWith(2, expect.anything(), true);
   });
 });
