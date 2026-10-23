@@ -1,7 +1,18 @@
-// Dynamic Expo config: inherits Expo's normalized app.json values and injects secrets at build time.
 module.exports = ({ config }) => {
   return {
     ...config,
+
+    android: {
+      ...(config.android ?? {}),
+      googleServicesFile: "./google-services.json",
+    },
+
+    plugins: [
+      ...(config.plugins ?? []),
+      "@react-native-firebase/app",
+      "@react-native-firebase/app-check",
+    ],
+
     extra: {
       ...(config.extra ?? {}),
     },

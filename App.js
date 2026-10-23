@@ -8,10 +8,18 @@ import { lazy, Suspense, useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { isExpoGoRuntime } from "./src/runtime/expoGo";
 import { ExpoGoUnsupportedScreen } from "./src/screens/ExpoGoUnsupportedScreen";
+import { registerAiAppCheckProvider } from "./src/remote/aiProxyClient";
 
 void SplashScreen.preventAutoHideAsync();
 
 const MoneyMapRoot = lazy(() => import("./src/MoneyMapRoot"));
+
+registerAiAppCheckProvider(async () => {
+  const { getMoneyMapAppCheckToken } =
+    await import("./src/remote/firebaseAppCheck");
+
+  return getMoneyMapAppCheckToken();
+});
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({ Roboto_400Regular, Roboto_500Medium, Roboto_700Bold });
