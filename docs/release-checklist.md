@@ -5,7 +5,7 @@
 1. **Package ID** — set in `app.json` / `app.config.js`  
    Current: `com.moneymap.financetracker` (replace `com.example.*`).
 2. **EAS project** — run `npx eas-cli login` then `npx eas-cli init` and commit the real `extra.eas.projectId` (not all zeros).
-3. **Secrets** — `eas secret:create --name GEMINI_API_KEY --value … --scope project` (optional Smart Tips). Never commit keys.
+3. **Secrets and proxy** — keep `GEMINI_API_KEY` only in Google Secret Manager; deploy the protected Cloud Run proxy using the dedicated runtime service account. Do NOT use EAS/Expo extras for the Gemini key. Register and verify native Firebase App Check first. See `backend/moneymap-ai/README.md`.
 4. **Icon / splash** — `assets/splash-icon.png` referenced as icon + adaptive icon; regenerate with `npm run asset:splash` if branding changes.
 5. **Privacy** — publish `docs/privacy-policy.md`; complete Play Data safety using `docs/play-data-safety.md`.
 6. **Version** — bump `expo.version` and `android.versionCode`.

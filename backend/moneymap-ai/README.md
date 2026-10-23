@@ -29,7 +29,7 @@ Gemini credentials belong only in Google Secret Manager, never in Expo, Android 
 3. Privately test verification of valid and invalid App Check tokens, denied consent, malformed payloads, quota errors, and network timeouts.
 4. Only then consider allowing unauthenticated Cloud Run IAM invocation; the application-level App Check verification remains mandatory. A public endpoint without verified App Check would expose free AI quotas.
 5. Limit Cloud Run max instances to 1 for the school demo; monitor Gemini quotas and Cloud costs. The in-process limiter is not a distributed or guaranteed spending cap.
-6. On the mobile side, replace the retired direct Gemini call with this protected proxy after attestation is configured and tested.
+6. The mobile client now uses the proxy path but intentionally fails closed until native Firebase App Check is registered and `EXPO_PUBLIC_MONEYMAP_AI_URL` points to a verified backend. No Firebase native SDK dependency or deployment was added in these commits.
 
 ## Safety
 Do not use a static token inside the APK as a substitute for verified App Check. Do not commit Gemini keys, debug App Check tokens, service account key JSON, private transaction data, or signing credentials. Existing offline tips continue working until secure setup is complete.

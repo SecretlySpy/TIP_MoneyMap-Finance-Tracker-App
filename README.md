@@ -17,7 +17,7 @@ The Pages site is the polished setup guide: root [`index.html`](./index.html) (s
 | Task 13 CSV + Excel import | Done |
 | Task 14 app lock (PIN + biometrics) | Implemented — attempt lockout plus device-authenticated PIN replacement and an explicit local-reset fallback; enrolled-device recovery remains release-gated |
 | Task 15 Smart Tips offline rules | Done |
-| Task 16 Smart Tips online Gemini (opt-in) | Done |
+| Task 16 Smart Tips online Gemini (opt-in) | Secure Cloud Run proxy integration staged on main; requires Firebase App Check registration and Cloud Run deployment before live online suggestions work |
 | Task 17 polish | Done |
 | Task 18 release prep docs | Done (EAS project ID still placeholder until `eas init`) |
 | Dark-mode theme consistency | Done (`useTheme` reads `themePreference`) |
@@ -50,7 +50,7 @@ device behavior still requires the Android verification path below.
 
 1. Install **Node.js 22 LTS**, **JDK 21**, Android SDK (API 35 recommended).
 2. `npm ci`
-3. Copy `.env.example` → `.env` (optional `GEMINI_API_KEY` for online tips).
+3. Copy `.env.example` → `.env` (optional PUBLIC Cloud Run URL only, after Firebase App Check is configured). Never bundle `GEMINI_API_KEY` in the app.
 4. `npm test` (58 suites, 402 tests verified on 2026-10-19)
 5. Start an emulator/device, then `npm run android` (dev client required — **Expo Go unsupported** because of SQLCipher). Scanning the Metro QR code in Expo Go shows an in-app explanation instead of a native-module crash. Default `npm run android` clears app data on the first active device (`com.example.financetracker` in the checked-in native project). Use `npm run android:preserve` to keep the local ledger across launches.
 
@@ -80,7 +80,7 @@ Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or th
 
 - Default **off**. First enable shows a consent sheet.
 - Offline: `deriveSmartTips` from local budgets/transactions.
-- Online: anonymized summary only (period, totals, category ratios, currency) to Gemini.
+- Online (after opt-in, Firebase App Check setup, and deployment): minimized summary only (period, totals, category ratios, currency) through the secured Cloud Run proxy to Gemini. Never send raw transactions. See [backend setup](./backend/moneymap-ai/README.md).
 - Never: raw transactions, notes, account names/IDs.
 
 ## Student Eats Near Me
