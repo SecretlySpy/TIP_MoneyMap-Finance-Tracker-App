@@ -1,6 +1,6 @@
 # MoneyMap Privacy Policy
 
-**Last updated:** 2026-10-19  
+**Last updated:** 2026-10-23  
 **App:** MoneyMap Finance Tracker  
 **Audience:** Students (personal finance, single-device)
 
@@ -38,14 +38,14 @@ We do **not** operate a MoneyMap account server. There is no cloud sync of your 
 
 - **Default:** off.
 - **Offline:** tips are computed on-device from your budgets and transactions. Nothing is sent.
-- **Online (after consent):** MoneyMap may send an **anonymized summary** to **Google Gemini**:
+- **Online (after consent, configuration, and app verification):** MoneyMap may send a **minimized summary** through a stateless Google Cloud Run proxy to **Google Gemini**:
   - budget period (e.g. `YYYY-MM`)
   - remaining / limit / spent totals (integer minor units)
   - per-category **spend ratios** and category labels
   - currency symbol
 - **Never sent:** raw transaction lists, notes/memos, account names or IDs, recurring-rule identifiers, contacts, or location.
 
-If the device is offline, the request fails, or the API key/quota is unavailable, MoneyMap **silently falls back** to offline tips. You will not see a broken empty state caused by network errors alone.
+Gemini credentials are stored server-side in Secret Manager. The backend requires a valid Firebase App Check token; there is no cloud ledger sync. Users should review Gemini Free Tier data-use terms before opting in with real financial summaries. If the device is offline, secure app verification is not set up, the request fails, or the model/quota is unavailable, MoneyMap falls back to offline tips. You will not see a broken empty state caused by network errors alone.
 
 You can turn Smart Tips off at any time in Settings. Turning it off stops further network requests for tips.
 
@@ -70,7 +70,7 @@ Uninstalling the app removes local app data on typical Android configurations. E
 When completing Google Play’s Data safety form, declare:
 
 - **Financial info** collected/processed **on device** (not shared with MoneyMap as a developer backend — there is none).
-- **Optional** data shared with a third party (**Google Gemini**) only if the user enables Smart Tips and consents: approximate budget summary / category ratios (not full transaction history).
+- **Optional** summary processed through Cloud Run and **Google Gemini** only if Smart Tips is enabled, consented, and authenticated app verification is configured: approximate budget summary / category ratios (not full transaction history).
 - **Data encrypted in transit** for that optional API call (HTTPS).
 - **Data encrypted at rest** on device (SQLCipher).
 - Users can stop optional sharing by disabling Smart Tips.

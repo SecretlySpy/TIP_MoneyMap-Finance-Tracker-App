@@ -1,4 +1,3 @@
-jest.mock("expo-constants", () => ({ __esModule: true, default: { expoConfig: { extra: { geminiApiKey: "qa-synthetic-key" } } } }));
 import { clearPlacesCache, fetchNearbyEats } from "../src/remote/placesClient";
 import { assertAnonymizedPayload, clearSmartTipsCache, fetchSmartTipsFromGemini } from "../src/remote/smartTipsClient";
 import { clearEatsTipsCache, fetchEatsAiTips } from "../src/remote/eatsTipsClient";
@@ -48,16 +47,16 @@ describe("QA remote boundary and deadline resilience", () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it.each([401, 429, 500, 503])("uses offline Smart Tips after HTTP %i with an actual mocked API key", async (status) => {
+  it.each([401, 429, 500, 503])("uses offline Smart Tips after HTTP %i with an authenticated proxy test double", async (status) => {
     const fetchImpl = jest.fn(async () => ({ ok: false, status }));
-    await expect(fetchSmartTipsFromGemini({ enabled: true, consentAccepted: true, payload, fetchImpl })).resolves.toBeNull();
+    await expect(fetchSmartTipsFromGemini({ enabled: true, consentAccepted: true, payload, fetchImpl, backendUrl: "https://example.test", appCheckToken: "synthetic-app-check-token" })).resolves.toBeNull();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it("aborts a stalled Smart Tips request and releases the timer", async () => {
     jest.useFakeTimers();
     const fetchImpl = jest.fn(stall);
-    const result = fetchSmartTipsFromGemini({ enabled: true, consentAccepted: true, payload, fetchImpl });
+    const result = fetchSmartTipsFromGemini({ enabled: true, consentAccepted: true, payload, fetchImpl, backendUrl: "https://example.test", appCheckToken: "synthetic-app-check-token" });
     await jest.advanceTimersByTimeAsync(12_000);
     await expect(result).resolves.toBeNull();
     expect(fetchImpl.mock.calls[0][1].signal.aborted).toBe(true);
@@ -66,7 +65,7 @@ describe("QA remote boundary and deadline resilience", () => {
 
   it("returns offline eats tips after malformed Gemini response", async () => {
     const fetchImpl = jest.fn(async () => ({ ok: true, json: async () => { throw new SyntaxError("invalid JSON"); } }));
-    await expect(fetchEatsAiTips({ enabled: true, consentAccepted: true, places: [], fetchImpl })).resolves.toBeNull();
+    await expect(fetchEatsAiTips({ enabled: true, consentAccepted: true, places: [], fetchImpl, backendUrl: "https://example.test", appCheckToken: "synthetic-app-check-token" })).resolves.toBeNull();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 

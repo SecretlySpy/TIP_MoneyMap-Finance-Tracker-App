@@ -1,4 +1,4 @@
-import Constants from "expo-constants";
+import { requestAiProxyTips } from "./aiProxyClient";
 import { budgetSummary, buildBudgetCards, spendingByCategory } from "../domain/services/financeView";
 
 /**
@@ -6,10 +6,7 @@ import { budgetSummary, buildBudgetCards, spendingByCategory } from "../domain/s
  * Outbound HTTPS is limited to src/remote/* modules. Every call must be gated by smartTipsEnabled + consent.
  */
 
-const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 const CACHE_TTL_MS = 30 * 60 * 1000;
-const FETCH_TIMEOUT_MS = 12_000;
 
 /** @type {Map<string, { expiresAt: number, tips: object[] }>} */
 const responseCache = new Map();
@@ -19,9 +16,8 @@ const responseCache = new Map();
  * @returns {string}
  */
 export function getGeminiApiKey() {
-  const extra = Constants.expoConfig?.extra ?? Constants.manifest?.extra ?? {};
-  const key = extra.geminiApiKey ?? extra.GEMINI_API_KEY ?? "";
-  return typeof key === "string" ? key.trim() : "";
+  // Legacy API retained for compatibility. Gemini keys are never bundled.
+  return "";
 }
 
 /**
@@ -236,68 +232,23 @@ export async function fetchSmartTipsFromGemini(options) {
     return cached;
   }
 
-  const apiKey = (typeof options.apiKey === "string" ? options.apiKey.trim() : "") || getGeminiApiKey();
-  if (apiKey.length === 0) {
-    return null;
-  }
-
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
-  if (typeof fetchImpl !== "function") {
-    return null;
-  }
-
-  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-  const timer = controller
-    ? setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-    : null;
-
-  try {
-    const prompt = [
-      "You help students budget. Given ONLY this anonymized JSON summary, return a JSON array of up to 4 tip objects.",
-      'Each object: {"emoji":"string","title":"string","meta":"string","tag":"string"}.',
-      "No markdown outside the array. No personal data. Amounts are integer minor units (centavos); mention major units in copy.",
-      JSON.stringify(options.payload),
-    ].join("\n");
-
-    const response = await fetchImpl(GEMINI_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      signal: controller?.signal,
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 512,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-    const body = await response.json();
-    const text = body?.candidates?.[0]?.content?.parts
-      ?.map((part) => part?.text ?? "")
-      .join("\n") ?? "";
-    const tips = parseGeminiTipsText(text);
-    if (tips.length === 0) {
-      return null;
-    }
-    responseCache.set(cacheKey(options.payload), {
-      expiresAt: (options.now ?? Date.now()) + CACHE_TTL_MS,
-      tips,
-    });
-    return tips;
-  } catch {
-    return null;
-  } finally {
-    if (timer !== null) {
-      clearTimeout(timer);
-    }
-  }
+  const result = await requestAiProxyTips({
+    path: "/v1/smart-tips",
+    payload: options.payload,
+    enabled: options.enabled,
+    consentAccepted: options.consentAccepted,
+    fetchImpl: options.fetchImpl,
+    backendUrl: options.backendUrl,
+    appCheckToken: options.appCheckToken,
+  });
+  if (!result?.length) return null;
+  const tips = result.map((tip, index) => normalizeAiTip(tip, index)).filter(Boolean);
+  if (tips.length === 0) return null;
+  responseCache.set(cacheKey(options.payload), {
+    expiresAt: (options.now ?? Date.now()) + CACHE_TTL_MS,
+    tips,
+  });
+  return tips;
 }
 
 /**

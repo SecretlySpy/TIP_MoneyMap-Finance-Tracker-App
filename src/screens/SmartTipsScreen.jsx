@@ -7,6 +7,7 @@ import { SectionCard } from "../components/SectionCard";
 import { deriveSmartTips } from "../domain/services/tips";
 import { formatMinor } from "../domain/services/money";
 import { loadOnlineSmartTips } from "../remote/smartTipsClient";
+import { isAiProxyConfigured } from "../remote/aiProxyClient";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -155,7 +156,7 @@ export function SmartTipsScreen({ navigation }) {
         >
           <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.tiny }}>✨</Text>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny }}>
-            {aiStatus === "ready" ? "Online + offline" : "Offline"}
+            {aiStatus === "ready" ? "Online + offline" : aiStatus === "loading" ? "Connecting" : smartTipsEnabled && smartTipsConsentAccepted ? (isAiProxyConfigured() ? "Service unavailable" : "Setup needed") : "Offline"}
           </Text>
         </View>
       </View>
@@ -225,7 +226,9 @@ export function SmartTipsScreen({ navigation }) {
               ? "Checking for personalized tips…"
               : aiStatus === "ready"
                 ? "Personalized suggestions when online · rules-based tips always available offline."
-                : "Tips are computed from your own spending and stay on-device. Online personalization is optional."}
+                : smartTipsEnabled && smartTipsConsentAccepted && !isAiProxyConfigured()
+                  ? "Offline tips are ready. Secure online personalization is not configured yet."
+                  : "Tips are computed from your own spending and stay on-device. Online personalization is optional."}
           </Text>
         </View>
         {aiStatus === "loading" ? (
