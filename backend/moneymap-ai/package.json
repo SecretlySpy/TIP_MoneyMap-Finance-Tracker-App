@@ -1,0 +1,15 @@
+{
+  "name": "moneymap-ai-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/index.cjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.5.0"
+  }
+}
