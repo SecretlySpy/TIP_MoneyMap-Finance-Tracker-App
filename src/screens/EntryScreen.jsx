@@ -350,7 +350,7 @@ export function EntryScreen({ navigation }) {
                     }),
                 });
                 if (typeof addSplitTransactions === "function") {
-                    await addSplitTransactions(splitTxs);
+                    await addSplitTransactions(splitTxs, { groupTitle: note.trim() ? note.trim() : null });
                 } else {
                     for (const sTx of splitTxs) {
                         await addTransaction(sTx);

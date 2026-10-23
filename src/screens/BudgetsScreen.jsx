@@ -11,7 +11,8 @@ import { ScreenContainer } from "../components/ScreenContainer";
 import { TextPromptModal } from "../components/TextPromptModal";
 import { BUDGET_BILL_EMOJI_PRESETS } from "../domain/services/emoji";
 import { budgetSummary, buildBudgetCards, formatMonthChip, shiftMonthYear } from "../domain/services/financeView";
-import { computeCategoryRollover, formatRolloverEquation, getBudgetsToCopy, SEMESTER_TEMPLATES } from "../domain/services/rollover";
+import { computeCategoryRollover, formatRolloverEquation, getBudgetsToCopy } from "../domain/services/rollover";
+import { BudgetTemplateModal } from "../components/BudgetTemplateModal";
 import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -404,83 +405,12 @@ export function BudgetsScreen({ navigation }) {
         visible={renameModalVisible}
       />
 
-      {/* Semester Plan Templates Sheet */}
-      <BottomSheet
+      {/* 08d Student Semester Templates Modal & Manager */}
+      <BudgetTemplateModal
         onClose={() => setSemesterSheetVisible(false)}
-        title="🎓 Student Semester Templates"
+        targetMonthYear={selectedMonthYear}
         visible={semesterSheetVisible}
-      >
-        <View style={{ gap: theme.spacing.md, paddingBottom: theme.spacing.xl }}>
-          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-            Preset student budget packages for Philippine academic life.
-          </Text>
-
-          {SEMESTER_TEMPLATES.map((tpl) => (
-            <Pressable
-              key={tpl.id}
-              accessibilityRole="button"
-              onPress={async () => {
-                if (busy) return;
-                setBusy(true);
-                try {
-                  for (const cat of tpl.categories) {
-                    const icon = cat.icon ?? cat.emoji ?? "📊";
-                    const limitMinor = cat.limitMinor ?? cat.amountMinor ?? 100_000;
-                    await addCategory({ name: cat.name, type: "EXPENSE", icon });
-                    await addBudget({ categoryName: cat.name, limitMinor, monthYear: selectedMonthYear });
-                  }
-                  setSemesterSheetVisible(false);
-                  Alert.alert("Template Applied", `Applied "${tpl.name}" for ${selectedMonthYear}.`);
-                } catch (err) {
-                  Alert.alert("Error", err instanceof Error ? err.message : "Failed to apply template.");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-              style={{
-                backgroundColor: theme.colors.bg,
-                borderColor: theme.colors.outline,
-                borderRadius: theme.radii.card,
-                borderWidth: 1,
-                gap: theme.spacing.xs,
-                padding: theme.spacing.md,
-              }}
-            >
-              <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
-                {tpl.name}
-              </Text>
-              <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
-                {tpl.description}
-              </Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.xs, marginTop: theme.spacing.xs }}>
-                {tpl.categories.map((c) => (
-                  <View
-                    key={c.name}
-                    style={{
-                      backgroundColor: theme.colors.surface,
-                      borderRadius: theme.radii.chip,
-                      paddingHorizontal: theme.spacing.sm,
-                      paddingVertical: 2,
-                    }}
-                  >
-                    <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
-                      {c.icon ?? c.emoji} {c.name}: {formatMinor(c.limitMinor ?? c.amountMinor, { currencySymbol, showCents: false })}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </Pressable>
-          ))}
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setSemesterSheetVisible(false)}
-            style={{ alignItems: "center", justifyContent: "center", minHeight: 44 }}
-          >
-            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium }}>Close</Text>
-          </Pressable>
-        </View>
-      </BottomSheet>
+      />
 
       {/* 08c Budget Rollover Sheet - Frame 299:2788 */}
       {selectedRolloverBudget && rolloverData ? (

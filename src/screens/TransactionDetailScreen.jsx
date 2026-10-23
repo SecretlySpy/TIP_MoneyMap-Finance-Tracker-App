@@ -8,6 +8,7 @@ import { SectionCard } from "../components/SectionCard";
 import { categoryEmoji, resolveDisplayEmoji } from "../domain/services/emoji";
 import { formatMinor, formatTransactionAmount } from "../domain/services/money";
 import { accountChipLabel } from "../domain/services/financeView";
+import { extractParentNote, stripSplitSuffix } from "../domain/services/splits";
 import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -16,22 +17,33 @@ export function TransactionDetailScreen({ navigation, route }) {
   const theme = useTheme(useUiStore((state) => state.themePreference));
   const currencySymbol = useUiStore((state) => state.currencySymbol);
   const transactions = useFinanceStore((state) => state.transactions);
+  const transactionGroups = useFinanceStore((state) => state.transactionGroups);
   const categories = useFinanceStore((state) => state.categories);
   const accounts = useFinanceStore((state) => state.accounts);
   const recurringRules = useFinanceStore((state) => state.recurringRules);
   const deleteTransactionById = useFinanceStore((state) => state.deleteTransactionById);
+  const deleteSplitTransactionGroup = useFinanceStore((state) => state.deleteSplitTransactionGroup);
   const transfers = useFinanceStore((state) => state.transfers);
   const deleteAccountTransferById = useFinanceStore((state) => state.deleteAccountTransferById);
 
   const [deleteSheetVisible, setDeleteSheetVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const explicitSplitGroupId = route?.params?.splitGroupId;
   const transactionId = Number(route?.params?.transactionId);
-  const transaction = transactions.find((item) => item.id === transactionId);
-
   const isTransfer = Boolean(route?.params?.isTransfer || route?.params?.transferId);
   const transferId = Number(route?.params?.transferId ?? route?.params?.transactionId);
   const transfer = isTransfer ? transfers.find((item) => item.id === transferId) : null;
+
+  const transaction = !isTransfer && !isNaN(transactionId)
+    ? transactions.find((item) => item.id === transactionId)
+    : null;
+
+  const resolvedSplitGroupId = explicitSplitGroupId ?? (transaction?.splitGroupId ?? null);
+  const isSplitGroup = Boolean(
+    resolvedSplitGroupId &&
+    (explicitSplitGroupId || (transaction && transactions.filter((t) => t.splitGroupId === resolvedSplitGroupId).length >= 2))
+  );
 
   if (isTransfer && transfer) {
     const fromAccount = accounts.find((a) => a.id === transfer.fromAccountId);
@@ -187,6 +199,349 @@ export function TransactionDetailScreen({ navigation, route }) {
                   setIsDeleting(false);
                 }
               }}
+              style={{ backgroundColor: theme.colors.expense }}
+            >
+              {isDeleting ? "Deleting…" : "Confirm Delete"}
+            </PrimaryButton>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setDeleteSheetVisible(false)}
+              style={{ alignItems: "center", justifyContent: "center", minHeight: 44 }}
+            >
+              <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </BottomSheet>
+      </ScreenContainer>
+    );
+  }
+
+  if (isSplitGroup) {
+    const groupAllocations = transactions.filter((t) => t.splitGroupId === resolvedSplitGroupId);
+    if (groupAllocations.length === 0) {
+      return (
+        <ScreenContainer contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }} testID="missing-transaction-screen">
+          <View
+            style={{
+              alignItems: "center",
+              gap: theme.spacing.lg,
+              justifyContent: "center",
+              paddingHorizontal: theme.spacing.screen,
+              paddingVertical: theme.spacing.xxl,
+            }}
+          >
+            <View
+              style={{
+                alignItems: "center",
+                backgroundColor: theme.colors.avatarBg,
+                borderRadius: theme.radii.round,
+                height: 64,
+                justifyContent: "center",
+                width: 64,
+              }}
+            >
+              <Text style={{ fontSize: 32 }}>⚠️</Text>
+            </View>
+            <Text
+              style={{
+                color: theme.colors.text,
+                fontFamily: theme.fonts.bold,
+                fontSize: theme.typeScale.screenTitle,
+                textAlign: "center",
+              }}
+            >
+              Purchase unavailable
+            </Text>
+            <Text
+              style={{
+                color: theme.colors.sub,
+                fontFamily: theme.fonts.regular,
+                fontSize: theme.typeScale.body,
+                maxWidth: 320,
+                textAlign: "center",
+              }}
+            >
+              This split purchase could not be found. It may have been deleted.
+            </Text>
+            <PrimaryButton
+              accessibilityLabel="Back to History"
+              onPress={() => navigation.goBack()}
+              style={{ marginTop: theme.spacing.md }}
+            >
+              Back to History
+            </PrimaryButton>
+          </View>
+        </ScreenContainer>
+      );
+    }
+
+    const groupMeta = transactionGroups.find((g) => g.id === resolvedSplitGroupId);
+    const totalAmountMinor = groupAllocations.reduce((sum, t) => sum + (Number(t.amountMinor) || 0), 0);
+    const groupAccount = accounts.find((a) => a.id === (groupMeta?.accountId ?? groupAllocations[0]?.accountId));
+    const groupDateObj = new Date(groupMeta?.dateEpochMillis ?? groupAllocations[0]?.dateEpochMillis);
+    const groupFormattedDate = groupDateObj.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    let groupTitle = groupMeta?.title?.trim() || null;
+    if (!groupTitle) {
+      for (const a of groupAllocations) {
+        const parent = extractParentNote(a.note, categories.find((c) => c.id === a.categoryId)?.name);
+        if (parent) {
+          groupTitle = parent;
+          break;
+        }
+      }
+    }
+    const displayTitle = groupTitle || `Expense · ${groupAllocations.length} categories`;
+    const formattedTotalAmount = formatTransactionAmount(totalAmountMinor, "EXPENSE", true, currencySymbol);
+
+    const handleDeleteSplitGroup = async () => {
+      try {
+        setIsDeleting(true);
+        await deleteSplitTransactionGroup(resolvedSplitGroupId);
+        setDeleteSheetVisible(false);
+        navigation.goBack();
+      } catch (error) {
+        Alert.alert(
+          "Delete failed",
+          error instanceof Error ? error.message : "Could not delete split purchase.",
+        );
+      } finally {
+        setIsDeleting(false);
+      }
+    };
+
+    return (
+      <ScreenContainer contentContainerStyle={{ flexGrow: 1, gap: theme.spacing.xl }} testID="transaction-detail-screen">
+        {/* Top Header */}
+        <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+          <Pressable
+            accessibilityLabel="Back to History"
+            accessibilityRole="button"
+            hitSlop={theme.spacing.md}
+            onPress={() => navigation.goBack()}
+            style={{
+              alignItems: "center",
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.outline,
+              borderRadius: theme.radii.round,
+              borderWidth: 1,
+              height: 40,
+              justifyContent: "center",
+              width: 40,
+            }}
+          >
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: 18 }}>‹</Text>
+          </Pressable>
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.screenTitle }}>
+            Split Purchase Detail
+          </Text>
+          <Pressable
+            accessibilityLabel="Edit purchase"
+            accessibilityRole="button"
+            hitSlop={theme.spacing.md}
+            onPress={() => navigation.navigate("EditTransaction", { splitGroupId: resolvedSplitGroupId })}
+          >
+            <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+              Edit
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Hero Card */}
+        <SectionCard style={{ alignItems: "center", gap: theme.spacing.md, paddingVertical: theme.spacing.xl }}>
+          <View
+            style={{
+              alignItems: "center",
+              backgroundColor: theme.colors.avatarBg,
+              borderRadius: theme.radii.round,
+              height: 64,
+              justifyContent: "center",
+              width: 64,
+            }}
+          >
+            <Text style={{ fontSize: 32 }}>🛒</Text>
+          </View>
+
+          <Text
+            numberOfLines={2}
+            style={{
+              color: theme.colors.text,
+              fontFamily: theme.fonts.bold,
+              fontSize: theme.typeScale.subScreenTitle,
+              textAlign: "center",
+            }}
+          >
+            {displayTitle}
+          </Text>
+
+          <Text
+            style={{
+              color: theme.colors.expense,
+              fontFamily: theme.fonts.bold,
+              fontSize: 32,
+            }}
+          >
+            {formattedTotalAmount}
+          </Text>
+
+          <View
+            style={{
+              alignItems: "center",
+              backgroundColor: theme.colors.tint,
+              borderRadius: theme.radii.chip,
+              flexDirection: "row",
+              gap: theme.spacing.xs,
+              paddingHorizontal: theme.spacing.md,
+              paddingVertical: theme.spacing.compact,
+            }}
+          >
+            <Text style={{ fontSize: 14 }}>🏷️</Text>
+            <Text
+              style={{
+                color: theme.colors.primary,
+                fontFamily: theme.fonts.bold,
+                fontSize: theme.typeScale.small,
+              }}
+            >
+              {groupAllocations.length} categories · {groupAccount?.name ?? "Account"}
+            </Text>
+          </View>
+        </SectionCard>
+
+        {/* Category Breakdown Card */}
+        <SectionCard style={{ gap: theme.spacing.md, padding: theme.spacing.lg }}>
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.cardHeader }}>
+            Category Breakdown
+          </Text>
+
+          {groupAllocations.map((alloc, idx) => {
+            const cat = categories.find((c) => c.id === alloc.categoryId);
+            const catName = cat?.name ?? "Other";
+            const catEmoji = cat ? resolveDisplayEmoji({ icon: cat.icon, name: catName }) : categoryEmoji(catName);
+            const cleanNote = stripSplitSuffix(alloc.note);
+
+            return (
+              <View key={alloc.id ? String(alloc.id) : `alloc-${idx}`} style={{ gap: theme.spacing.xs }}>
+                {idx > 0 ? <View style={{ backgroundColor: theme.colors.outline, height: 1 }} /> : null}
+                <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingTop: idx > 0 ? theme.spacing.xs : 0 }}>
+                  <View style={{ alignItems: "center", flexDirection: "row", gap: theme.spacing.sm, flex: 1, minWidth: 0 }}>
+                    <View
+                      style={{
+                        alignItems: "center",
+                        backgroundColor: theme.colors.avatarBg,
+                        borderRadius: theme.radii.round,
+                        height: 36,
+                        justifyContent: "center",
+                        width: 36,
+                      }}
+                    >
+                      <Text style={{ fontSize: 18 }}>{catEmoji}</Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text numberOfLines={1} style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                        {catName}
+                      </Text>
+                      {cleanNote && cleanNote !== catName ? (
+                        <Text numberOfLines={1} style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+                          {cleanNote}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                    {formatMinor(alloc.amountMinor, { currencySymbol })}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+
+          <View style={{ backgroundColor: theme.colors.outline, height: 1 }} />
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+              Total Allocated
+            </Text>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+              {formatMinor(totalAmountMinor, { currencySymbol })}
+            </Text>
+          </View>
+        </SectionCard>
+
+        {/* Details Card */}
+        <SectionCard style={{ gap: theme.spacing.md, padding: theme.spacing.lg }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+              Date
+            </Text>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+              {groupFormattedDate}
+            </Text>
+          </View>
+
+          <View style={{ backgroundColor: theme.colors.outline, height: 1 }} />
+
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+              Account
+            </Text>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+              {groupAccount?.name ?? "Account"}
+            </Text>
+          </View>
+
+          <View style={{ backgroundColor: theme.colors.outline, height: 1 }} />
+
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+              Type
+            </Text>
+            <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+              Expense
+            </Text>
+          </View>
+        </SectionCard>
+
+        {/* Delete Purchase Button */}
+        <Pressable
+          accessibilityLabel="Delete purchase"
+          accessibilityRole="button"
+          onPress={() => setDeleteSheetVisible(true)}
+          style={{
+            alignItems: "center",
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.expense,
+            borderRadius: theme.radii.button,
+            borderWidth: 1.5,
+            height: theme.sizes.primaryButton,
+            justifyContent: "center",
+            marginTop: theme.spacing.md,
+            width: "100%",
+          }}
+        >
+          <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.cardHeader }}>
+            Delete purchase
+          </Text>
+        </Pressable>
+
+        {/* Delete Confirmation Bottom Sheet */}
+        <BottomSheet
+          onClose={() => setDeleteSheetVisible(false)}
+          testID="delete-confirmation-sheet"
+          title="Delete this purchase?"
+          visible={deleteSheetVisible}
+        >
+          <View style={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.md }}>
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body }}>
+              This will delete the entire purchase and all {groupAllocations.length} category allocations. Balances will be restored. This cannot be undone.
+            </Text>
+            <PrimaryButton
+              accessibilityLabel="Confirm Delete"
+              disabled={isDeleting}
+              onPress={handleDeleteSplitGroup}
               style={{ backgroundColor: theme.colors.expense }}
             >
               {isDeleting ? "Deleting…" : "Confirm Delete"}

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { initializeDatabase } from "../db/client";
-import { AccountRepository, BudgetRepository, CategoryRepository, GoalRepository, RecurringRepository, TransactionRepository, TransferRepository, } from "../db/repositories";
+import { AccountRepository, BudgetRepository, CategoryRepository, GoalRepository, RecurringRepository, TransactionRepository, TransactionGroupRepository, TransferRepository, } from "../db/repositories";
 import { canArchiveAccount, canDeleteAccount, canDeleteCategory, canRenameCategory, } from "../domain/services/entityGuards";
 import { toMonthYear, } from "../domain/services/financeView";
 import { advanceNextRunEpochMillis } from "../domain/services/recurringCatchUp";
@@ -12,6 +12,15 @@ import { buildBackup, parseBackup, serializeBackup, validateBackup } from "../se
 import { ONBOARDING_FIRST_TRANSACTION_SOURCE_KEY } from "../services/onboarding";
 import { performLocalReset } from "../services/localReset";
 import { registerFinanceSnapshotProvider, syncRemindersFromStores } from "./uiStore";
+import { generateSplitGroupId, stripSplitSuffix, extractParentNote, validateSplitSum } from "../domain/services/splits";
+import {
+    getActiveBudgetTemplates,
+    saveBudgetTemplate as persistBudgetTemplate,
+    duplicateBudgetTemplate as persistDuplicateBudgetTemplate,
+    deleteBudgetTemplate as persistDeleteBudgetTemplate,
+    restoreBudgetTemplate as persistRestoreBudgetTemplate,
+    clearBudgetTemplatesStorage,
+} from "../services/budgetTemplatesStorage";
 const DEFAULT_ACCOUNTS = [
     { name: "Cash", type: "CASH" },
     { name: "Card", type: "CARD" },
@@ -69,6 +78,7 @@ function repositories(database) {
         goals: new GoalRepository(database),
         recurring: new RecurringRepository(database),
         transactions: new TransactionRepository(database),
+        transactionGroups: new TransactionGroupRepository(database),
         transfers: new TransferRepository(database),
     };
 }
@@ -119,7 +129,7 @@ async function loadSnapshot(database) {
     // Defaults are a one-time bootstrap, not a repair loop. User archive/delete choices
     // and exact backup restores must survive every subsequent refresh.
     await ensureBootstrapDefaults(database);
-    const [accounts, categories, transactions, transfers, budgets, recurringRules, goals] = await Promise.all([
+    const [accounts, categories, transactions, transfers, budgets, recurringRules, goals, budgetTemplates, transactionGroups] = await Promise.all([
         repos.accounts.list(),
         repos.categories.list(),
         repos.transactions.list(),
@@ -127,8 +137,10 @@ async function loadSnapshot(database) {
         repos.budgets.list(),
         repos.recurring.list(),
         repos.goals.list(),
+        getActiveBudgetTemplates({ database }),
+        repos.transactionGroups.list(),
     ]);
-    return { accounts, categories, transactions, transfers, budgets, recurringRules, goals };
+    return { accounts, categories, transactions, transfers, budgets, recurringRules, goals, budgetTemplates, transactionGroups };
 }
 function findCategory(categories, name, type) {
     const match = categories.find((category) => category.name.toLowerCase() === name.toLowerCase() && category.type === type);
@@ -154,6 +166,7 @@ function findActiveAccountById(accounts, id) {
 export const useFinanceStore = create((set, get) => ({
     accounts: [],
     budgets: [],
+    budgetTemplates: [],
     categories: [],
     errorMessage: null,
     goals: [],
@@ -163,6 +176,7 @@ export const useFinanceStore = create((set, get) => ({
     selectedMonthYear: toMonthYear(),
     status: "idle",
     transactions: [],
+    transactionGroups: [],
     transfers: [],
     setSelectedMonthYear: (monthYear) => set({ selectedMonthYear: monthYear }),
     ensureHydrated: async () => {
@@ -221,6 +235,7 @@ export const useFinanceStore = create((set, get) => ({
         set({
             accounts: [],
             budgets: [],
+            budgetTemplates: [],
             categories: [],
             errorMessage: null,
             goals: [],
@@ -229,9 +244,11 @@ export const useFinanceStore = create((set, get) => ({
             selectedMonthYear: toMonthYear(),
             status: "resetting",
             transactions: [],
+            transactionGroups: [],
             transfers: [],
         });
         try {
+            await clearBudgetTemplatesStorage({ database: databaseRef });
             await performLocalReset();
             set({ status: "idle", revision: get().revision + 1 });
         }
@@ -302,19 +319,53 @@ export const useFinanceStore = create((set, get) => ({
         await get().refresh();
         return created;
     },
-    addSplitTransactions: async (splitInputs) => withMutationLock(async () => {
+    addSplitTransactions: async (splitInputs, options = {}) => withMutationLock(async () => {
         await get().ensureHydrated();
         const database = databaseRef;
         if (database === null) {
             throw new Error("Database is not ready.");
         }
-        if (!Array.isArray(splitInputs) || splitInputs.length === 0) {
+
+        let items = [];
+        let explicitGroupTitle = options.groupTitle ?? null;
+        let explicitGroupId = options.splitGroupId ?? null;
+        let explicitAccountId = options.accountId ?? null;
+        let explicitDateEpochMillis = options.dateEpochMillis ?? null;
+
+        if (Array.isArray(splitInputs)) {
+            items = splitInputs;
+        } else if (splitInputs && typeof splitInputs === "object" && Array.isArray(splitInputs.splits)) {
+            items = splitInputs.splits;
+            explicitGroupTitle = splitInputs.groupTitle ?? explicitGroupTitle;
+            explicitGroupId = splitInputs.splitGroupId ?? explicitGroupId;
+            explicitAccountId = splitInputs.accountId ?? explicitAccountId;
+            explicitDateEpochMillis = splitInputs.dateEpochMillis ?? explicitDateEpochMillis;
+        } else {
             throw new Error("No split transactions provided.");
         }
+
+        if (items.length === 0) {
+            throw new Error("No split transactions provided.");
+        }
+
         const { accounts, categories } = get();
         const validatedPayloads = [];
-        for (let i = 0; i < splitInputs.length; i++) {
-            const input = splitInputs[i];
+
+        let resolvedGroupId = explicitGroupId;
+        if (!resolvedGroupId) {
+            for (const item of items) {
+                if (item.splitGroupId) {
+                    resolvedGroupId = item.splitGroupId;
+                    break;
+                }
+            }
+        }
+        if (!resolvedGroupId && items.length >= 2) {
+            resolvedGroupId = generateSplitGroupId();
+        }
+
+        for (let i = 0; i < items.length; i++) {
+            const input = items[i];
             let category;
             if (input.categoryId !== undefined && input.categoryId !== null) {
                 category = categories.find((c) => c.id === input.categoryId);
@@ -328,17 +379,25 @@ export const useFinanceStore = create((set, get) => ({
                     throw new Error(`Category ID ${input.categoryId} does not match name "${input.categoryName}".`);
                 }
             } else if (input.categoryName) {
-                category = findCategory(categories, input.categoryName, input.type);
+                category = findCategory(categories, input.categoryName, input.type || "EXPENSE");
             } else {
                 throw new Error(`Category is required for split #${i + 1}.`);
             }
-            const account = input.accountId === undefined
+
+            const targetAccountId = input.accountId ?? explicitAccountId;
+            const account = targetAccountId === undefined || targetAccountId === null
                 ? findAccount(accounts, input.accountType)
-                : findActiveAccountById(accounts, input.accountId);
-            const dateEpochMillis = input.dateEpochMillis ?? Date.now();
+                : findActiveAccountById(accounts, targetAccountId);
+
+            const dateEpochMillis = input.dateEpochMillis ?? explicitDateEpochMillis ?? Date.now();
             if (!Number.isSafeInteger(dateEpochMillis)) {
                 throw new Error(`Invalid transaction date for split #${i + 1}.`);
             }
+
+            if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0) {
+                throw new Error(`Split #${i + 1} must have a positive integer minor amount.`);
+            }
+
             validatedPayloads.push({
                 amountMinor: input.amountMinor,
                 type: input.type || "EXPENSE",
@@ -349,18 +408,219 @@ export const useFinanceStore = create((set, get) => ({
                 recurringRuleId: null,
                 scheduledDateEpochMillis: null,
                 sourceKey: input.sourceKey ?? null,
+                splitGroupId: items.length >= 2 ? resolvedGroupId : null,
             });
         }
+
+        let groupTitle = explicitGroupTitle?.trim() || null;
+        if (!groupTitle && items.length >= 2) {
+            for (const p of validatedPayloads) {
+                const parent = extractParentNote(p.note, categories.find((c) => c.id === p.categoryId)?.name);
+                if (parent) {
+                    groupTitle = parent;
+                    break;
+                }
+            }
+        }
+
         const createdRecords = [];
         await database.transaction(async (transaction) => {
             const transactionRepo = new TransactionRepository(transaction);
+            const groupRepo = new TransactionGroupRepository(transaction);
+
+            if (items.length >= 2 && resolvedGroupId) {
+                const firstPayload = validatedPayloads[0];
+                await groupRepo.create({
+                    id: resolvedGroupId,
+                    title: groupTitle,
+                    accountId: firstPayload.accountId,
+                    dateEpochMillis: firstPayload.dateEpochMillis,
+                    createdEpochMillis: Date.now(),
+                });
+            }
+
             for (const payload of validatedPayloads) {
                 const created = await transactionRepo.create(payload);
                 createdRecords.push(created);
             }
         });
+
         await get().refresh();
+        createdRecords.splitGroupId = resolvedGroupId;
+        createdRecords.transactions = createdRecords;
         return createdRecords;
+    }),
+    updateSplitTransactionGroup: async (groupId, { title, accountId, dateEpochMillis, splits }) => withMutationLock(async () => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        if (!groupId) {
+            throw new Error("Split group ID is required.");
+        }
+        if (!Array.isArray(splits) || splits.length === 0) {
+            throw new Error("At least one split allocation is required.");
+        }
+
+        for (let i = 0; i < splits.length; i++) {
+            const s = splits[i];
+            if (!Number.isSafeInteger(s.amountMinor) || s.amountMinor <= 0) {
+                throw new Error(`Split #${i + 1} must have a positive integer minor amount.`);
+            }
+        }
+
+        const { accounts, categories } = get();
+        const resolvedAccount = accountId !== undefined && accountId !== null
+            ? findActiveAccountById(accounts, accountId)
+            : null;
+        const resolvedDate = dateEpochMillis !== undefined ? dateEpochMillis : null;
+        if (resolvedDate !== null && !Number.isSafeInteger(resolvedDate)) {
+            throw new Error("Invalid transaction date.");
+        }
+
+        await database.transaction(async (tx) => {
+            const txRepo = new TransactionRepository(tx);
+            const groupRepo = new TransactionGroupRepository(tx);
+
+            const existingGroup = await groupRepo.getById(groupId);
+            const existingTxs = await txRepo.listBySplitGroupId(groupId);
+            const existingIds = new Set(existingTxs.map((t) => t.id));
+
+            const targetAccountId = resolvedAccount?.id ?? existingGroup?.accountId ?? existingTxs[0]?.accountId;
+            const targetDate = resolvedDate ?? existingGroup?.dateEpochMillis ?? existingTxs[0]?.dateEpochMillis ?? Date.now();
+            const groupTitle = title !== undefined ? (title?.trim() || null) : (existingGroup?.title ?? null);
+
+            if (splits.length === 1) {
+                // Logical transition to a normal single-category transaction
+                const singleSplit = splits[0];
+                let category;
+                if (singleSplit.categoryId !== undefined && singleSplit.categoryId !== null) {
+                    category = categories.find((c) => c.id === singleSplit.categoryId);
+                } else if (singleSplit.categoryName) {
+                    category = findCategory(categories, singleSplit.categoryName, "EXPENSE");
+                }
+                if (!category) {
+                    throw new Error("Valid category is required.");
+                }
+
+                const cleanNote = singleSplit.note?.trim()
+                    ? stripSplitSuffix(singleSplit.note.trim())
+                    : (groupTitle || null);
+
+                let primaryTxId = singleSplit.id && existingIds.has(singleSplit.id)
+                    ? singleSplit.id
+                    : existingTxs[0]?.id;
+
+                if (primaryTxId) {
+                    await txRepo.update(primaryTxId, {
+                        amountMinor: singleSplit.amountMinor,
+                        categoryId: category.id,
+                        accountId: targetAccountId,
+                        dateEpochMillis: targetDate,
+                        note: cleanNote,
+                        splitGroupId: null,
+                    });
+                    for (const txItem of existingTxs) {
+                        if (txItem.id !== primaryTxId) {
+                            await txRepo.delete(txItem.id);
+                        }
+                    }
+                } else {
+                    await txRepo.create({
+                        amountMinor: singleSplit.amountMinor,
+                        type: "EXPENSE",
+                        categoryId: category.id,
+                        accountId: targetAccountId,
+                        dateEpochMillis: targetDate,
+                        note: cleanNote,
+                        splitGroupId: null,
+                    });
+                }
+
+                if (existingGroup) {
+                    await groupRepo.delete(groupId);
+                }
+            } else {
+                // 2 or more splits
+                if (existingGroup) {
+                    await groupRepo.update(groupId, {
+                        title: groupTitle,
+                        accountId: targetAccountId,
+                        dateEpochMillis: targetDate,
+                    });
+                } else {
+                    await groupRepo.create({
+                        id: groupId,
+                        title: groupTitle,
+                        accountId: targetAccountId,
+                        dateEpochMillis: targetDate,
+                        createdEpochMillis: Date.now(),
+                    });
+                }
+
+                const retainedIds = new Set();
+                for (let i = 0; i < splits.length; i++) {
+                    const split = splits[i];
+                    let category;
+                    if (split.categoryId !== undefined && split.categoryId !== null) {
+                        category = categories.find((c) => c.id === split.categoryId);
+                    } else if (split.categoryName) {
+                        category = findCategory(categories, split.categoryName, "EXPENSE");
+                    }
+                    if (!category) {
+                        throw new Error(`Category is required for split #${i + 1}.`);
+                    }
+
+                    const note = split.note?.trim() ? split.note.trim() : null;
+
+                    if (split.id && existingIds.has(split.id)) {
+                        retainedIds.add(split.id);
+                        await txRepo.update(split.id, {
+                            amountMinor: split.amountMinor,
+                            categoryId: category.id,
+                            accountId: targetAccountId,
+                            dateEpochMillis: targetDate,
+                            note,
+                            splitGroupId: groupId,
+                        });
+                    } else {
+                        const created = await txRepo.create({
+                            amountMinor: split.amountMinor,
+                            type: "EXPENSE",
+                            categoryId: category.id,
+                            accountId: targetAccountId,
+                            dateEpochMillis: targetDate,
+                            note,
+                            splitGroupId: groupId,
+                        });
+                        retainedIds.add(created.id);
+                    }
+                }
+
+                for (const txItem of existingTxs) {
+                    if (!retainedIds.has(txItem.id)) {
+                        await txRepo.delete(txItem.id);
+                    }
+                }
+            }
+        });
+
+        await get().refresh();
+    }),
+    deleteSplitTransactionGroup: async (groupId) => withMutationLock(async () => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        await database.transaction(async (tx) => {
+            const txRepo = new TransactionRepository(tx);
+            const groupRepo = new TransactionGroupRepository(tx);
+            await txRepo.deleteBySplitGroupId(groupId);
+            await groupRepo.delete(groupId);
+        });
+        await get().refresh();
     }),
     addAccountTransfer: async (input) => withMutationLock(async () => {
         await get().ensureHydrated();
@@ -1090,6 +1350,7 @@ export const useFinanceStore = create((set, get) => ({
                             accounts: await currentRepos.accounts.list(),
                             categories: await currentRepos.categories.list(),
                             transactions: await currentRepos.transactions.list(),
+                            transactionGroups: await currentRepos.transactionGroups.list(),
                             transfers: await currentRepos.transfers.list(),
                             budgets: await currentRepos.budgets.list(),
                             recurringRules: await currentRepos.recurring.list(),
@@ -1106,6 +1367,7 @@ export const useFinanceStore = create((set, get) => ({
                         await tx.execute("DELETE FROM restore_recovery_snapshot WHERE id = 1");
                     }
             await tx.execute("DELETE FROM transactions");
+            await tx.execute("DELETE FROM transaction_groups");
             await tx.execute("DELETE FROM account_transfers");
             await tx.execute("DELETE FROM budgets");
             await tx.execute("DELETE FROM recurring_rules");
@@ -1173,6 +1435,18 @@ export const useFinanceStore = create((set, get) => ({
                 ]);
                 recurringIdMap.set(rule.id, nextId);
             }
+            const groupIdMap = new Map();
+            for (const group of backup.transactionGroups ?? []) {
+                const accountId = accountIdMap.get(group.accountId);
+                if (accountId !== undefined) {
+                    await tx.execute(
+                        `INSERT INTO transaction_groups (id, title, account_id, date_epoch_millis, created_epoch_millis)
+                         VALUES (?, ?, ?, ?, ?)`,
+                        [group.id, group.title ?? null, accountId, group.dateEpochMillis, group.createdEpochMillis ?? Date.now()]
+                    );
+                    groupIdMap.set(group.id, group.id);
+                }
+            }
             for (const transaction of backup.transactions) {
                 const categoryId = categoryIdMap.get(transaction.categoryId);
                 const accountId = accountIdMap.get(transaction.accountId);
@@ -1182,10 +1456,13 @@ export const useFinanceStore = create((set, get) => ({
                 const recurringRuleId = transaction.recurringRuleId === null
                     ? null
                     : (recurringIdMap.get(transaction.recurringRuleId) ?? null);
+                const splitGroupId = transaction.splitGroupId
+                    ? (groupIdMap.get(transaction.splitGroupId) ?? transaction.splitGroupId)
+                    : null;
                 await tx.execute(`INSERT INTO transactions (
              amount_minor, type, category_id, account_id, date_epoch_millis, note, recurring_rule_id,
-             scheduled_date_epoch_millis, source_key
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+             scheduled_date_epoch_millis, source_key, split_group_id
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
                     transaction.amountMinor,
                     transaction.type,
                     categoryId,
@@ -1196,6 +1473,7 @@ export const useFinanceStore = create((set, get) => ({
                     transaction.scheduledDateEpochMillis
                         ?? (recurringRuleId === null ? null : transaction.dateEpochMillis),
                     transaction.sourceKey ?? null,
+                    splitGroupId,
                 ]);
             }
             for (const budget of backup.budgets) {
@@ -1275,15 +1553,39 @@ export const useFinanceStore = create((set, get) => ({
         await new RecurringRepository(database).delete(id);
         await get().refresh();
     },
-    deleteTransactionById: async (id) => {
+    deleteTransactionById: async (id) => withMutationLock(async () => {
         await get().ensureHydrated();
         const database = databaseRef;
         if (database === null) {
             throw new Error("Database is not ready.");
         }
-        await new TransactionRepository(database).delete(id);
+        const numericId = Number(id);
+        await database.transaction(async (tx) => {
+            const txRepo = new TransactionRepository(tx);
+            const groupRepo = new TransactionGroupRepository(tx);
+            const existing = await txRepo.getById(numericId);
+            if (!existing) {
+                return;
+            }
+            const splitGroupId = existing.splitGroupId;
+            await txRepo.delete(numericId);
+            if (splitGroupId) {
+                const siblings = await txRepo.listBySplitGroupId(splitGroupId);
+                if (siblings.length === 1) {
+                    const remaining = siblings[0];
+                    const cleanNote = stripSplitSuffix(remaining.note);
+                    await txRepo.update(remaining.id, {
+                        splitGroupId: null,
+                        note: cleanNote,
+                    });
+                    await groupRepo.delete(splitGroupId);
+                } else if (siblings.length === 0) {
+                    await groupRepo.delete(splitGroupId);
+                }
+            }
+        });
         await get().refresh();
-    },
+    }),
     addGoal: async (input) => {
         await get().ensureHydrated();
         const database = databaseRef;
@@ -1317,6 +1619,91 @@ export const useFinanceStore = create((set, get) => ({
         }
         await new GoalRepository(database).update(id, { isArchived: true });
         await get().refresh();
+    },
+    loadBudgetTemplates: async () => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        const templates = await getActiveBudgetTemplates({ database });
+        set({ budgetTemplates: templates });
+        return templates;
+    },
+    saveBudgetTemplate: async (template) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        const result = await persistBudgetTemplate(template, { database });
+        if (!result.success) {
+            throw new Error(result.error || "Failed to save template.");
+        }
+        const updatedList = await getActiveBudgetTemplates({ database });
+        set({ budgetTemplates: updatedList });
+        return result.template;
+    },
+    duplicateBudgetTemplate: async (templateId, customName) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        const duplicated = await persistDuplicateBudgetTemplate(templateId, customName, { database });
+        if (!duplicated) {
+            throw new Error("Failed to duplicate template.");
+        }
+        const updatedList = await getActiveBudgetTemplates({ database });
+        set({ budgetTemplates: updatedList });
+        return duplicated;
+    },
+    deleteBudgetTemplate: async (templateId) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        const deleted = await persistDeleteBudgetTemplate(templateId, { database });
+        if (!deleted) {
+            throw new Error("Cannot delete this template. System presets cannot be deleted.");
+        }
+        const updatedList = await getActiveBudgetTemplates({ database });
+        set({ budgetTemplates: updatedList });
+        return true;
+    },
+    restoreBudgetTemplate: async (templateId) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        const restored = await persistRestoreBudgetTemplate(templateId, { database });
+        if (!restored) {
+            throw new Error("Failed to restore system template.");
+        }
+        const updatedList = await getActiveBudgetTemplates({ database });
+        set({ budgetTemplates: updatedList });
+        return restored;
+    },
+    applyBudgetTemplate: async ({ templateId, monthYear }) => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        const templates = get().budgetTemplates.length > 0
+            ? get().budgetTemplates
+            : await getActiveBudgetTemplates({ database });
+        const target = templates.find((t) => t.id === templateId);
+        if (!target) {
+            throw new Error(`Budget template "${templateId}" was not found.`);
+        }
+
+        const targetMonthYear = monthYear ?? get().selectedMonthYear;
+        const appliedCategories = [];
+        let totalMinor = 0;
+
+        for (const cat of target.categories) {
+            const catName = cat.name?.trim();
+            if (!catName) continue;
+            const limitMinor = Number(cat.amountMinor ?? cat.limitMinor ?? 0);
+            if (limitMinor <= 0) continue;
+
+            const icon = cat.icon ?? cat.emoji ?? "📊";
+            await get().addCategory({ name: catName, type: "EXPENSE", icon });
+            await get().addBudget({ categoryName: catName, limitMinor, monthYear: targetMonthYear });
+            appliedCategories.push({ name: catName, limitMinor, icon });
+            totalMinor += limitMinor;
+        }
+
+        await get().refresh();
+        return { template: target, appliedCategories, totalMinor, monthYear: targetMonthYear };
     },
 }));
 export function listAccountChips(accounts) {

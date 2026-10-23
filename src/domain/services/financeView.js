@@ -1,4 +1,5 @@
 import { categoryEmoji as resolveCategoryEmoji, resolveDisplayEmoji } from "./emoji";
+import { groupTransactionsBySplit, stripSplitSuffix } from "./splits";
 
 const MONTH_LABELS = [
     "Jan",
@@ -167,11 +168,48 @@ export function buildUiTransaction(transaction, categoriesById, accountsById) {
             toAccountId: transaction.toAccountId,
         };
     }
+
+    if (transaction.isGroup) {
+        const account = accountsById.get(transaction.accountId);
+        const count = transaction.allocationCount || transaction.allocations?.length || 2;
+        const accountName = account?.name ?? "Account";
+        const title = transaction.title?.trim() || `Expense · ${count} categories`;
+        const allocations = (transaction.allocations ?? []).map((a) => {
+            const cat = categoriesById.get(a.categoryId);
+            const catName = cat?.name ?? "Other";
+            return {
+                id: a.id,
+                categoryId: a.categoryId,
+                categoryName: catName,
+                emoji: resolveDisplayEmoji({ icon: cat?.icon, name: catName }),
+                amountMinor: a.amountMinor,
+                note: stripSplitSuffix(a.note),
+            };
+        });
+        const firstCat = categoriesById.get(transaction.categoryId);
+        const groupEmoji = firstCat ? resolveDisplayEmoji({ icon: firstCat.icon, name: firstCat.name }) : "🧾";
+
+        return {
+            id: String(transaction.id),
+            amountMinor: transaction.amountMinor,
+            emoji: groupEmoji,
+            meta: `${count} categories · ${accountName}`,
+            title,
+            type: transaction.type || "EXPENSE",
+            isGroup: true,
+            splitGroupId: transaction.splitGroupId,
+            allocations,
+            allocationCount: count,
+            accountId: transaction.accountId,
+            dateEpochMillis: transaction.dateEpochMillis,
+        };
+    }
+
     const category = categoriesById.get(transaction.categoryId);
     const account = accountsById.get(transaction.accountId);
     const categoryName = category?.name ?? "Other";
-    const title = transaction.note?.trim() ||
-        (transaction.type === "INCOME" ? categoryName : categoryName);
+    const cleanedNote = stripSplitSuffix(transaction.note);
+    const title = cleanedNote || categoryName;
     return {
         id: String(transaction.id),
         amountMinor: transaction.amountMinor,
@@ -179,10 +217,12 @@ export function buildUiTransaction(transaction, categoriesById, accountsById) {
         meta: `${categoryName} · ${account?.name ?? "Account"}`,
         title,
         type: transaction.type,
+        splitGroupId: transaction.splitGroupId ?? null,
     };
 }
-export function recentUiTransactions(transactions, categoriesById, accountsById, limit = 5) {
-    return [...transactions]
+export function recentUiTransactions(transactions, categoriesById, accountsById, limit = 5, transactionGroups = []) {
+    const grouped = groupTransactionsBySplit(transactions, transactionGroups);
+    return [...grouped]
         .sort((left, right) => right.dateEpochMillis - left.dateEpochMillis)
         .slice(0, limit)
         .map((transaction) => buildUiTransaction(transaction, categoriesById, accountsById));
@@ -308,9 +348,10 @@ function historyGroupLabel(dayStart, now = new Date()) {
     }
     return `${month} ${day}`;
 }
-export function groupHistory(transactions, categoriesById, accountsById, monthYear, now = new Date(), transfers = []) {
+export function groupHistory(transactions, categoriesById, accountsById, monthYear, now = new Date(), transfers = [], transactionGroups = []) {
+    const grouped = groupTransactionsBySplit(transactions, transactionGroups);
     const combined = [
-        ...transactions,
+        ...grouped,
         ...transfers.map((t) => ({ ...t, type: "TRANSFER" })),
     ];
     const filtered = combined

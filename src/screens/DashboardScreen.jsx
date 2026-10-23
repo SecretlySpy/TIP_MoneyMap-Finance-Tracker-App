@@ -31,6 +31,7 @@ export function DashboardScreen({ navigation }) {
   const budgets = useFinanceStore((state) => state.budgets);
   const categories = useFinanceStore((state) => state.categories);
   const transactions = useFinanceStore((state) => state.transactions);
+  const transactionGroups = useFinanceStore((state) => state.transactionGroups);
   const transfers = useFinanceStore((state) => state.transfers);
   const recurringRules = useFinanceStore((state) => state.recurringRules);
   const goals = useFinanceStore((state) => state.goals);
@@ -49,8 +50,8 @@ export function DashboardScreen({ navigation }) {
   );
   const recent = useMemo(() => {
     const scoped = transactions.filter((t) => transactionInMonth(t, selectedMonthYear));
-    return recentUiTransactions(scoped, categoriesById, accountsById, 5);
-  }, [transactions, categoriesById, accountsById, selectedMonthYear]);
+    return recentUiTransactions(scoped, categoriesById, accountsById, 5, transactionGroups);
+  }, [transactions, categoriesById, accountsById, selectedMonthYear, transactionGroups]);
   const dueReminders = useMemo(
     () => (remindersEnabled ? computeDueReminders(recurringRules, categoriesById) : []),
     [remindersEnabled, recurringRules, categoriesById],
@@ -304,13 +305,22 @@ export function DashboardScreen({ navigation }) {
             title="No transactions yet"
           />
         ) : (
-          recent.map((transaction) => (
-            <TransactionRow
-              key={transaction.id}
-              {...transaction}
-              onPress={() => navigation.navigate("TransactionDetail", { transactionId: transaction.id })}
-            />
-          ))
+          recent.map((transaction) => {
+            const isGroup = Boolean(transaction.isGroup);
+            const navParams = isGroup
+              ? { splitGroupId: transaction.splitGroupId }
+              : { transactionId: transaction.id };
+
+            return (
+              <TransactionRow
+                key={transaction.id}
+                {...transaction}
+                onEditBreakdown={() => navigation.navigate("EditTransaction", navParams)}
+                onPress={() => navigation.navigate("TransactionDetail", navParams)}
+                onViewDetails={() => navigation.navigate("TransactionDetail", navParams)}
+              />
+            );
+          })
         )}
       </SectionCard>
     </ScreenContainer>

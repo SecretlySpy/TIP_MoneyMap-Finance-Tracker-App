@@ -21,6 +21,7 @@ export function HistoryBody({
   onClearFilters,
   onClearSearch,
   onDeleteTransaction,
+  onEditTransaction,
   onSelectTransaction,
   searchQuery = "",
   selectedMonthYear = "",
@@ -62,15 +63,15 @@ export function HistoryBody({
           </Text>
           <SectionCard padding={theme.spacing.lg} style={{ gap: theme.spacing.md }}>
             {group.transactions.map((transaction) => (
-              <Pressable
+              <TransactionRow
                 key={transaction.id}
-                accessibilityHint="Tap to view details, long press to delete this transaction"
-                accessibilityRole="button"
+                compact
+                {...transaction}
+                onEditBreakdown={() => onEditTransaction?.(transaction)}
                 onLongPress={() => onDeleteTransaction?.(transaction)}
                 onPress={() => onSelectTransaction?.(transaction)}
-              >
-                <TransactionRow compact {...transaction} />
-              </Pressable>
+                onViewDetails={() => onSelectTransaction?.(transaction)}
+              />
             ))}
           </SectionCard>
         </View>
@@ -86,8 +87,10 @@ export function HistoryScreen({ navigation }) {
   const accounts = useFinanceStore((state) => state.accounts);
   const categories = useFinanceStore((state) => state.categories);
   const transactions = useFinanceStore((state) => state.transactions);
+  const transactionGroups = useFinanceStore((state) => state.transactionGroups);
   const selectedMonthYear = useFinanceStore((state) => state.selectedMonthYear);
   const deleteTransactionById = useFinanceStore((state) => state.deleteTransactionById);
+  const deleteSplitTransactionGroup = useFinanceStore((state) => state.deleteSplitTransactionGroup);
   const transfers = useFinanceStore((state) => state.transfers);
   const deleteAccountTransferById = useFinanceStore((state) => state.deleteAccountTransferById);
 
@@ -104,18 +107,52 @@ export function HistoryScreen({ navigation }) {
 
   const filteredTransactions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+
+    const matchingGroupIds = new Set();
+    if (q.length > 0) {
+      for (const group of transactionGroups ?? []) {
+        if (group?.title?.toLowerCase().includes(q)) {
+          matchingGroupIds.add(group.id);
+        }
+      }
+      for (const t of transactions) {
+        if (t.splitGroupId) {
+          const noteText = (t.note ?? "").toLowerCase();
+          const categoryName = (categoriesById.get(t.categoryId)?.name ?? "").toLowerCase();
+          if (noteText.includes(q) || categoryName.includes(q)) {
+            matchingGroupIds.add(t.splitGroupId);
+          }
+        }
+      }
+    }
+
+    const categoryMatchingGroupIds = new Set();
+    if (categoryFilter !== null) {
+      for (const t of transactions) {
+        if (t.splitGroupId) {
+          const name = categoriesById.get(t.categoryId)?.name;
+          if (name === categoryFilter) {
+            categoryMatchingGroupIds.add(t.splitGroupId);
+          }
+        }
+      }
+    }
+
     return transactions.filter((transaction) => {
       if (q.length > 0) {
         const noteText = (transaction.note ?? "").toLowerCase();
         const categoryName = (categoriesById.get(transaction.categoryId)?.name ?? "").toLowerCase();
         const accountName = (accountsById.get(transaction.accountId)?.name ?? "").toLowerCase();
-        if (!noteText.includes(q) && !categoryName.includes(q) && !accountName.includes(q)) {
+        const matchesDirectly = noteText.includes(q) || categoryName.includes(q) || accountName.includes(q);
+        const matchesGroup = transaction.splitGroupId && matchingGroupIds.has(transaction.splitGroupId);
+        if (!matchesDirectly && !matchesGroup) {
           return false;
         }
       }
       if (categoryFilter !== null) {
         const name = categoriesById.get(transaction.categoryId)?.name;
-        if (name !== categoryFilter) {
+        const matchesGroup = transaction.splitGroupId && categoryMatchingGroupIds.has(transaction.splitGroupId);
+        if (name !== categoryFilter && !matchesGroup) {
           return false;
         }
       }
@@ -126,7 +163,7 @@ export function HistoryScreen({ navigation }) {
       }
       return true;
     });
-  }, [transactions, searchQuery, categoryFilter, accountFilter, categoriesById, accountsById]);
+  }, [transactions, searchQuery, categoryFilter, accountFilter, categoriesById, accountsById, transactionGroups]);
 
   const filteredTransfers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -152,8 +189,8 @@ export function HistoryScreen({ navigation }) {
   }, [transfers, searchQuery, categoryFilter, accountFilter, accountsById]);
 
   const groups = useMemo(
-    () => groupHistory(filteredTransactions, categoriesById, accountsById, selectedMonthYear, undefined, filteredTransfers),
-    [filteredTransactions, categoriesById, accountsById, selectedMonthYear, filteredTransfers],
+    () => groupHistory(filteredTransactions, categoriesById, accountsById, selectedMonthYear, undefined, filteredTransfers, transactionGroups),
+    [filteredTransactions, categoriesById, accountsById, selectedMonthYear, filteredTransfers, transactionGroups],
   );
 
   const totalMatchingCount = useMemo(
@@ -398,6 +435,25 @@ export function HistoryScreen({ navigation }) {
             );
             return;
           }
+          if (transaction.isGroup) {
+            Alert.alert(
+              "Delete purchase?",
+              "Delete this entire purchase and all its category allocations? This cannot be undone.",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: () => {
+                    void deleteSplitTransactionGroup(transaction.splitGroupId).catch((error) => {
+                      Alert.alert("Delete failed", error instanceof Error ? error.message : "Could not delete.");
+                    });
+                  },
+                },
+              ],
+            );
+            return;
+          }
           Alert.alert(
             transaction.title ?? "Transaction",
             "Delete this transaction? This cannot be undone.",
@@ -415,12 +471,26 @@ export function HistoryScreen({ navigation }) {
             ],
           );
         }}
+        onEditTransaction={(transaction) => {
+          if (transaction.type === "TRANSFER" || transaction.transferId) {
+            navigation.navigate("EditTransaction", {
+              isTransfer: true,
+              transferId: Number(transaction.transferId ?? transaction.id),
+            });
+          } else if (transaction.isGroup) {
+            navigation.navigate("EditTransaction", { splitGroupId: transaction.splitGroupId });
+          } else {
+            navigation.navigate("EditTransaction", { transactionId: Number(transaction.id) });
+          }
+        }}
         onSelectTransaction={(transaction) => {
           if (transaction.type === "TRANSFER" || transaction.transferId) {
             navigation.navigate("TransactionDetail", {
               isTransfer: true,
               transferId: Number(transaction.transferId ?? transaction.id),
             });
+          } else if (transaction.isGroup) {
+            navigation.navigate("TransactionDetail", { splitGroupId: transaction.splitGroupId });
           } else {
             navigation.navigate("TransactionDetail", { transactionId: Number(transaction.id) });
           }

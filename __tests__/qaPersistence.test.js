@@ -124,7 +124,7 @@ describe("QA persistence and concurrent-operation contracts", () => {
     const incomeCategory = (await new CategoryRepository(database).list()).find((row) => row.type === "INCOME");
     const row = await transactions.create(transactionInput(account.id, category.id));
     expect((await database.execute("PRAGMA foreign_keys")).rows[0].foreign_keys).toBe(1);
-    expect((await database.execute("PRAGMA foreign_key_list(transactions)")).rows).toHaveLength(4);
+    expect((await database.execute("PRAGMA foreign_key_list(transactions)")).rows).toHaveLength(5);
     expect((await database.execute("SELECT account_id FROM transactions")).rows).toEqual([{ account_id: account.id }]);
     expect((await database.execute("SELECT id FROM accounts WHERE id = ?", [account.id])).rows).toEqual([{ id: account.id }]);
     // Native SQLite errors may belong to another Jest VM; assert their stable error code.
@@ -139,7 +139,7 @@ describe("QA persistence and concurrent-operation contracts", () => {
     await database.execute("ALTER TABLE recurring_rules DROP COLUMN icon");
     await database.execute("ALTER TABLE recurring_rules DROP COLUMN anchor_day");
     await database.execute("PRAGMA user_version = 2");
-    expect((await migrateDatabase(database)).appliedVersions).toEqual([3, 4, 5, 6, 7, 8]);
+    expect((await migrateDatabase(database)).appliedVersions).toEqual([3, 4, 5, 6, 7, 8, 9]);
     const columns = (await database.execute("PRAGMA table_info(recurring_rules)")).rows.map((row) => row.name);
     expect(columns).toEqual(expect.arrayContaining(["icon", "anchor_day"]));
     expect((await migrateDatabase(database)).appliedVersions).toEqual([]);

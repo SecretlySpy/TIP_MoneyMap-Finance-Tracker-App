@@ -16,6 +16,7 @@ function mapTransaction(row) {
             ? null
             : readInteger(row, "scheduled_date_epoch_millis"),
         sourceKey: readNullableString(row, "source_key"),
+        splitGroupId: readNullableString(row, "split_group_id"),
     };
 }
 function validateTransaction(transaction) {
@@ -39,6 +40,15 @@ function validateTransaction(transaction) {
             throw new TypeError("sourceKey must be at most 256 characters.");
         }
     }
+    if (transaction.splitGroupId !== null && transaction.splitGroupId !== undefined) {
+        if (typeof transaction.splitGroupId !== "string") {
+            throw new TypeError("splitGroupId must be text or null.");
+        }
+        assertNonBlank(transaction.splitGroupId, "splitGroupId");
+        if (transaction.splitGroupId.length > 256) {
+            throw new TypeError("splitGroupId must be at most 256 characters.");
+        }
+    }
 }
 
 function isSameFinancialEffect(existing, transaction) {
@@ -49,7 +59,8 @@ function isSameFinancialEffect(existing, transaction) {
         && existing.dateEpochMillis === transaction.dateEpochMillis
         && existing.note === transaction.note
         && existing.recurringRuleId === transaction.recurringRuleId
-        && existing.scheduledDateEpochMillis === transaction.scheduledDateEpochMillis;
+        && existing.scheduledDateEpochMillis === transaction.scheduledDateEpochMillis
+        && existing.splitGroupId === transaction.splitGroupId;
 }
 async function assertCategoryMatchesType(database, categoryId, type) {
     const result = await database.execute("SELECT type FROM categories WHERE id = ?", [categoryId]);
@@ -74,14 +85,15 @@ export class TransactionRepository {
                 ?? (recurringRuleId === null ? null : transaction.dateEpochMillis),
             recurringRuleId,
             sourceKey: transaction.sourceKey ?? null,
+            splitGroupId: transaction.splitGroupId ?? null,
         };
         validateTransaction(normalized);
         await assertCategoryMatchesType(this.database, normalized.categoryId, normalized.type);
         const sourceKey = normalized.sourceKey;
         const statement = `INSERT INTO transactions (
           amount_minor, type, category_id, account_id, date_epoch_millis, note, recurring_rule_id,
-          scheduled_date_epoch_millis, source_key
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+          scheduled_date_epoch_millis, source_key, split_group_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
         const parameters = [
             normalized.amountMinor,
             normalized.type,
@@ -92,6 +104,7 @@ export class TransactionRepository {
             normalized.recurringRuleId,
             normalized.scheduledDateEpochMillis,
             sourceKey,
+            normalized.splitGroupId,
         ];
         if (sourceKey !== null) {
             const result = await this.database.execute(`${statement} ON CONFLICT(source_key) DO NOTHING`, parameters);
@@ -122,6 +135,28 @@ export class TransactionRepository {
     }
     async list() {
         return (await listRows(this.database, "transactions")).map(mapTransaction);
+    }
+    async listBySplitGroupId(splitGroupId) {
+        if (typeof splitGroupId !== "string") {
+            throw new TypeError("splitGroupId must be text.");
+        }
+        assertNonBlank(splitGroupId, "splitGroupId");
+        const result = await this.database.execute(
+            "SELECT * FROM transactions WHERE split_group_id = ? ORDER BY id ASC",
+            [splitGroupId]
+        );
+        return (result.rows ?? []).map(mapTransaction);
+    }
+    async deleteBySplitGroupId(splitGroupId) {
+        if (typeof splitGroupId !== "string") {
+            throw new TypeError("splitGroupId must be text.");
+        }
+        assertNonBlank(splitGroupId, "splitGroupId");
+        const result = await this.database.execute(
+            "DELETE FROM transactions WHERE split_group_id = ?",
+            [splitGroupId]
+        );
+        return result.rowsAffected;
     }
     async update(id, patch) {
         const assignments = [];
@@ -159,6 +194,9 @@ export class TransactionRepository {
                 assertPositiveInteger(patch.recurringRuleId, "recurringRuleId");
             }
             assignments.push({ column: "recurring_rule_id", value: patch.recurringRuleId });
+        }
+        if (patch.splitGroupId !== undefined) {
+            assignments.push({ column: "split_group_id", value: patch.splitGroupId });
         }
         const didUpdate = await updateRow(this.database, "transactions", id, assignments);
         return didUpdate ? this.getById(id) : null;

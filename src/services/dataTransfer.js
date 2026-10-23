@@ -22,6 +22,7 @@ export function buildBackup(snapshot) {
         accounts: snapshot.accounts,
         categories: snapshot.categories,
         transactions: snapshot.transactions,
+        transactionGroups: snapshot.transactionGroups ?? [],
         transfers: snapshot.transfers ?? [],
         budgets: snapshot.budgets,
         recurringRules: snapshot.recurringRules,
@@ -197,6 +198,21 @@ export function validateBackup(backup) {
             transferSourceKeys.add(row.sourceKey);
         }
     }
+    if (backup.transactionGroups !== undefined) {
+        if (!Array.isArray(backup.transactionGroups)) {
+            throw new Error("Backup transactionGroups must be an array.");
+        }
+        for (const group of backup.transactionGroups) {
+            if (group === null || typeof group !== "object" || !group.id) {
+                throw new Error("Backup transactionGroups contains invalid identifier.");
+            }
+            if (!ids.get("accounts").has(group.accountId)) {
+                throw new Error("Backup transactionGroups contains an invalid account reference.");
+            }
+            assertValidEpochMillis(group.dateEpochMillis, "transaction group date");
+            requireNote(group.title, "transaction group title");
+        }
+    }
 }
 export function parseBackup(raw) {
     let parsed;
@@ -232,7 +248,7 @@ export function parseBackup(raw) {
         throw new Error("Backup transfers must be an array.");
     }
     // Legacy omitted collections remain supported; present malformed collections fail closed.
-    for (const field of ["transactions", "budgets", "recurringRules"]) {
+    for (const field of ["transactions", "budgets", "recurringRules", "transactionGroups"]) {
         if (record[field] !== undefined && !Array.isArray(record[field])) {
             throw new Error(`Backup ${field} must be an array.`);
         }
@@ -244,6 +260,7 @@ export function parseBackup(raw) {
         accounts: record.accounts,
         categories: record.categories,
         transactions: Array.isArray(record.transactions) ? record.transactions : [],
+        transactionGroups: Array.isArray(record.transactionGroups) ? record.transactionGroups : [],
         transfers: Array.isArray(record.transfers) ? record.transfers : [],
         budgets: Array.isArray(record.budgets) ? record.budgets : [],
         recurringRules: Array.isArray(record.recurringRules) ? record.recurringRules : [],

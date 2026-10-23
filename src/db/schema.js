@@ -1,6 +1,6 @@
 import { seedInitialData } from "./seed";
 import { DataIntegrityError, readInteger } from "./validation";
-export const LATEST_SCHEMA_VERSION = 8;
+export const LATEST_SCHEMA_VERSION = 9;
 const CREATE_SCHEMA_STATEMENTS = [
     `CREATE TABLE accounts (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -126,6 +126,18 @@ const CREATE_ACCOUNT_TRANSFERS_STATEMENTS = [
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_account_transfers_source_key ON account_transfers (source_key)",
 ];
 
+const CREATE_TRANSACTION_GROUPS_STATEMENTS = [
+    `CREATE TABLE IF NOT EXISTS transaction_groups (
+      id TEXT PRIMARY KEY CHECK (length(trim(id)) > 0),
+      title TEXT,
+      account_id INTEGER NOT NULL,
+      date_epoch_millis INTEGER NOT NULL,
+      created_epoch_millis INTEGER NOT NULL,
+      FOREIGN KEY (account_id) REFERENCES accounts (id) ON UPDATE RESTRICT ON DELETE RESTRICT
+    ) STRICT`,
+    "CREATE INDEX IF NOT EXISTS idx_transaction_groups_date ON transaction_groups (date_epoch_millis DESC)",
+];
+
 const MIGRATIONS = [
     {
         version: 1,
@@ -232,6 +244,93 @@ const MIGRATIONS = [
         async apply(database) {
             for (const statement of CREATE_ACCOUNT_TRANSFERS_STATEMENTS) {
                 await database.execute(statement);
+            }
+        },
+    },
+    {
+        version: 9,
+        name: "add transaction split groups and link split allocations",
+        async apply(database) {
+            for (const statement of CREATE_TRANSACTION_GROUPS_STATEMENTS) {
+                await database.execute(statement);
+            }
+            const columns = await database.execute("PRAGMA table_info(transactions)");
+            const hasSplitGroupId = (columns.rows ?? []).some((row) => row.name === "split_group_id");
+            if (!hasSplitGroupId) {
+                await database.execute("ALTER TABLE transactions ADD COLUMN split_group_id TEXT REFERENCES transaction_groups(id) ON UPDATE CASCADE ON DELETE SET NULL");
+            }
+            await database.execute("CREATE INDEX IF NOT EXISTS idx_transactions_split_group_id ON transactions (split_group_id)");
+
+            // Migrate provable legacy split transactions into groups
+            const candidatesResult = await database.execute(`
+              SELECT id, amount_minor, type, category_id, account_id, date_epoch_millis, note, source_key
+              FROM transactions
+              WHERE split_group_id IS NULL AND (
+                source_key LIKE '%:split:%' OR note LIKE '%(Split %/%)'
+              )
+              ORDER BY id ASC
+            `);
+            const candidates = candidatesResult.rows ?? [];
+            if (candidates.length > 0) {
+                const groupBuckets = new Map();
+                for (const row of candidates) {
+                    let bucketKey = null;
+                    if (row.source_key && /:split:\d+$/.test(row.source_key)) {
+                        const baseSourceKey = row.source_key.replace(/:split:\d+$/, "");
+                        bucketKey = `src:${baseSourceKey}:${row.account_id}:${row.date_epoch_millis}:${row.type}`;
+                    } else if (row.note && /\(Split\s+\d+\/\d+\)$/i.test(row.note.trim())) {
+                        const match = row.note.trim().match(/\(Split\s+(\d+)\/(\d+)\)$/i);
+                        if (match) {
+                            const expectedTotal = Number(match[2]);
+                            bucketKey = `note:${row.account_id}:${row.date_epoch_millis}:${row.type}:${expectedTotal}`;
+                        }
+                    }
+                    if (bucketKey) {
+                        const list = groupBuckets.get(bucketKey) ?? [];
+                        list.push(row);
+                        groupBuckets.set(bucketKey, list);
+                    }
+                }
+
+                for (const [key, items] of groupBuckets.entries()) {
+                    if (key.startsWith("note:")) {
+                        const parts = key.split(":");
+                        const expectedCount = Number(parts[4]);
+                        if (items.length !== expectedCount) {
+                            // Ambiguous count -> keep intact without guessing
+                            continue;
+                        }
+                    } else if (items.length < 2) {
+                        // Orphaned split item -> keep intact
+                        continue;
+                    }
+                    const first = items[0];
+                    const groupId = `spg_legacy_${first.id}_${first.date_epoch_millis}`;
+                    let parentTitle = null;
+                    for (const item of items) {
+                        if (item.note) {
+                            const clean = item.note.replace(/\s*\(Split\s+\d+\/\d+\)\s*$/i, "").trim();
+                            const cleanedWithoutCat = clean.replace(/\s*-\s*[^-]+$/, "").trim();
+                            if (cleanedWithoutCat.length > 0) {
+                                parentTitle = cleanedWithoutCat;
+                                break;
+                            } else if (clean.length > 0) {
+                                parentTitle = clean;
+                                break;
+                            }
+                        }
+                    }
+                    await database.execute(
+                        "INSERT OR IGNORE INTO transaction_groups (id, title, account_id, date_epoch_millis, created_epoch_millis) VALUES (?, ?, ?, ?, ?)",
+                        [groupId, parentTitle, first.account_id, first.date_epoch_millis, Date.now()]
+                    );
+                    for (const item of items) {
+                        await database.execute(
+                            "UPDATE transactions SET split_group_id = ? WHERE id = ?",
+                            [groupId, item.id]
+                        );
+                    }
+                }
             }
         },
     },

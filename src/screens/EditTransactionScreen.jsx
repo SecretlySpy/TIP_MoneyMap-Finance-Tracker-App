@@ -10,6 +10,14 @@ import { SectionCard } from "../components/SectionCard";
 import { categoryEmoji, resolveDisplayEmoji } from "../domain/services/emoji";
 import { accountChipLabel, categoriesForType, computeAccountBalances } from "../domain/services/financeView";
 import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
+import {
+  computeSplitBreakdown,
+  extractParentNote,
+  formatSplitEquation,
+  stripSplitSuffix,
+  validateSplitSum,
+} from "../domain/services/splits";
+import { SplitItemEditor } from "../components/SplitItemEditor";
 import { listAccountChips, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -108,18 +116,28 @@ export function EditTransactionScreen({ navigation, route }) {
   const theme = useTheme(useUiStore((state) => state.themePreference));
   const currencySymbol = useUiStore((state) => state.currencySymbol);
   const transactions = useFinanceStore((state) => state.transactions);
+  const transactionGroups = useFinanceStore((state) => state.transactionGroups);
   const transfers = useFinanceStore((state) => state.transfers);
   const categories = useFinanceStore((state) => state.categories);
   const accounts = useFinanceStore((state) => state.accounts);
   const updateTransaction = useFinanceStore((state) => state.updateTransaction);
+  const updateSplitTransactionGroup = useFinanceStore((state) => state.updateSplitTransactionGroup);
+  const deleteSplitTransactionGroup = useFinanceStore((state) => state.deleteSplitTransactionGroup);
   const updateAccountTransfer = useFinanceStore((state) => state.updateAccountTransfer);
 
   const isTransfer = Boolean(route?.params?.isTransfer || route?.params?.transferId);
   const transferId = Number(route?.params?.transferId ?? route?.params?.transactionId);
   const transfer = isTransfer ? transfers.find((item) => item.id === transferId) : null;
 
+  const explicitSplitGroupId = route?.params?.splitGroupId;
   const transactionId = Number(route?.params?.transactionId);
-  const transaction = !isTransfer ? transactions.find((item) => item.id === transactionId) : null;
+  const transaction = !isTransfer && !isNaN(transactionId) ? transactions.find((item) => item.id === transactionId) : null;
+
+  const resolvedSplitGroupId = explicitSplitGroupId ?? (transaction?.splitGroupId ?? null);
+  const isSplitGroup = Boolean(
+    resolvedSplitGroupId &&
+    (explicitSplitGroupId || (transaction && transactions.filter((t) => t.splitGroupId === resolvedSplitGroupId).length >= 2))
+  );
 
   if (isTransfer) {
     if (!transfer) {
@@ -135,6 +153,28 @@ export function EditTransactionScreen({ navigation, route }) {
         transfer={transfer}
         transfers={transfers}
         updateAccountTransfer={updateAccountTransfer}
+      />
+    );
+  }
+
+  if (isSplitGroup) {
+    const groupAllocations = transactions.filter((t) => t.splitGroupId === resolvedSplitGroupId);
+    if (groupAllocations.length === 0) {
+      return <MissingTransactionView navigation={navigation} theme={theme} />;
+    }
+    const groupMeta = transactionGroups.find((g) => g.id === resolvedSplitGroupId);
+    return (
+      <EditSplitPurchaseForm
+        accounts={accounts}
+        categories={categories}
+        currencySymbol={currencySymbol}
+        deleteSplitTransactionGroup={deleteSplitTransactionGroup}
+        groupAllocations={groupAllocations}
+        groupMeta={groupMeta}
+        navigation={navigation}
+        splitGroupId={resolvedSplitGroupId}
+        theme={theme}
+        updateSplitTransactionGroup={updateSplitTransactionGroup}
       />
     );
   }
@@ -1088,6 +1128,559 @@ function EditTransferForm({
         title="Select Date"
         visible={datePickerVisible}
       />
+    </ScreenContainer>
+  );
+}
+
+function EditSplitPurchaseForm({
+  splitGroupId,
+  groupMeta,
+  groupAllocations,
+  navigation,
+  theme,
+  currencySymbol,
+  categories,
+  accounts,
+  updateSplitTransactionGroup,
+  deleteSplitTransactionGroup,
+}) {
+  const initialTotalMinor = groupAllocations.reduce((sum, a) => sum + (Number(a.amountMinor) || 0), 0);
+  const [totalMinor, setTotalMinor] = useState(initialTotalMinor);
+  const [totalStr, setTotalStr] = useState(
+    initialTotalMinor % 100 === 0 ? String(initialTotalMinor / 100) : (initialTotalMinor / 100).toFixed(2)
+  );
+
+  let initialTitle = groupMeta?.title?.trim() || "";
+  if (!initialTitle) {
+    for (const a of groupAllocations) {
+      const parent = extractParentNote(a.note, categories.find((c) => c.id === a.categoryId)?.name);
+      if (parent) {
+        initialTitle = parent;
+        break;
+      }
+    }
+  }
+
+  const [title, setTitle] = useState(initialTitle);
+  const [accountId, setAccountId] = useState(groupMeta?.accountId ?? groupAllocations[0]?.accountId);
+  const [dateEpochMillis, setDateEpochMillis] = useState(groupMeta?.dateEpochMillis ?? groupAllocations[0]?.dateEpochMillis ?? Date.now());
+
+  const [splits, setSplits] = useState(() =>
+    groupAllocations.map((a) => {
+      const cat = categories.find((c) => c.id === a.categoryId);
+      return {
+        id: a.id,
+        categoryId: a.categoryId,
+        categoryName: cat?.name ?? "Other",
+        amountMinor: a.amountMinor,
+        rawAmount: a.amountMinor % 100 === 0 ? String(a.amountMinor / 100) : (a.amountMinor / 100).toFixed(2),
+        note: stripSplitSuffix(a.note) || "",
+      };
+    })
+  );
+
+  const [activeSplitId, setActiveSplitId] = useState(splits[0]?.id ?? null);
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+  const [categoryPickerTargetId, setCategoryPickerTargetId] = useState(null);
+  const [deleteSheetVisible, setDeleteSheetVisible] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  const activeAccounts = useMemo(
+    () => accounts.filter((a) => !a.isArchived || a.id === accountId),
+    [accounts, accountId],
+  );
+
+  const expenseCategories = useMemo(
+    () => categories.filter((c) => c.type === "EXPENSE"),
+    [categories],
+  );
+
+  const formattedDate = new Date(dateEpochMillis).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  const hasCentavos = splits.some((s) => (Number(s.amountMinor) || 0) % 100 !== 0) || totalMinor % 100 !== 0;
+  const splitValidation = validateSplitSum(splits, totalMinor, { requireCategory: true });
+  const splitBreakdown = computeSplitBreakdown({ totalMinor, splits });
+
+  const handleTotalChange = (text) => {
+    setTotalStr(text);
+    const cleaned = text.trim().replace(/[₱$,\s]/g, "");
+    const parsed = parseDecimalToMinor(cleaned);
+    if (Number.isInteger(parsed) && parsed >= 0) {
+      setTotalMinor(parsed);
+    }
+  };
+
+  const handleSplitAmountChange = (splitId, text) => {
+    const cleaned = text.trim().replace(/[₱$,\s]/g, "");
+    const parsed = parseDecimalToMinor(cleaned);
+    setSplits((prev) =>
+      prev.map((s) => {
+        if (s.id !== splitId) return s;
+        return {
+          ...s,
+          rawAmount: text,
+          amountMinor: Number.isInteger(parsed) && parsed >= 0 ? parsed : 0,
+        };
+      })
+    );
+  };
+
+  const handleAddSplit = () => {
+    const newId = `new_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const currentSum = splits.reduce((acc, s) => acc + (Number(s.amountMinor) || 0), 0);
+    const remaining = Math.max(0, totalMinor - currentSum);
+
+    const usedCatIds = new Set(splits.map((s) => s.categoryId));
+    const nextCat = expenseCategories.find((c) => !usedCatIds.has(c.id)) || expenseCategories[0];
+
+    const newSplit = {
+      id: newId,
+      categoryId: nextCat?.id,
+      categoryName: nextCat?.name ?? "Other",
+      amountMinor: remaining,
+      rawAmount: remaining % 100 === 0 ? String(remaining / 100) : (remaining / 100).toFixed(2),
+      note: "",
+    };
+
+    setSplits((prev) => [...prev, newSplit]);
+    setActiveSplitId(newId);
+  };
+
+  const handleRemoveSplit = (splitId) => {
+    if (splits.length <= 1) {
+      return;
+    }
+    setSplits((prev) => prev.filter((s) => s.id !== splitId));
+  };
+
+  const handleCategorySelect = (selectedCat) => {
+    if (!categoryPickerTargetId) return;
+    setSplits((prev) =>
+      prev.map((s) => {
+        if (s.id !== categoryPickerTargetId) return s;
+        return {
+          ...s,
+          categoryId: selectedCat.id,
+          categoryName: selectedCat.name,
+        };
+      })
+    );
+    setCategoryPickerVisible(false);
+    setCategoryPickerTargetId(null);
+  };
+
+  const handleSave = async () => {
+    if (!splitValidation.isValid) {
+      setSaveError(splitValidation.error || "Allocated sum must equal total amount.");
+      return;
+    }
+    if (totalMinor <= 0) {
+      setSaveError("Total amount must be greater than zero.");
+      return;
+    }
+    if (!accountId) {
+      setSaveError("Please select an account.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setSaveError(null);
+      await updateSplitTransactionGroup(splitGroupId, {
+        title: title.trim() || null,
+        accountId,
+        dateEpochMillis,
+        splits: splits.map((s) => ({
+          id: typeof s.id === "number" ? s.id : undefined,
+          amountMinor: s.amountMinor,
+          categoryId: s.categoryId,
+          categoryName: s.categoryName,
+          note: s.note?.trim() || null,
+        })),
+      });
+      navigation.goBack();
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Could not save split transaction changes.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteEntirePurchase = async () => {
+    try {
+      setIsDeleting(true);
+      await deleteSplitTransactionGroup(splitGroupId);
+      setDeleteSheetVisible(false);
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert(
+        "Delete failed",
+        error instanceof Error ? error.message : "Could not delete split purchase.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const canSave = splitValidation.isValid && totalMinor > 0 && !isSaving;
+
+  return (
+    <ScreenContainer contentContainerStyle={{ flexGrow: 1, gap: theme.spacing.xl }} testID="edit-split-purchase-screen">
+      {/* Top Header */}
+      <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+        <Pressable
+          accessibilityLabel="Cancel edit"
+          accessibilityRole="button"
+          hitSlop={theme.spacing.md}
+          onPress={() => navigation.goBack()}
+          style={{
+            alignItems: "center",
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.outline,
+            borderRadius: theme.radii.round,
+            borderWidth: 1,
+            height: 40,
+            justifyContent: "center",
+            width: 40,
+          }}
+        >
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: 18 }}>‹</Text>
+        </Pressable>
+        <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.screenTitle }}>
+          Edit Split Purchase
+        </Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {saveError ? (
+        <View
+          style={{
+            backgroundColor: theme.colors.amberBg,
+            borderColor: theme.colors.warning,
+            borderRadius: theme.radii.card,
+            borderWidth: 1,
+            padding: theme.spacing.md,
+          }}
+        >
+          <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.bold }}>⚠️ {saveError}</Text>
+        </View>
+      ) : null}
+
+      {/* Total Purchase Amount Input */}
+      <SectionCard style={{ gap: theme.spacing.sm, padding: theme.spacing.lg }}>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny, letterSpacing: 1 }}>
+          TOTAL PURCHASE AMOUNT
+        </Text>
+        <View style={{ alignItems: "center", flexDirection: "row", gap: theme.spacing.sm }}>
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: 28 }}>
+            {currencySymbol}
+          </Text>
+          <TextInput
+            accessibilityLabel="Total purchase amount"
+            keyboardType="decimal-pad"
+            onChangeText={handleTotalChange}
+            placeholder="0.00"
+            placeholderTextColor={theme.colors.sub}
+            style={{
+              color: theme.colors.text,
+              flex: 1,
+              fontFamily: theme.fonts.bold,
+              fontSize: 28,
+              padding: 0,
+            }}
+            testID="edit-split-total-input"
+            value={totalStr}
+          />
+        </View>
+      </SectionCard>
+
+      {/* Purchase Title / Note */}
+      <SectionCard style={{ gap: theme.spacing.sm, padding: theme.spacing.lg }}>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny, letterSpacing: 1 }}>
+          PURCHASE TITLE / NOTE
+        </Text>
+        <TextInput
+          accessibilityLabel="Purchase title"
+          maxLength={120}
+          onChangeText={setTitle}
+          placeholder="e.g. School supplies, Grocery run"
+          placeholderTextColor={theme.colors.sub}
+          style={{
+            borderColor: theme.colors.outline,
+            borderRadius: theme.radii.chip,
+            borderWidth: 1,
+            color: theme.colors.text,
+            fontFamily: theme.fonts.regular,
+            fontSize: theme.typeScale.body,
+            minHeight: 44,
+            paddingHorizontal: theme.spacing.md,
+          }}
+          testID="edit-split-title-input"
+          value={title}
+        />
+      </SectionCard>
+
+      {/* Paid From Account */}
+      <SectionCard style={{ gap: theme.spacing.sm, padding: theme.spacing.lg }}>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny, letterSpacing: 1 }}>
+          PAID FROM ACCOUNT
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -theme.spacing.sm }}>
+          <View style={{ flexDirection: "row", gap: theme.spacing.sm, paddingHorizontal: theme.spacing.sm }}>
+            {activeAccounts.map((account) => {
+              const isSelected = account.id === accountId;
+              return (
+                <Chip
+                  key={account.id}
+                  label={account.name}
+                  onPress={() => setAccountId(account.id)}
+                  selected={isSelected}
+                />
+              );
+            })}
+          </View>
+        </ScrollView>
+      </SectionCard>
+
+      {/* Date Picker */}
+      <SectionCard style={{ gap: theme.spacing.sm, padding: theme.spacing.lg }}>
+        <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.tiny, letterSpacing: 1 }}>
+          PURCHASE DATE
+        </Text>
+        <Pressable
+          accessibilityLabel={`Change purchase date, current is ${formattedDate}`}
+          accessibilityRole="button"
+          onPress={() => setDatePickerVisible(true)}
+          style={{
+            alignItems: "center",
+            borderColor: theme.colors.outline,
+            borderRadius: theme.radii.chip,
+            borderWidth: 1,
+            flexDirection: "row",
+            justifyContent: "space-between",
+            minHeight: 44,
+            paddingHorizontal: theme.spacing.md,
+          }}
+        >
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.body }}>
+            {formattedDate}
+          </Text>
+          <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: 18 }}>📅</Text>
+        </Pressable>
+      </SectionCard>
+
+      {/* Split Allocations Breakdown Card */}
+      <SectionCard style={{ gap: theme.spacing.md, padding: theme.spacing.lg }}>
+        <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.cardHeader }}>
+            Category Allocations ({splits.length})
+          </Text>
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+            {formatSplitEquation(splits, totalMinor, currencySymbol, { showCents: hasCentavos })}
+          </Text>
+        </View>
+
+        {/* Transition to Single Allocation Notice */}
+        {splits.length === 1 ? (
+          <View
+            style={{
+              backgroundColor: theme.colors.tint,
+              borderColor: theme.colors.primary,
+              borderRadius: theme.radii.row,
+              borderWidth: 1,
+              padding: theme.spacing.sm,
+            }}
+          >
+            <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
+              ℹ️ Single allocation: Saving with 1 category will transition this purchase into a standard single-category transaction.
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Split Item Editors */}
+        <View style={{ gap: theme.spacing.sm }}>
+          {splits.map((split, idx) => (
+            <SplitItemEditor
+              categoryIcon={categories.find((c) => c.id === split.categoryId)?.icon}
+              currencySymbol={currencySymbol}
+              index={idx}
+              isActive={activeSplitId === split.id}
+              key={split.id}
+              onAmountChange={(text) => handleSplitAmountChange(split.id, text)}
+              onAmountFocus={() => setActiveSplitId(split.id)}
+              onCategoryPress={() => {
+                setActiveSplitId(split.id);
+                setCategoryPickerTargetId(split.id);
+                setCategoryPickerVisible(true);
+              }}
+              canRemove={splits.length > 1}
+              onRemove={() => handleRemoveSplit(split.id)}
+              onSelect={() => setActiveSplitId(split.id)}
+              split={split}
+            />
+          ))}
+        </View>
+
+        {/* Add Split Button */}
+        <Pressable
+          accessibilityLabel="Add category split"
+          accessibilityRole="button"
+          hitSlop={theme.spacing.xs}
+          onPress={handleAddSplit}
+          style={{
+            alignItems: "center",
+            borderColor: theme.colors.primary,
+            borderRadius: theme.radii.row,
+            borderStyle: "dashed",
+            borderWidth: 1.5,
+            justifyContent: "center",
+            minHeight: 44,
+            paddingVertical: theme.spacing.sm,
+          }}
+          testID="edit-add-split-btn"
+        >
+          <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+            + Add Another Category
+          </Text>
+        </Pressable>
+
+        {/* Validation Status Bar */}
+        <View style={{ borderTopColor: theme.colors.outline, borderTopWidth: 1, gap: 4, paddingTop: theme.spacing.sm }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
+              Allocated Total: {formatMinor(splitBreakdown?.sumMinor || 0, { currencySymbol, showCents: hasCentavos })}
+            </Text>
+            <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>
+              Purchase Total: {formatMinor(totalMinor, { currencySymbol, showCents: hasCentavos })}
+            </Text>
+          </View>
+
+          <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginTop: theme.spacing.xxs }}>
+            {splitValidation.isValid ? (
+              <Text style={{ color: theme.colors.income, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                ✓ Exact sum verified
+              </Text>
+            ) : (
+              <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
+                {splitValidation.diffMinor > 0
+                  ? `Remaining: ${formatMinor(splitValidation.diffMinor, { currencySymbol, showCents: hasCentavos })}`
+                  : `Over by: ${formatMinor(Math.abs(splitValidation.diffMinor), { currencySymbol, showCents: hasCentavos })}`}
+              </Text>
+            )}
+            {!splitValidation.isValid ? (
+              <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
+                Must equal total to save
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      </SectionCard>
+
+      {/* Save Button */}
+      <PrimaryButton
+        accessibilityLabel="Save split changes"
+        disabled={!canSave}
+        onPress={handleSave}
+        style={{ marginTop: theme.spacing.sm }}
+      >
+        {isSaving ? "Saving changes…" : "Save Changes"}
+      </PrimaryButton>
+
+      {/* Delete Purchase Button */}
+      <Pressable
+        accessibilityLabel="Delete entire purchase"
+        accessibilityRole="button"
+        onPress={() => setDeleteSheetVisible(true)}
+        style={{
+          alignItems: "center",
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.expense,
+          borderRadius: theme.radii.button,
+          borderWidth: 1.5,
+          height: theme.sizes.primaryButton,
+          justifyContent: "center",
+          marginBottom: theme.spacing.xxl,
+          width: "100%",
+        }}
+      >
+        <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.cardHeader }}>
+          Delete Entire Purchase
+        </Text>
+      </Pressable>
+
+      {/* Date Picker Sheet */}
+      <CalendarPickerSheet
+        onClose={() => setDatePickerVisible(false)}
+        onConfirm={(epochMillis) => {
+          setDateEpochMillis(epochMillis);
+          setDatePickerVisible(false);
+        }}
+        selectedDateEpochMillis={dateEpochMillis}
+        testID="split-date-picker-sheet"
+        title="Select Purchase Date"
+        visible={datePickerVisible}
+      />
+
+      {/* Category Picker Sheet */}
+      <BottomSheet
+        onClose={() => {
+          setCategoryPickerVisible(false);
+          setCategoryPickerTargetId(null);
+        }}
+        title="Choose Category"
+        visible={categoryPickerVisible}
+      >
+        <ScrollView style={{ maxHeight: 380 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm, paddingBottom: theme.spacing.lg }}>
+            {expenseCategories.map((cat) => (
+              <Chip
+                key={cat.id}
+                label={`${resolveDisplayEmoji({ icon: cat.icon, name: cat.name })} ${cat.name}`}
+                onPress={() => handleCategorySelect(cat)}
+                selected={splits.find((s) => s.id === categoryPickerTargetId)?.categoryId === cat.id}
+              />
+            ))}
+          </View>
+        </ScrollView>
+      </BottomSheet>
+
+      {/* Delete Confirmation Sheet */}
+      <BottomSheet
+        onClose={() => setDeleteSheetVisible(false)}
+        testID="delete-split-confirmation-sheet"
+        title="Delete this entire purchase?"
+        visible={deleteSheetVisible}
+      >
+        <View style={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.md }}>
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body }}>
+            This will delete all {splits.length} category allocations for this purchase. Account balances will be restored. This cannot be undone.
+          </Text>
+          <PrimaryButton
+            accessibilityLabel="Confirm Delete"
+            disabled={isDeleting}
+            onPress={handleDeleteEntirePurchase}
+            style={{ backgroundColor: theme.colors.expense }}
+          >
+            {isDeleting ? "Deleting…" : "Confirm Delete"}
+          </PrimaryButton>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setDeleteSheetVisible(false)}
+            style={{ alignItems: "center", justifyContent: "center", minHeight: 44 }}
+          >
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.medium }}>Cancel</Text>
+          </Pressable>
+        </View>
+      </BottomSheet>
     </ScreenContainer>
   );
 }

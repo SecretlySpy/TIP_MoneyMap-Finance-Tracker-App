@@ -110,44 +110,11 @@ export function getBudgetsToCopy({ fromMonthYear, toMonthYear, budgets }) {
   return sourceBudgets.filter((b) => !existingCategoryIds.has(b.categoryId));
 }
 
+import { DEFAULT_STUDENT_TEMPLATES } from "./budgetTemplates";
+
 /**
  * Student Semester Planning Templates (amounts in PHP minor units)
+ * Re-exported from domain budgetTemplates service for backwards compatibility.
  */
-export const SEMESTER_TEMPLATES = [
-  {
-    id: "standard-student",
-    name: "Standard Student Semester",
-    description: "Balanced budget for tuition, books, commute, meals, and emergency fund.",
-    categories: [
-      { name: "Food", amountMinor: 450_000, emoji: "🍜" },
-      { name: "Transport", amountMinor: 200_000, emoji: "🚌" },
-      { name: "School Supplies", amountMinor: 150_000, emoji: "📚" },
-      { name: "Load/Data", amountMinor: 50_000, emoji: "📱" },
-      { name: "Emergency Buffer", amountMinor: 100_000, emoji: "🛡️" },
-    ],
-  },
-  {
-    id: "commuter-student",
-    name: "Daily Commuter Plan",
-    description: "Optimized for daily transit (jeep, bus, LRT) and campus meals.",
-    categories: [
-      { name: "Food", amountMinor: 350_000, emoji: "🍜" },
-      { name: "Transport", amountMinor: 250_000, emoji: "🚌" },
-      { name: "Load/Data", amountMinor: 40_000, emoji: "📱" },
-      { name: "School Projects", amountMinor: 120_000, emoji: "📑" },
-      { name: "Emergency Buffer", amountMinor: 80_000, emoji: "🛡️" },
-    ],
-  },
-  {
-    id: "dormer-student",
-    name: "Dormer / Boarding House Plan",
-    description: "Covers monthly dorm rent, utilities, groceries, and laundry.",
-    categories: [
-      { name: "Rent & Boarding", amountMinor: 500_000, emoji: "🏠" },
-      { name: "Food & Groceries", amountMinor: 550_000, emoji: "🛒" },
-      { name: "School Supplies", amountMinor: 100_000, emoji: "📚" },
-      { name: "Laundry & Personal", amountMinor: 120_000, emoji: "🧺" },
-      { name: "Emergency Buffer", amountMinor: 150_000, emoji: "🛡️" },
-    ],
-  },
-];
+export const SEMESTER_TEMPLATES = DEFAULT_STUDENT_TEMPLATES;
+

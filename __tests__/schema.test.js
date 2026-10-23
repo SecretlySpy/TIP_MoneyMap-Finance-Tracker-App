@@ -33,12 +33,12 @@ describe("database schema and seed", () => {
     test("migrates a fresh database to the latest version with domain tables including goals", async () => {
         const migration = await migrateDatabase(database);
         const tables = await database.execute(`SELECT name FROM sqlite_schema
-       WHERE type = 'table' AND name IN (?, ?, ?, ?, ?, ?, ?)
-       ORDER BY name`, ["account_transfers", "accounts", "budgets", "categories", "recurring_rules", "savings_goals", "transactions"]);
+       WHERE type = 'table' AND name IN (?, ?, ?, ?, ?, ?, ?, ?)
+       ORDER BY name`, ["account_transfers", "accounts", "budgets", "categories", "recurring_rules", "savings_goals", "transaction_groups", "transactions"]);
         expect(migration).toEqual({
             previousVersion: 0,
             currentVersion: LATEST_SCHEMA_VERSION,
-            appliedVersions: [1, 2, 3, 4, 5, 6, 7, 8],
+            appliedVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9],
         });
         expect(tables.rows.map(({ name }) => name)).toEqual([
             "account_transfers",
@@ -47,6 +47,7 @@ describe("database schema and seed", () => {
             "categories",
             "recurring_rules",
             "savings_goals",
+            "transaction_groups",
             "transactions",
         ]);
     });
@@ -93,7 +94,7 @@ describe("database schema and seed", () => {
         const rows = await database.execute("SELECT amount_minor, note, source_key FROM transactions");
         const recoveryTable = await database.execute("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'restore_recovery_snapshot'");
         const bootstrap = await database.execute("SELECT value FROM app_metadata WHERE key = ?", ["bootstrap-defaults-v1"]);
-        expect(migration.appliedVersions).toEqual([5, 6, 7, 8]);
+        expect(migration.appliedVersions).toEqual([5, 6, 7, 8, 9]);
         expect(rows.rows).toEqual([{ amount_minor: 1250, note: "Existing row", source_key: null }]);
         expect(recoveryTable.rows).toEqual([{ name: "restore_recovery_snapshot" }]);
         expect(bootstrap.rows).toEqual([{ value: "complete" }]);

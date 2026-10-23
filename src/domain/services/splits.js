@@ -97,6 +97,60 @@ export function computeSplitBreakdown({ totalMinor, splits = [] }) {
 }
 
 /**
+ * Generates a stable unique identifier for a split transaction group.
+ * Format: spg_<timestamp>_<random>
+ * @returns {string}
+ */
+export function generateSplitGroupId() {
+  const timestamp = Date.now();
+  const rand = Math.random().toString(36).substring(2, 9);
+  return `spg_${timestamp}_${rand}`;
+}
+
+/**
+ * Strips technical "(Split X/Y)" suffix from note text.
+ * @param {string | null | undefined} note
+ * @returns {string | null}
+ */
+export function stripSplitSuffix(note) {
+  if (typeof note !== "string") return "";
+  const cleaned = note.replace(/\s*[\(\[]\s*Split\s+\d+(\/|\s+of\s+)\d+\s*[\]\)]\s*$/i, "").trim();
+  return cleaned;
+}
+
+/**
+ * Extracts parent/overall purchase note by removing generated category suffix and split suffix.
+ * E.g., "School supplies - Books (Split 1/2)" -> "School supplies"
+ * @param {string | null | undefined} note
+ * @param {string | null | undefined} categoryName
+ * @returns {string | null}
+ */
+export function extractParentNote(note, categoryName) {
+  const stripped = stripSplitSuffix(note);
+  if (!stripped) return null;
+  if (categoryName) {
+    const catLower = categoryName.toLowerCase();
+    const strippedLower = stripped.toLowerCase();
+    if (strippedLower.endsWith(` - ${catLower}`)) {
+      const parent = stripped.slice(0, -(categoryName.length + 3)).trim();
+      return parent.length > 0 ? parent : null;
+    }
+    if (strippedLower.endsWith(`: ${catLower}`)) {
+      const parent = stripped.slice(0, -(categoryName.length + 2)).trim();
+      return parent.length > 0 ? parent : null;
+    }
+    if (strippedLower === catLower) {
+      return null;
+    }
+  }
+  const separatorMatch = stripped.match(/^(.*?)\s*[-:]\s*[^-:]+$/);
+  if (separatorMatch && separatorMatch[1].trim().length > 0) {
+    return separatorMatch[1].trim();
+  }
+  return stripped;
+}
+
+/**
  * Builds preview transaction records for saving split items.
  * @param {{ parentTransaction: object, splits: Array<{ categoryId: number, categoryName?: string, amountMinor: number, note?: string }> }} input
  */
@@ -105,6 +159,8 @@ export function buildSplitTransactions({ parentTransaction, splits }) {
   if (!validation.isValid) {
     throw new Error(validation.error || "Cannot create split transactions: sum mismatch.");
   }
+
+  const splitGroupId = parentTransaction.splitGroupId ?? undefined;
 
   return splits.map((split, index) => ({
     type: parentTransaction.type || "EXPENSE",
@@ -119,6 +175,157 @@ export function buildSplitTransactions({ parentTransaction, splits }) {
       : split.categoryName || parentTransaction.note || "Transaction") + ` (Split ${index + 1}/${splits.length})`,
     dateEpochMillis: parentTransaction.dateEpochMillis,
     sourceKey: parentTransaction.sourceKey ? `${parentTransaction.sourceKey}:split:${index}` : undefined,
+    splitGroupId,
   }));
 }
+
+/**
+ * Groups raw database transactions into logical items for history and dashboard.
+ * Preserves normal single transactions and combines split allocations into one logical purchase.
+ * @param {Array<object>} transactions
+ * @param {Array<object>} [transactionGroups]
+ * @returns {Array<object>}
+ */
+export function groupTransactionsBySplit(transactions, transactionGroups = []) {
+  if (!Array.isArray(transactions) || transactions.length === 0) {
+    return [];
+  }
+
+  const groupsById = new Map();
+  for (const group of transactionGroups ?? []) {
+    if (group && group.id) {
+      groupsById.set(group.id, group);
+    }
+  }
+
+  const splitBuckets = new Map();
+  const unassigned = [];
+
+  for (const tx of transactions) {
+    if (tx.splitGroupId) {
+      const list = splitBuckets.get(tx.splitGroupId) ?? [];
+      list.push(tx);
+      splitBuckets.set(tx.splitGroupId, list);
+    } else {
+      unassigned.push(tx);
+    }
+  }
+
+  const result = [];
+
+  // 1. Process explicit splitGroupId buckets
+  for (const [groupId, allocations] of splitBuckets.entries()) {
+    if (allocations.length >= 2) {
+      const sorted = [...allocations].sort((a, b) => a.id - b.id);
+      const groupMeta = groupsById.get(groupId);
+      const first = sorted[0];
+      const totalAmountMinor = sorted.reduce((sum, a) => sum + (Number(a.amountMinor) || 0), 0);
+      
+      let title = groupMeta?.title?.trim() || null;
+      if (!title) {
+        for (const a of sorted) {
+          const parent = extractParentNote(a.note, a.categoryName);
+          if (parent) {
+            title = parent;
+            break;
+          }
+        }
+      }
+
+      result.push({
+        id: `group:${groupId}`,
+        isGroup: true,
+        splitGroupId: groupId,
+        title,
+        amountMinor: totalAmountMinor,
+        type: first.type || "EXPENSE",
+        accountId: groupMeta?.accountId ?? first.accountId,
+        dateEpochMillis: groupMeta?.dateEpochMillis ?? first.dateEpochMillis,
+        allocations: sorted,
+        allocationCount: sorted.length,
+        splitCategoryCount: sorted.length,
+        categoryId: first.categoryId,
+      });
+    } else {
+      // Degraded to single allocation
+      result.push(...allocations);
+    }
+  }
+
+  // 2. Identify provable legacy split transactions among unassigned
+  const remainingUnassigned = [];
+  const legacyBuckets = new Map();
+
+  for (const tx of unassigned) {
+    let legacyKey = null;
+
+    if (tx.sourceKey && typeof tx.sourceKey === "string") {
+      const match = tx.sourceKey.match(/^(?:split:)?(.*?)(?::split)?:\d+$/i);
+      if (match && match[1]) {
+        legacyKey = `source:${tx.accountId}:${tx.dateEpochMillis}:${match[1]}`;
+      }
+    }
+
+    if (!legacyKey && tx.note && typeof tx.note === "string") {
+      const noteMatch = tx.note.match(/^(.*?)\s*[\(\[]\s*Split\s+(\d+)\/(\d+)\s*[\]\)]\s*$/i);
+      if (noteMatch) {
+        const baseNote = noteMatch[1].trim();
+        const totalSplits = parseInt(noteMatch[3], 10);
+        const parentTitle = extractParentNote(tx.note, tx.categoryName) || baseNote;
+        legacyKey = `note:${tx.accountId}:${tx.dateEpochMillis}:${tx.type}:${parentTitle}:${totalSplits}`;
+      }
+    }
+
+    if (legacyKey) {
+      const list = legacyBuckets.get(legacyKey) ?? [];
+      list.push(tx);
+      legacyBuckets.set(legacyKey, list);
+    } else {
+      remainingUnassigned.push(tx);
+    }
+  }
+
+  for (const [key, allocations] of legacyBuckets.entries()) {
+    if (allocations.length >= 2) {
+      const sorted = [...allocations].sort((a, b) => a.id - b.id);
+      const first = sorted[0];
+      const totalAmountMinor = sorted.reduce((sum, a) => sum + (Number(a.amountMinor) || 0), 0);
+      let title = null;
+      for (const a of sorted) {
+        const parent = extractParentNote(a.note, a.categoryName);
+        if (parent) {
+          title = parent;
+          break;
+        }
+      }
+      if (!title) {
+        title = stripSplitSuffix(first.note) || `Expense · ${sorted.length} categories`;
+      }
+
+      const syntheticGroupId = `legacy_${first.id}`;
+      result.push({
+        id: `group:${syntheticGroupId}`,
+        isGroup: true,
+        splitGroupId: syntheticGroupId,
+        title,
+        amountMinor: totalAmountMinor,
+        type: first.type || "EXPENSE",
+        accountId: first.accountId,
+        dateEpochMillis: first.dateEpochMillis,
+        allocations: sorted,
+        allocationCount: sorted.length,
+        splitCategoryCount: sorted.length,
+        categoryId: first.categoryId,
+      });
+    } else {
+      remainingUnassigned.push(...allocations);
+    }
+  }
+
+  // 3. Add remaining non-split unassigned transactions
+  result.push(...remainingUnassigned);
+
+  return result;
+}
+
 

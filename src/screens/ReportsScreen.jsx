@@ -264,7 +264,7 @@ export function ReportsScreen({ navigation }) {
               >
                 {/* Table Header */}
                 <View
-                  accessibilityRole="row"
+                  accessible
                   style={{
                     backgroundColor: theme.colors.bg,
                     borderBottomColor: theme.colors.outline,
@@ -291,8 +291,8 @@ export function ReportsScreen({ navigation }) {
                 {cashFlowTrends.map((t) => (
                   <View
                     key={t.monthYear}
+                    accessible
                     accessibilityLabel={`${formatMonthChip(t.monthYear)}: Income ${formatMinor(t.incomeMinor, { currencySymbol })}, Expenses ${formatMinor(t.expenseMinor, { currencySymbol })}, Net ${formatMinor(t.netSavingsMinor, { currencySymbol })}`}
-                    accessibilityRole="row"
                     style={{
                       borderBottomColor: theme.colors.outline,
                       borderBottomWidth: theme.spacing.hairline,
