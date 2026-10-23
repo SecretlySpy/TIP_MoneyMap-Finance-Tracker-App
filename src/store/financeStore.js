@@ -250,7 +250,28 @@ export const useFinanceStore = create((set, get) => ({
             throw new Error("Database is not ready.");
         }
         const { accounts, categories } = get();
-        const category = findCategory(categories, input.categoryName, input.type);
+        let category;
+        if (input.categoryId !== undefined && input.categoryId !== null) {
+            category = categories.find((c) => c.id === input.categoryId);
+            if (!category) {
+                throw new Error(`Category with ID ${input.categoryId} was not found.`);
+            }
+            if (input.type && category.type !== input.type) {
+                throw new Error(`Transaction type must match category type.`);
+            }
+            if (input.categoryName && category.name.toLowerCase() !== input.categoryName.toLowerCase()) {
+                throw new Error(`Category ID ${input.categoryId} does not match name "${input.categoryName}".`);
+            }
+        } else if (input.categoryName) {
+            category = findCategory(categories, input.categoryName, input.type);
+        } else if (input.note === "Reconciliation adjustment") {
+            category = categories.find((c) => c.type === input.type);
+            if (!category) {
+                throw new Error(`No available category for ${input.type}.`);
+            }
+        } else {
+            throw new Error("Category is required.");
+        }
         const account = input.accountId === undefined
             ? findAccount(accounts, input.accountType)
             : findActiveAccountById(accounts, input.accountId);
@@ -281,6 +302,66 @@ export const useFinanceStore = create((set, get) => ({
         await get().refresh();
         return created;
     },
+    addSplitTransactions: async (splitInputs) => withMutationLock(async () => {
+        await get().ensureHydrated();
+        const database = databaseRef;
+        if (database === null) {
+            throw new Error("Database is not ready.");
+        }
+        if (!Array.isArray(splitInputs) || splitInputs.length === 0) {
+            throw new Error("No split transactions provided.");
+        }
+        const { accounts, categories } = get();
+        const validatedPayloads = [];
+        for (let i = 0; i < splitInputs.length; i++) {
+            const input = splitInputs[i];
+            let category;
+            if (input.categoryId !== undefined && input.categoryId !== null) {
+                category = categories.find((c) => c.id === input.categoryId);
+                if (!category) {
+                    throw new Error(`Category with ID ${input.categoryId} was not found.`);
+                }
+                if (input.type && category.type !== input.type) {
+                    throw new Error("Transaction type must match category type.");
+                }
+                if (input.categoryName && category.name.toLowerCase() !== input.categoryName.toLowerCase()) {
+                    throw new Error(`Category ID ${input.categoryId} does not match name "${input.categoryName}".`);
+                }
+            } else if (input.categoryName) {
+                category = findCategory(categories, input.categoryName, input.type);
+            } else {
+                throw new Error(`Category is required for split #${i + 1}.`);
+            }
+            const account = input.accountId === undefined
+                ? findAccount(accounts, input.accountType)
+                : findActiveAccountById(accounts, input.accountId);
+            const dateEpochMillis = input.dateEpochMillis ?? Date.now();
+            if (!Number.isSafeInteger(dateEpochMillis)) {
+                throw new Error(`Invalid transaction date for split #${i + 1}.`);
+            }
+            validatedPayloads.push({
+                amountMinor: input.amountMinor,
+                type: input.type || "EXPENSE",
+                categoryId: category.id,
+                accountId: account.id,
+                dateEpochMillis,
+                note: input.note?.trim() ? input.note.trim() : null,
+                recurringRuleId: null,
+                scheduledDateEpochMillis: null,
+                sourceKey: input.sourceKey ?? null,
+            });
+        }
+        const createdRecords = [];
+        await database.transaction(async (transaction) => {
+            const transactionRepo = new TransactionRepository(transaction);
+            for (const payload of validatedPayloads) {
+                const created = await transactionRepo.create(payload);
+                createdRecords.push(created);
+            }
+        });
+        await get().refresh();
+        return createdRecords;
+    }),
     addAccountTransfer: async (input) => withMutationLock(async () => {
         await get().ensureHydrated();
         const database = databaseRef;

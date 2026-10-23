@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Crypto from "expo-crypto";
-import { Alert, Pressable, View } from "react-native";
+import { Alert, Pressable, ScrollView, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
+import { BottomSheet } from "../components/BottomSheet";
 import { CalendarPickerSheet } from "../components/CalendarPickerSheet";
 import { Chip } from "../components/Chip";
 import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
+import { SplitItemEditor } from "../components/SplitItemEditor";
 import { TextPromptModal } from "../components/TextPromptModal";
 import { accountChipLabel, categoriesForType, computeAccountBalances, toMonthYear } from "../domain/services/financeView";
 import { resolveDisplayEmoji } from "../domain/services/emoji";
 import { formatMinor, parseDecimalToMinor, updateMoneyInput } from "../domain/services/money";
-import { buildSplitTransactions, formatSplitEquation, validateSplitSum } from "../domain/services/splits";
+import { buildSplitTransactions, computeSplitBreakdown, formatSplitEquation, validateSplitSum } from "../domain/services/splits";
 import { extractTags } from "../domain/services/tags";
 import { listAccountChips, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -52,6 +54,7 @@ export function EntryScreen({ navigation }) {
     const accounts = useFinanceStore((state) => state.accounts);
     const categories = useFinanceStore((state) => state.categories);
     const addTransaction = useFinanceStore((state) => state.addTransaction);
+    const addSplitTransactions = useFinanceStore((state) => state.addSplitTransactions);
     const addAccountTransfer = useFinanceStore((state) => state.addAccountTransfer);
     const transfers = useFinanceStore((state) => state.transfers);
     const addCategory = useFinanceStore((state) => state.addCategory);
@@ -67,6 +70,10 @@ export function EntryScreen({ navigation }) {
     const [showNotePrompt, setShowNotePrompt] = useState(false);
     const [isSplitMode, setIsSplitMode] = useState(false);
     const [splits, setSplits] = useState([]);
+    const [activeSplitId, setActiveSplitId] = useState(null);
+    const [activeTarget, setActiveTarget] = useState("split");
+    const [splitCategoryPickerVisible, setSplitCategoryPickerVisible] = useState(false);
+    const [splitCategoryPickerTargetId, setSplitCategoryPickerTargetId] = useState(null);
     const [datePickerVisible, setDatePickerVisible] = useState(false);
     const [selectedDateEpochMillis, setSelectedDateEpochMillis] = useState(() => localNoonToday());
     const sourceKeyRef = useRef(createManualSourceKey());
@@ -179,12 +186,119 @@ export function EntryScreen({ navigation }) {
             return 0;
         }
     }, [amountInput]);
+    const hasCentavos = useMemo(() => {
+        return amountMinor % 100 !== 0 || splits.some((s) => (s.amountMinor || 0) % 100 !== 0);
+    }, [amountMinor, splits]);
+
+    const splitBreakdown = useMemo(() => {
+        if (!isSplitMode || splits.length === 0) return null;
+        return computeSplitBreakdown({ totalMinor: amountMinor, splits });
+    }, [isSplitMode, splits, amountMinor]);
+
+    const splitValidation = useMemo(() => {
+        if (!isSplitMode || splits.length === 0) return { isValid: false, error: null };
+        return validateSplitSum(splits, amountMinor, { requireCategory: true });
+    }, [isSplitMode, splits, amountMinor]);
+
+    const handleSelectSplit = (splitId) => {
+        setActiveSplitId(splitId);
+        setActiveTarget("split");
+        const found = splits.find((s) => s.id === splitId);
+        if (found?.categoryName) {
+            setSelectedCategory(found.categoryName);
+        }
+    };
+
+    const handleCategoryPress = (categoryName) => {
+        if (categoryName === "New") {
+            setShowNewCategory(true);
+            return;
+        }
+        if (isSplitMode && activeSplitId) {
+            const catObj = typeCategories.find((c) => c.name === categoryName) || categories.find((c) => c.name === categoryName);
+            setSplits((prevSplits) =>
+                prevSplits.map((s) =>
+                    s.id === activeSplitId
+                        ? { ...s, categoryName, categoryId: catObj?.id ?? s.categoryId }
+                        : s
+                )
+            );
+            setSelectedCategory(categoryName);
+        } else {
+            setSelectedCategory(categoryName);
+        }
+    };
+
+    const handleSplitAmountChange = (splitId, text) => {
+        setSplits((prevSplits) =>
+            prevSplits.map((s) => {
+                if (s.id !== splitId) return s;
+                let parsedMinor = 0;
+                try {
+                    parsedMinor = parseDecimalToMinor(text);
+                } catch {
+                    parsedMinor = 0;
+                }
+                return {
+                    ...s,
+                    rawAmount: text,
+                    amountMinor: parsedMinor,
+                };
+            })
+        );
+    };
+
+    const handleKeypadPress = (key) => {
+        if (isSplitMode && activeTarget === "split" && activeSplitId) {
+            const activeSplit = splits.find((s) => s.id === activeSplitId);
+            if (!activeSplit) return;
+            const currentVal = activeSplit.rawAmount !== undefined
+                ? activeSplit.rawAmount
+                : (activeSplit.amountMinor === 0 ? "0" : (activeSplit.amountMinor % 100 === 0 ? String(activeSplit.amountMinor / 100) : (activeSplit.amountMinor / 100).toFixed(2)));
+            const nextVal = updateMoneyInput(currentVal, key);
+            handleSplitAmountChange(activeSplitId, nextVal);
+        } else {
+            setAmountInput((current) => updateMoneyInput(current, key));
+        }
+    };
+
+    const handleAddSplit = () => {
+        const nextIndex = splits.length + 1;
+        const cat = typeCategories[(nextIndex - 1) % typeCategories.length] || typeCategories[0] || { id: 1, name: "Expense" };
+        const newSplit = {
+            id: `split-${Date.now()}-${nextIndex}-${Math.random().toString(36).slice(2, 7)}`,
+            categoryId: cat.id,
+            categoryName: cat.name,
+            amountMinor: 0,
+            rawAmount: "0",
+        };
+        setSplits((prev) => [...prev, newSplit]);
+        setActiveSplitId(newSplit.id);
+        setActiveTarget("split");
+        setSelectedCategory(cat.name);
+    };
+
+    const handleRemoveSplit = (splitId) => {
+        if (splits.length <= 2) return;
+        setSplits((prev) => {
+            if (prev.length <= 2) return prev;
+            const next = prev.filter((s) => s.id !== splitId);
+            if (activeSplitId === splitId && next.length > 0) {
+                setActiveSplitId(next[0].id);
+                if (next[0].categoryName) {
+                    setSelectedCategory(next[0].categoryName);
+                }
+            }
+            return next;
+        });
+    };
+
     const amountColor = transactionType === "EXPENSE" ? theme.colors.expense : transactionType === "INCOME" ? theme.colors.income : theme.colors.text;
     const selectedAccountLabel = accountChips.find((account) => account.id === selectedAccountId)?.label.replace(/^\S+\s/, "") ?? "Choose account";
     const canSave = transactionType === "TRANSFER"
         ? amountMinor > 0 && selectedAccountId !== null && selectedToAccountId !== null && selectedAccountId !== selectedToAccountId && activeAccounts.length >= 2 && !saving
-        : isSplitMode
-            ? amountMinor > 0 && splits.length > 0 && validateSplitSum(splits, amountMinor).isValid && selectedAccountId !== null && !saving
+        : (isSplitMode && transactionType === "EXPENSE")
+            ? amountMinor > 0 && splits.length > 0 && splitValidation.isValid && selectedAccountId !== null && !saving
             : amountMinor > 0 && selectedCategory !== "" && selectedCategory !== "New" && selectedAccountId !== null && !saving;
 
     const handleSave = async () => {
@@ -202,11 +316,19 @@ export function EntryScreen({ navigation }) {
                     dateEpochMillis: selectedDateEpochMillis,
                     sourceKey: sourceKeyRef.current,
                 });
-            } else if (isSplitMode && splits.length > 0) {
-                const validation = validateSplitSum(splits, amountMinor);
+            } else if (isSplitMode && transactionType === "EXPENSE" && splits.length > 0) {
+                const validation = validateSplitSum(splits, amountMinor, { requireCategory: true });
                 if (!validation.isValid) {
                     Alert.alert("Split Mismatch", validation.error || "Splits do not equal total.");
                     return;
+                }
+                for (let i = 0; i < splits.length; i++) {
+                    const s = splits[i];
+                    const cat = categories.find((c) => c.id === s.categoryId) || categories.find((c) => c.name.toLowerCase() === s.categoryName?.toLowerCase() && c.type === "EXPENSE");
+                    if (!cat) {
+                        Alert.alert("Invalid Category", `Split #${i + 1} has an invalid or missing category.`);
+                        return;
+                    }
                 }
                 const splitTxs = buildSplitTransactions({
                     parentTransaction: {
@@ -217,14 +339,22 @@ export function EntryScreen({ navigation }) {
                         dateEpochMillis: selectedDateEpochMillis,
                         sourceKey: sourceKeyRef.current,
                     },
-                    splits: splits.map((s) => ({
-                        categoryId: categories.find((c) => c.name === s.categoryName)?.id || typeCategories[0]?.id || 1,
-                        amountMinor: s.amountMinor,
-                        note: s.categoryName,
-                    })),
+                    splits: splits.map((s) => {
+                        const cat = categories.find((c) => c.id === s.categoryId) || categories.find((c) => c.name.toLowerCase() === s.categoryName?.toLowerCase() && c.type === "EXPENSE");
+                        return {
+                            categoryId: cat.id,
+                            categoryName: cat.name,
+                            amountMinor: s.amountMinor,
+                            note: s.note?.trim() ? s.note.trim() : (note.trim() ? `${note.trim()} - ${cat.name}` : cat.name),
+                        };
+                    }),
                 });
-                for (const sTx of splitTxs) {
-                    await addTransaction(sTx);
+                if (typeof addSplitTransactions === "function") {
+                    await addSplitTransactions(splitTxs);
+                } else {
+                    for (const sTx of splitTxs) {
+                        await addTransaction(sTx);
+                    }
                 }
             } else {
                 await addTransaction({
@@ -240,12 +370,16 @@ export function EntryScreen({ navigation }) {
             // A mounted Entry route may be revisited after switching tabs. Retire the
             // completed mutation key while preserving it across any failed/uncertain retry.
             sourceKeyRef.current = createManualSourceKey();
-            setSelectedMonthYear(toMonthYear(new Date(selectedDateEpochMillis)));
+            if (typeof setSelectedMonthYear === "function") {
+                setSelectedMonthYear(toMonthYear(new Date(selectedDateEpochMillis)));
+            }
             if (isMountedRef.current) {
                 setAmountInput("");
                 setNote("");
                 setIsSplitMode(false);
                 setSplits([]);
+                setActiveSplitId(null);
+                setActiveTarget("split");
                 setSelectedDateEpochMillis(localNoonToday());
             }
             if (typeof navigation?.canGoBack === "function" && navigation.canGoBack()) {
@@ -284,7 +418,15 @@ export function EntryScreen({ navigation }) {
         }}>
         {["EXPENSE", "INCOME", "TRANSFER"].map((type) => {
             const selected = transactionType === type;
-            return (<Pressable accessibilityRole="tab" accessibilityState={{ selected }} key={type} onPress={() => setTransactionType(type)} style={{
+            return (<Pressable accessibilityRole="tab" accessibilityState={{ selected }} key={type} onPress={() => {
+                setTransactionType(type);
+                if (type !== "EXPENSE" && isSplitMode) {
+                    setIsSplitMode(false);
+                    setSplits([]);
+                    setActiveSplitId(null);
+                    setActiveTarget("split");
+                }
+            }} style={{
                     alignItems: "center",
                     backgroundColor: selected ? theme.colors.surface : theme.colors.track,
                     borderRadius: theme.radii.chip,
@@ -305,7 +447,26 @@ export function EntryScreen({ navigation }) {
         })}
       </View>
 
-      <View style={{ alignItems: "center", height: theme.sizes.entryAmountBlock, justifyContent: "center" }}>
+      <Pressable
+        accessibilityHint="Tap to edit total amount"
+        accessibilityLabel={`Total amount ${formatMinor(amountMinor, { currencySymbol })}`}
+        accessibilityRole="button"
+        onPress={() => {
+          if (isSplitMode) {
+            setActiveTarget("parent");
+          }
+        }}
+        testID="entry-parent-amount"
+        style={{
+          alignItems: "center",
+          borderColor: isSplitMode && activeTarget === "parent" ? theme.colors.primary : "transparent",
+          borderRadius: theme.radii.card,
+          borderWidth: isSplitMode && activeTarget === "parent" ? 2 : 0,
+          height: theme.sizes.entryAmountBlock,
+          justifyContent: "center",
+          paddingHorizontal: theme.spacing.md,
+        }}
+      >
         <Text style={{ color: amountColor, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.entryAmount }}>
           {formatMinor(amountMinor, { currencySymbol })}
         </Text>
@@ -320,7 +481,7 @@ export function EntryScreen({ navigation }) {
             {dateLabel(selectedDateEpochMillis)} ▾
           </Text>
         </Pressable>
-      </View>
+      </Pressable>
 
       {transactionType === "TRANSFER" ? (
         <View style={{ gap: theme.spacing.md }}>
@@ -511,7 +672,7 @@ export function EntryScreen({ navigation }) {
                 {recentCategoryChips.map((name) => (
                   <Chip
                     key={`recent-${name}`}
-                    onPress={() => setSelectedCategory(name)}
+                    onPress={() => handleCategoryPress(name)}
                     selected={selectedCategory === name}
                     style={{ height: theme.sizes.filterChip }}
                   >
@@ -549,12 +710,8 @@ export function EntryScreen({ navigation }) {
                         return <View key={`empty-${rowIndex}-${cellIndex}`} style={{ flex: 1 }}/>;
                     }
                     const selected = selectedCategory === category.label;
-                    return (<Pressable accessibilityRole="button" accessibilityState={{ selected }} key={category.label} onPress={() => {
-                            if (category.label === "New") {
-                                setShowNewCategory(true);
-                                return;
-                            }
-                            setSelectedCategory(category.label);
+                    return (<Pressable accessibilityLabel={category.label} accessibilityRole="button" accessibilityState={{ selected }} key={category.label} testID={`category-cell-${category.label}`} onPress={() => {
+                            handleCategoryPress(category.label);
                         }} style={{
                             alignItems: "center",
                             backgroundColor: selected ? theme.colors.tint : theme.colors.surface,
@@ -630,14 +787,34 @@ export function EntryScreen({ navigation }) {
                   onPress={() => {
                     if (!isSplitMode) {
                       const half = Math.floor(amountMinor / 2);
-                      setSplits([
-                        { categoryName: selectedCategory || typeCategories[0]?.name || "Expense", amountMinor: half },
-                        { categoryName: typeCategories[1]?.name || typeCategories[0]?.name || "Expense", amountMinor: amountMinor - half },
-                      ]);
+                      const cat1 = typeCategories.find((c) => c.name === selectedCategory) || typeCategories[0] || { id: 1, name: "Expense" };
+                      const cat2 = typeCategories.find((c) => c.id !== cat1.id) || typeCategories[1] || cat1;
+                      const initialSplits = [
+                        {
+                          id: "split-1",
+                          categoryId: cat1.id,
+                          categoryName: cat1.name,
+                          amountMinor: half,
+                          rawAmount: half % 100 === 0 ? String(half / 100) : (half / 100).toFixed(2),
+                        },
+                        {
+                          id: "split-2",
+                          categoryId: cat2.id,
+                          categoryName: cat2.name,
+                          amountMinor: amountMinor - half,
+                          rawAmount: (amountMinor - half) % 100 === 0 ? String((amountMinor - half) / 100) : ((amountMinor - half) / 100).toFixed(2),
+                        },
+                      ];
+                      setSplits(initialSplits);
+                      setActiveSplitId("split-1");
+                      setActiveTarget("split");
                       setIsSplitMode(true);
+                      setSelectedCategory(cat1.name);
                     } else {
                       setIsSplitMode(false);
                       setSplits([]);
+                      setActiveSplitId(null);
+                      setActiveTarget("split");
                     }
                   }}
                   style={{
@@ -663,33 +840,102 @@ export function EntryScreen({ navigation }) {
                     borderColor: theme.colors.primary,
                     borderRadius: theme.radii.card,
                     borderWidth: 1,
-                    gap: theme.spacing.xs,
+                    gap: theme.spacing.sm,
                     padding: theme.spacing.md,
                   }}
+                  testID="split-breakdown-card"
                 >
                   <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
                     EXACT-SUM SPLIT BREAKDOWN
                   </Text>
                   <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.body }}>
-                    {formatSplitEquation(splits, amountMinor, currencySymbol)}
+                    {formatSplitEquation(splits, amountMinor, currencySymbol, { showCents: hasCentavos })}
                   </Text>
-                  {splits.map((split, idx) => (
-                    <View key={idx} style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
-                      <Text style={{ color: theme.colors.text, fontSize: theme.typeScale.small }}>
-                        {idx + 1}. {split.categoryName}
+
+                  {/* Split items list */}
+                  <View style={{ gap: theme.spacing.xs }}>
+                    {splits.map((split, idx) => (
+                      <SplitItemEditor
+                        categoryIcon={categories.find((c) => c.id === split.categoryId)?.icon}
+                        currencySymbol={currencySymbol}
+                        index={idx}
+                        isActive={activeTarget === "split" && activeSplitId === split.id}
+                        key={split.id}
+                        onAmountChange={(text) => handleSplitAmountChange(split.id, text)}
+                        onAmountFocus={() => {
+                          setActiveSplitId(split.id);
+                          setActiveTarget("split");
+                        }}
+                        onCategoryPress={() => {
+                          setActiveSplitId(split.id);
+                          setActiveTarget("split");
+                          setSplitCategoryPickerTargetId(split.id);
+                          setSplitCategoryPickerVisible(true);
+                        }}
+                        canRemove={splits.length > 2}
+                        onRemove={() => handleRemoveSplit(split.id)}
+                        onSelect={() => handleSelectSplit(split.id)}
+                        split={split}
+                      />
+                    ))}
+                  </View>
+
+                  {/* Add split button */}
+                  <Pressable
+                    accessibilityLabel="Add split item"
+                    accessibilityRole="button"
+                    hitSlop={theme.spacing.xs}
+                    onPress={handleAddSplit}
+                    style={{
+                      alignItems: "center",
+                      borderColor: theme.colors.primary,
+                      borderRadius: theme.radii.row,
+                      borderStyle: "dashed",
+                      borderWidth: 1,
+                      justifyContent: "center",
+                      minHeight: 38,
+                      paddingVertical: theme.spacing.xs,
+                    }}
+                    testID="add-split-btn"
+                  >
+                    <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                      + Add Split
+                    </Text>
+                  </Pressable>
+
+                  {/* Verification status and totals */}
+                  <View style={{ borderTopColor: theme.colors.outline, borderTopWidth: theme.spacing.hairline, gap: 4, paddingTop: theme.spacing.xs }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
+                        Allocated: {formatMinor(splitBreakdown?.sumMinor || 0, { currencySymbol, showCents: hasCentavos })}
                       </Text>
-                      <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
-                        {formatMinor(split.amountMinor, { currencySymbol })}
+                      <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
+                        Total: {formatMinor(amountMinor, { currencySymbol, showCents: hasCentavos })}
                       </Text>
                     </View>
-                  ))}
-                  <View style={{ borderTopColor: theme.colors.outline, borderTopWidth: theme.spacing.hairline, flexDirection: "row", justifyContent: "space-between", paddingTop: 4 }}>
-                    <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
-                      {validateSplitSum(splits, amountMinor).isValid ? "✓ Exact sum verified" : "⚠️ Sum mismatch"}
-                    </Text>
-                    <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.tiny }}>
-                      Total: {formatMinor(amountMinor, { currencySymbol })}
-                    </Text>
+                    <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
+                      {splitValidation.isValid ? (
+                        <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                          ✓ Exact sum verified
+                        </Text>
+                      ) : splitValidation.error && !splitValidation.error.includes("does not equal transaction total") ? (
+                        <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                          ⚠️ {splitValidation.error}
+                        </Text>
+                      ) : splitBreakdown && splitBreakdown.remainingMinor > 0 ? (
+                        <Text style={{ color: theme.colors.warning || theme.colors.amberText, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                          ⚠️ {formatMinor(splitBreakdown.remainingMinor, { currencySymbol, showCents: hasCentavos })} remaining
+                        </Text>
+                      ) : splitBreakdown && splitBreakdown.remainingMinor < 0 ? (
+                        <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                          ⚠️ {formatMinor(Math.abs(splitBreakdown.remainingMinor), { currencySymbol, showCents: hasCentavos })} over-allocation
+                        </Text>
+                      ) : (
+                        <Text style={{ color: theme.colors.expense, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                          ⚠️ {splitValidation.error || "Sum mismatch"}
+                        </Text>
+                      )}
+                    </View>
                   </View>
                 </View>
               ) : null}
@@ -700,7 +946,7 @@ export function EntryScreen({ navigation }) {
 
       <View style={{ gap: theme.spacing.keyGap }}>
         {keypadRows.map((row, rowIndex) => (<View key={`keypad-row-${rowIndex}`} style={{ flexDirection: "row", gap: theme.spacing.keyGap }}>
-            {row.map((key) => (<Pressable accessibilityLabel={key === "⌫" ? "Delete digit" : key === "." ? "Decimal point" : key} accessibilityRole="button" key={key} onPress={() => setAmountInput((current) => updateMoneyInput(current, key))} style={{
+            {row.map((key) => (<Pressable accessibilityLabel={key === "⌫" ? "Delete digit" : key === "." ? "Decimal point" : key} accessibilityRole="button" key={key} onPress={() => handleKeypadPress(key)} style={{
                     alignItems: "center",
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.outline,
@@ -735,6 +981,15 @@ export function EntryScreen({ navigation }) {
             void (async () => {
                 try {
                     const created = await addCategory({ name: value, type: transactionType });
+                    if (isSplitMode && activeSplitId) {
+                      setSplits((prev) =>
+                        prev.map((s) =>
+                          s.id === activeSplitId
+                            ? { ...s, categoryName: created.name, categoryId: created.id }
+                            : s
+                        )
+                      );
+                    }
                     setSelectedCategory(created.name);
                     setShowNewCategory(false);
                 }
@@ -747,5 +1002,43 @@ export function EntryScreen({ navigation }) {
             setNote(value);
             setShowNotePrompt(false);
         }} placeholder="Lunch — Jollibee" title="Transaction note" visible={showNotePrompt}/>
+
+      {/* Split Category Picker Sheet */}
+      <BottomSheet
+        onClose={() => setSplitCategoryPickerVisible(false)}
+        testID="split-category-picker-sheet"
+        title="Select Split Category"
+        visible={splitCategoryPickerVisible}
+      >
+        <ScrollView contentContainerStyle={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm, paddingVertical: theme.spacing.md }}>
+          {typeCategories.map((cat) => {
+            const currentSplit = splits.find((s) => s.id === splitCategoryPickerTargetId);
+            const isSelected = currentSplit?.categoryId === cat.id || currentSplit?.categoryName === cat.name;
+            const catEmoji = resolveDisplayEmoji({ icon: cat.icon, name: cat.name });
+            return (
+              <Chip
+                key={`picker-cat-${cat.id}`}
+                onPress={() => {
+                  if (splitCategoryPickerTargetId) {
+                    setSplits((prev) =>
+                      prev.map((s) =>
+                        s.id === splitCategoryPickerTargetId
+                          ? { ...s, categoryId: cat.id, categoryName: cat.name }
+                          : s
+                      )
+                    );
+                    setSelectedCategory(cat.name);
+                  }
+                  setSplitCategoryPickerVisible(false);
+                }}
+                selected={isSelected}
+                testID={`picker-category-chip-${cat.id}`}
+              >
+                {catEmoji} {cat.name}
+              </Chip>
+            );
+          })}
+        </ScrollView>
+      </BottomSheet>
     </ScreenContainer>);
 }

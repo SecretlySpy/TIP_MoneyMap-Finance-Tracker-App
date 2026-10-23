@@ -12,7 +12,7 @@ import { formatMinor } from "./money";
  * @param {number} totalMinor
  * @returns {{ isValid: boolean, sumMinor: number, diffMinor: number, error: string | null }}
  */
-export function validateSplitSum(splits, totalMinor) {
+export function validateSplitSum(splits, totalMinor, options = {}) {
   if (!Array.isArray(splits) || splits.length === 0) {
     return {
       isValid: false,
@@ -34,6 +34,14 @@ export function validateSplitSum(splits, totalMinor) {
         error: `Split item ${i + 1} must have a positive integer minor amount.`,
       };
     }
+    if (options.requireCategory && !item.categoryId && !item.categoryName) {
+      return {
+        isValid: false,
+        sumMinor,
+        diffMinor: totalMinor - sumMinor,
+        error: `Split item ${i + 1} must have a category.`,
+      };
+    }
     sumMinor += amount;
   }
 
@@ -50,18 +58,21 @@ export function validateSplitSum(splits, totalMinor) {
 
 /**
  * Formats split equation string according to the mathematical invariant.
- * Example: "₱300 + ₱200 = ₱500"
+ * Example: "₱300 + ₱200 = ₱500" or with centavos "₱300.50 + ₱199.50 = ₱500.00"
  * @param {Array<{ amountMinor: number }>} splits
  * @param {number} totalMinor
  * @param {string} currencySymbol
+ * @param {{ showCents?: boolean }} [options]
  * @returns {string}
  */
-export function formatSplitEquation(splits, totalMinor, currencySymbol = "₱") {
+export function formatSplitEquation(splits, totalMinor, currencySymbol = "₱", options = {}) {
+  const hasCentavos = (Array.isArray(splits) && splits.some((s) => (Number(s.amountMinor) || 0) % 100 !== 0)) || (Number(totalMinor) || 0) % 100 !== 0;
+  const showCents = options.showCents ?? hasCentavos;
   if (!Array.isArray(splits) || splits.length === 0) {
-    return `${formatMinor(0, { currencySymbol, showCents: false })} = ${formatMinor(totalMinor, { currencySymbol, showCents: false })}`;
+    return `${formatMinor(0, { currencySymbol, showCents })} = ${formatMinor(totalMinor, { currencySymbol, showCents })}`;
   }
-  const parts = splits.map((s) => formatMinor(s.amountMinor, { currencySymbol, showCents: false }));
-  return `${parts.join(" + ")} = ${formatMinor(totalMinor, { currencySymbol, showCents: false })}`;
+  const parts = splits.map((s) => formatMinor(s.amountMinor || 0, { currencySymbol, showCents }));
+  return `${parts.join(" + ")} = ${formatMinor(totalMinor, { currencySymbol, showCents })}`;
 }
 
 /**
@@ -87,7 +98,7 @@ export function computeSplitBreakdown({ totalMinor, splits = [] }) {
 
 /**
  * Builds preview transaction records for saving split items.
- * @param {{ parentTransaction: object, splits: Array<{ categoryId: number, amountMinor: number, note?: string }> }} input
+ * @param {{ parentTransaction: object, splits: Array<{ categoryId: number, categoryName?: string, amountMinor: number, note?: string }> }} input
  */
 export function buildSplitTransactions({ parentTransaction, splits }) {
   const validation = validateSplitSum(splits, parentTransaction.amountMinor);
@@ -99,9 +110,15 @@ export function buildSplitTransactions({ parentTransaction, splits }) {
     type: parentTransaction.type || "EXPENSE",
     accountId: parentTransaction.accountId,
     categoryId: split.categoryId,
+    categoryName: split.categoryName,
     amountMinor: split.amountMinor,
-    note: split.note ? `${split.note} (Split ${index + 1}/${splits.length})` : `${parentTransaction.note || "Transaction"} (Split ${index + 1}/${splits.length})`,
+    note: (split.note
+      ? split.note
+      : split.categoryName && parentTransaction.note
+      ? `${parentTransaction.note} - ${split.categoryName}`
+      : split.categoryName || parentTransaction.note || "Transaction") + ` (Split ${index + 1}/${splits.length})`,
     dateEpochMillis: parentTransaction.dateEpochMillis,
     sourceKey: parentTransaction.sourceKey ? `${parentTransaction.sourceKey}:split:${index}` : undefined,
   }));
 }
+

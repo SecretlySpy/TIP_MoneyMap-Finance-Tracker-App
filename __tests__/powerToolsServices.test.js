@@ -73,6 +73,32 @@ describe("P2 Power Tools Domain Services", () => {
       expect(breakdown.items[0].percentage).toBe(60);
     });
 
+    it("formats split equation with centavo precision when cents exist", () => {
+      const splits = [
+        { amountMinor: 30_050 }, // ₱300.50
+        { amountMinor: 19_950 }, // ₱199.50
+      ];
+      const eq = formatSplitEquation(splits, 50_000, "₱");
+      expect(eq).toBe("₱300.50 + ₱199.50 = ₱500.00");
+    });
+
+    it("validates split items have categories when requireCategory option is enabled", () => {
+      const splitsWithoutCat = [
+        { amountMinor: 25_000 },
+        { amountMinor: 25_000 },
+      ];
+      const res = validateSplitSum(splitsWithoutCat, 50_000, { requireCategory: true });
+      expect(res.isValid).toBe(false);
+      expect(res.error).toContain("must have a category");
+
+      const splitsWithCat = [
+        { categoryId: 1, amountMinor: 25_000 },
+        { categoryName: "Transport", amountMinor: 25_000 },
+      ];
+      const validRes = validateSplitSum(splitsWithCat, 50_000, { requireCategory: true });
+      expect(validRes.isValid).toBe(true);
+    });
+
     it("builds preview transaction records for split items", () => {
       const parent = {
         type: "EXPENSE",
@@ -83,17 +109,119 @@ describe("P2 Power Tools Domain Services", () => {
         sourceKey: "tx:999",
       };
       const splits = [
-        { categoryId: 1, amountMinor: 30_000, note: "Food" },
-        { categoryId: 2, amountMinor: 20_000, note: "Supplies" },
+        { categoryId: 1, categoryName: "Food", amountMinor: 30_000, note: "Food" },
+        { categoryId: 2, categoryName: "Supplies", amountMinor: 20_000, note: "Supplies" },
       ];
 
       const txs = buildSplitTransactions({ parentTransaction: parent, splits });
       expect(txs).toHaveLength(2);
       expect(txs[0].amountMinor).toBe(30_000);
+      expect(txs[0].categoryId).toBe(1);
+      expect(txs[0].categoryName).toBe("Food");
       expect(txs[0].note).toContain("Split 1/2");
       expect(txs[0].sourceKey).toBe("tx:999:split:0");
       expect(txs[1].amountMinor).toBe(20_000);
+      expect(txs[1].categoryId).toBe(2);
+      expect(txs[1].categoryName).toBe("Supplies");
       expect(txs[1].sourceKey).toBe("tx:999:split:1");
+    });
+
+    it("validates 4-split transaction matching prompt specification (₱1,000 = 400 + 250 + 200 + 150)", () => {
+      const splits = [
+        { categoryId: 1, categoryName: "Food", amountMinor: 40_000 },
+        { categoryId: 2, categoryName: "Transport", amountMinor: 25_000 },
+        { categoryId: 3, categoryName: "Shopping", amountMinor: 20_000 },
+        { categoryId: 4, categoryName: "Entertainment", amountMinor: 15_000 },
+      ];
+      const result = validateSplitSum(splits, 100_000, { requireCategory: true });
+      expect(result.isValid).toBe(true);
+      expect(result.sumMinor).toBe(100_000);
+      expect(result.diffMinor).toBe(0);
+      expect(result.error).toBeNull();
+
+      const eq = formatSplitEquation(splits, 100_000, "₱");
+      expect(eq).toBe("₱400 + ₱250 + ₱200 + ₱150 = ₱1,000");
+
+      const breakdown = computeSplitBreakdown({ totalMinor: 100_000, splits });
+      expect(breakdown.isExact).toBe(true);
+      expect(breakdown.sumMinor).toBe(100_000);
+      expect(breakdown.remainingMinor).toBe(0);
+      expect(breakdown.items).toHaveLength(4);
+      expect(breakdown.items[0].percentage).toBe(40);
+      expect(breakdown.items[1].percentage).toBe(25);
+      expect(breakdown.items[2].percentage).toBe(20);
+      expect(breakdown.items[3].percentage).toBe(15);
+    });
+
+    it("accurately validates 5-split transaction with centavo precision", () => {
+      const splits = [
+        { categoryId: 1, amountMinor: 20_011 },
+        { categoryId: 2, amountMinor: 20_011 },
+        { categoryId: 3, amountMinor: 20_011 },
+        { categoryId: 4, amountMinor: 20_011 },
+        { categoryId: 5, amountMinor: 20_011 },
+      ];
+      const result = validateSplitSum(splits, 100_055);
+      expect(result.isValid).toBe(true);
+      expect(result.sumMinor).toBe(100_055);
+      expect(result.diffMinor).toBe(0);
+
+      const eq = formatSplitEquation(splits, 100_055, "₱");
+      expect(eq).toBe("₱200.11 + ₱200.11 + ₱200.11 + ₱200.11 + ₱200.11 = ₱1,000.55");
+    });
+
+    it("correctly identifies under-allocation and over-allocation across multi-splits", () => {
+      // Under-allocated 4 splits
+      const underSplits = [
+        { categoryId: 1, amountMinor: 40_000 },
+        { categoryId: 2, amountMinor: 25_000 },
+      ];
+      const underRes = validateSplitSum(underSplits, 100_000);
+      expect(underRes.isValid).toBe(false);
+      expect(underRes.diffMinor).toBe(35_000); // 35,000 remaining
+      const underBreakdown = computeSplitBreakdown({ totalMinor: 100_000, splits: underSplits });
+      expect(underBreakdown.remainingMinor).toBe(35_000);
+
+      // Over-allocated 4 splits
+      const overSplits = [
+        { categoryId: 1, amountMinor: 40_000 },
+        { categoryId: 2, amountMinor: 25_000 },
+        { categoryId: 3, amountMinor: 20_000 },
+        { categoryId: 4, amountMinor: 20_000 }, // sum 105,000 vs 100,000
+      ];
+      const overRes = validateSplitSum(overSplits, 100_000);
+      expect(overRes.isValid).toBe(false);
+      expect(overRes.diffMinor).toBe(-5_000); // 5,000 over
+      const overBreakdown = computeSplitBreakdown({ totalMinor: 100_000, splits: overSplits });
+      expect(overBreakdown.remainingMinor).toBe(-5_000);
+    });
+
+    it("builds multi-split transaction records with proper indexing and source keys", () => {
+      const parent = {
+        type: "EXPENSE",
+        accountId: 1,
+        amountMinor: 100_000,
+        note: "Weekend outing",
+        dateEpochMillis: 1780000000000,
+        sourceKey: "tx:out:123",
+      };
+      const splits = [
+        { categoryId: 1, categoryName: "Food", amountMinor: 40_000 },
+        { categoryId: 2, categoryName: "Transport", amountMinor: 25_000 },
+        { categoryId: 3, categoryName: "Shopping", amountMinor: 20_000 },
+        { categoryId: 4, categoryName: "Entertainment", amountMinor: 15_000 },
+      ];
+
+      const records = buildSplitTransactions({ parentTransaction: parent, splits });
+      expect(records).toHaveLength(4);
+      expect(records[0].note).toBe("Weekend outing - Food (Split 1/4)");
+      expect(records[0].sourceKey).toBe("tx:out:123:split:0");
+      expect(records[1].note).toBe("Weekend outing - Transport (Split 2/4)");
+      expect(records[1].sourceKey).toBe("tx:out:123:split:1");
+      expect(records[2].note).toBe("Weekend outing - Shopping (Split 3/4)");
+      expect(records[2].sourceKey).toBe("tx:out:123:split:2");
+      expect(records[3].note).toBe("Weekend outing - Entertainment (Split 4/4)");
+      expect(records[3].sourceKey).toBe("tx:out:123:split:3");
     });
   });
 
