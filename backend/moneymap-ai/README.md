@@ -11,7 +11,7 @@ No Gemini API credentials, private tokens, or transaction histories are shipped 
 | **Cloud Run Service** | `moneymap-ai-proxy` | Regional deployment (`asia-southeast1` recommended) |
 | **Runtime Service Account** | `moneymap-ai-run@project-50d13184-689a-4396-ab2.iam.gserviceaccount.com` | Minimum privilege: Secret Accessor only |
 | **Secret Manager Secret** | `moneymap-gemini-key` (version 1) | Gemini API key from Archim-Gemini-Default-Project |
-| **Gemini Tier & Model** | Free Tier only (`gemini-2.0-flash`) | Enforced by whitelist; paid models rejected |
+| **Gemini Tier & Model** | Free Tier only (`gemini-3.5-flash-lite`) | Enforced by whitelist; paid models rejected |
 | **Verification Gate** | Firebase App Check (Admin SDK) | Attests genuine Android app before Gemini is called |
 | **Cost Control** | $1 monthly budget alert + max 1 instance | School project guardrails |
 
@@ -79,7 +79,7 @@ npm test
 All unit tests verify:
 - Health check endpoint
 - Rejection of unapproved paid models (e.g. `gemini-1.5-pro` returns 503)
-- Acceptance of Free Tier models (`gemini-2.0-flash`, `gemini-2.0-flash-lite`, `gemini-1.5-flash`)
+- Acceptance of Free Tier models (`gemini-3.5-flash-lite`, `gemini-1.5-flash`)
 - App Check verification failure paths (401)
 - User consent enforcement (403)
 - Rate limiting and quota failure responses (429)
@@ -103,7 +103,7 @@ gcloud run deploy moneymap-ai-proxy \
   --allow-unauthenticated \
   --service-account moneymap-ai-run@project-50d13184-689a-4396-ab2.iam.gserviceaccount.com \
   --set-secrets="GEMINI_API_KEY=moneymap-gemini-key:1" \
-  --set-env-vars="FIREBASE_PROJECT_ID=project-50d13184-689a-4396-ab2,GEMINI_MODEL=gemini-2.0-flash" \
+  --set-env-vars="FIREBASE_PROJECT_ID=project-50d13184-689a-4396-ab2,GEMINI_MODEL=gemini-3.5-flash-lite" \
   --max-instances 1 \
   --memory 256Mi \
   --cpu 1 \

@@ -81,9 +81,9 @@ test("refuses to initialize with paid or unauthorized models", async () => {
 });
 
 test("accepts approved free-tier models", () => {
-  assert.equal(ALLOWED_FREE_TIER_MODELS.includes("gemini-2.0-flash"), true);
-  assert.equal(ALLOWED_FREE_TIER_MODELS.includes("gemini-2.0-flash-lite"), true);
+  assert.equal(ALLOWED_FREE_TIER_MODELS.includes("gemini-3.5-flash-lite"), true);
   assert.equal(ALLOWED_FREE_TIER_MODELS.includes("gemini-1.5-flash"), true);
+  assert.equal(ALLOWED_FREE_TIER_MODELS.includes("gemini-2.0-flash"), false);
   assert.equal(ALLOWED_FREE_TIER_MODELS.includes("gemini-1.5-pro"), false);
 });
 

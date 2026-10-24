@@ -27,7 +27,7 @@ sequenceDiagram
     Note over Proxy: Validate Token with Firebase Admin SDK
     Note over Proxy: Validate Payload Schema & Rate Limits
     Proxy->>SM: Read GEMINI_API_KEY (injected at startup)
-    Proxy->>Gemini: POST generateContent (gemini-2.0-flash)
+    Proxy->>Gemini: POST generateContent (gemini-3.5-flash-lite)
     Gemini-->>Proxy: Return JSON Tips
     Proxy-->>App: Return Sanitized Tips Array
     App->>User: Display Online Recommendations (✨)
@@ -45,7 +45,7 @@ sequenceDiagram
 | **App Check Provider** | Play Integrity (Release) / Debug (Development) | Registered in Firebase Console |
 | **Cloud Run Service Account** | `moneymap-ai-run@project-50d13184-689a-4396-ab2.iam.gserviceaccount.com` | Granted `Secret Manager Secret Accessor` on `moneymap-gemini-key` |
 | **Secret Manager Secret** | `moneymap-gemini-key:1` | Holds Gemini API key from Archim-Gemini-Default-Project |
-| **Allowed Models** | `gemini-2.0-flash`, `gemini-2.0-flash-lite`, `gemini-1.5-flash` | Free Tier only; paid models strictly blocked |
+| **Allowed Models** | `gemini-3.5-flash-lite`, `gemini-1.5-flash` | Free Tier only; paid models strictly blocked |
 | **Budget & Spend Control** | $1 monthly budget alert + max 1 Cloud Run instance | Enforced to prevent trial credit consumption |
 
 ---
@@ -125,7 +125,7 @@ gcloud run deploy moneymap-ai-proxy \
   --allow-unauthenticated \
   --service-account moneymap-ai-run@project-50d13184-689a-4396-ab2.iam.gserviceaccount.com \
   --set-secrets="GEMINI_API_KEY=moneymap-gemini-key:1" \
-  --set-env-vars="FIREBASE_PROJECT_ID=project-50d13184-689a-4396-ab2,GEMINI_MODEL=gemini-2.0-flash" \
+  --set-env-vars="FIREBASE_PROJECT_ID=project-50d13184-689a-4396-ab2,GEMINI_MODEL=gemini-3.5-flash-lite" \
   --max-instances 1 \
   --memory 256Mi \
   --cpu 1 \
@@ -134,7 +134,7 @@ gcloud run deploy moneymap-ai-proxy \
 
 ### Server Safeguards
 - **App Check Verification:** Token validated via `firebase-admin/app-check`.
-- **Free Tier Whitelist:** `ALLOWED_FREE_TIER_MODELS` strictly whitelist `gemini-2.0-flash`, `gemini-2.0-flash-lite`, and `gemini-1.5-flash`. Paid models are rejected with 503.
+- **Free Tier Whitelist:** `ALLOWED_FREE_TIER_MODELS` strictly whitelist `gemini-3.5-flash-lite` and `gemini-1.5-flash`. Paid models are rejected with 503.
 - **In-Memory Rate Limiter:** 8 requests per minute per verified application ID.
 - **Payload Validation:** Enforces strict limits on arrays, string lengths, and minor currency amounts. Rejecting transactions, notes, or coordinates with 422.
 

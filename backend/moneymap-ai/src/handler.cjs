@@ -3,11 +3,9 @@ const MAX_BYTES = 8192;
 const MAX_MINOR = 1_000_000_000_000;
 
 const ALLOWED_FREE_TIER_MODELS = [
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
+  "gemini-3.5-flash-lite",
   "gemini-1.5-flash",
   "gemini-1.5-flash-8b",
-  "gemini-3.5-flash-lite",
 ];
 
 function record(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
@@ -67,7 +65,7 @@ async function body(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
-function createHandler({apiKey,verifyAppCheck,fetchImpl=globalThis.fetch,model="gemini-2.0-flash",now=Date.now}) {
+function createHandler({apiKey,verifyAppCheck,fetchImpl=globalThis.fetch,model="gemini-3.5-flash-lite",now=Date.now}) {
   const buckets=new Map();
   return async function(req,res) {
     if(req.url==="/healthz" && req.method==="GET") return send(res,200,{status:"ok"});

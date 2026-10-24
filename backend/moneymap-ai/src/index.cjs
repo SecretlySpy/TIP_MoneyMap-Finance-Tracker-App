@@ -27,7 +27,7 @@ function resolveApiKey() {
 }
 
 const apiKey = resolveApiKey();
-const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const handler = createHandler({ verifyAppCheck, apiKey, model });
 const port = Number(process.env.PORT || 8080);
 
