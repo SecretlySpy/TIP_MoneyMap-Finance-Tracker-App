@@ -65,7 +65,7 @@ async function body(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
-function createHandler({apiKey,verifyAppCheck,fetchImpl=globalThis.fetch,model="gemini-3.5-flash-lite",now=Date.now}) {
+function createHandler({apiKey,verifyAppCheck,fetchImpl=globalThis.fetch,model="gemini-3.5-flash-lite",expectedAppId,now=Date.now}) {
   const buckets=new Map();
   return async function(req,res) {
     if(req.url==="/healthz" && req.method==="GET") return send(res,200,{status:"ok"});
@@ -80,11 +80,18 @@ function createHandler({apiKey,verifyAppCheck,fetchImpl=globalThis.fetch,model="
     let verified;
     try {verified=await verifyAppCheck(token);} catch {return send(res,401,{error:"app_check_invalid"});}
     if(!verified || !string(verified.appId,200)) return send(res,401,{error:"app_check_invalid"});
+    if(expectedAppId && verified.appId!==expectedAppId) return send(res,403,{error:"unauthorized_app"});
 
-    // Per-instance abuse brake only; does not replace Gemini quotas or Cloud Run budget alerts.
-    const bucket=buckets.get(verified.appId)||{until:now()+60000,count:0};
+    // Per-client abuse brake; isolates rate-limit counters per client IP and appId.
+    const clientIp=String(req.headers["x-forwarded-for"]||req.socket?.remoteAddress||"").split(",")[0].trim();
+    const rateKey=clientIp?`${verified.appId}:${clientIp}`:verified.appId;
+    if(buckets.size>1000) {
+      const current=now();
+      for(const [k,v] of buckets.entries()){if(current>=v.until) buckets.delete(k);}
+    }
+    const bucket=buckets.get(rateKey)||{until:now()+60000,count:0};
     if(now()>=bucket.until){bucket.until=now()+60000;bucket.count=0;}
-    bucket.count++; buckets.set(verified.appId,bucket);
+    bucket.count++; buckets.set(rateKey,bucket);
     if(bucket.count>8) return send(res,429,{error:"rate_limited"});
 
     let input;

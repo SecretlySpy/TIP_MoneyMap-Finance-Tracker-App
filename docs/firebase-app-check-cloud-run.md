@@ -125,7 +125,7 @@ gcloud run deploy moneymap-ai-proxy \
   --allow-unauthenticated \
   --service-account moneymap-ai-run@project-50d13184-689a-4396-ab2.iam.gserviceaccount.com \
   --set-secrets="GEMINI_API_KEY=moneymap-gemini-key:1" \
-  --set-env-vars="FIREBASE_PROJECT_ID=project-50d13184-689a-4396-ab2,GEMINI_MODEL=gemini-3.5-flash-lite" \
+  --set-env-vars="FIREBASE_PROJECT_ID=project-50d13184-689a-4396-ab2,GEMINI_MODEL=gemini-3.5-flash-lite,EXPECTED_FIREBASE_APP_ID=1:644502021888:android:b55d182b7c556e414f35e5" \
   --max-instances 1 \
   --memory 256Mi \
   --cpu 1 \
@@ -133,10 +133,11 @@ gcloud run deploy moneymap-ai-proxy \
 ```
 
 ### Server Safeguards
-- **App Check Verification:** Token validated via `firebase-admin/app-check`.
-- **Free Tier Whitelist:** `ALLOWED_FREE_TIER_MODELS` strictly whitelist `gemini-3.5-flash-lite` and `gemini-1.5-flash`. Paid models are rejected with 503.
-- **In-Memory Rate Limiter:** 8 requests per minute per verified application ID.
+- **App Check Verification & App ID Check:** Token validated via `firebase-admin/app-check`. When `EXPECTED_FIREBASE_APP_ID` is set, requests from any other app in the same Firebase project are rejected with HTTP 403 (`unauthorized_app`).
+- **Free Tier Whitelist:** `ALLOWED_FREE_TIER_MODELS` strictly whitelists `gemini-3.5-flash-lite` and `gemini-1.5-flash`. Paid or unlisted models are rejected with 503.
+- **Per-Client Rate Limiter:** 8 requests per minute per verified application ID and client IP (`${appId}:${clientIp}`). Prevents a single client from exhausting rate limits for other users.
 - **Payload Validation:** Enforces strict limits on arrays, string lengths, and minor currency amounts. Rejecting transactions, notes, or coordinates with 422.
+- **Cost & Quota Safeguards:** Bounded to 1 instance (`--max-instances 1`) with $1 monthly budget alert. Note: Budget alerts notify administrators of spend, but do not automatically terminate active instances.
 
 ---
 

@@ -21,16 +21,25 @@ export async function initializeMoneyMapAppCheck() {
     appCheckPromise = (async () => {
       const provider = new ReactNativeFirebaseAppCheckProvider();
 
-      const debugToken =
-        typeof process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN === "string" &&
-        process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN.trim().length > 0
-          ? process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN.trim()
-          : undefined;
+      let debugToken = undefined;
+      if (__DEV__) {
+        // Safe development-only debug token resolution.
+        // Release builds strip dead __DEV__ branches and never bundle or use debug credentials.
+        const devToken =
+          typeof process !== "undefined" && process?.env?.EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN;
+        if (typeof devToken === "string" && devToken.trim().length > 0) {
+          debugToken = devToken.trim();
+        }
+      }
 
-      const androidConfig = {
-        provider: __DEV__ ? "debug" : "playIntegrity",
-        ...(debugToken ? { debugToken } : {}),
-      };
+      const androidConfig = __DEV__
+        ? {
+            provider: "debug",
+            ...(debugToken ? { debugToken } : {}),
+          }
+        : {
+            provider: "playIntegrity",
+          };
 
       provider.configure({
         android: androidConfig,

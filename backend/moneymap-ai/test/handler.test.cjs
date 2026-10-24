@@ -170,12 +170,76 @@ test("handles quota failures and rate limits gracefully", async () => {
     assert.equal(res.status, 429);
     assert.equal((await res.json()).error, "quota_unavailable");
 
-    // Make 8 more requests to trigger the in-memory abuse rate limiter (max 8 per minute per appId)
+    // Make 8 more requests to trigger the in-memory abuse rate limiter (max 8 per minute per appId/client IP)
     for (let i = 0; i < 7; i++) {
       await fetch(url + "/v1/smart-tips", { method: "POST", headers, body: JSON.stringify(summary) });
     }
     const rateLimitedRes = await fetch(url + "/v1/smart-tips", { method: "POST", headers, body: JSON.stringify(summary) });
     assert.equal(rateLimitedRes.status, 429);
     assert.equal((await rateLimitedRes.json()).error, "rate_limited");
+  });
+});
+
+test("enforces expectedAppId to reject other apps from the same Firebase project", async () => {
+  const handler = createHandler({
+    apiKey: "synthetic",
+    expectedAppId: "com.moneymap.financetracker.registered-id",
+    verifyAppCheck: async () => ({ appId: "unrelated-app-in-same-project" }),
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: '[{"title":"Tip","meta":"Desc"}]' }] } }] }),
+    }),
+  });
+
+  await serve(handler, async (url) => {
+    const res = await fetch(url + "/v1/smart-tips", { method: "POST", headers, body: JSON.stringify(summary) });
+    assert.equal(res.status, 403);
+    const data = await res.json();
+    assert.equal(data.error, "unauthorized_app");
+  });
+
+  const matchingHandler = createHandler({
+    apiKey: "synthetic",
+    expectedAppId: "com.moneymap.financetracker.registered-id",
+    verifyAppCheck: async () => ({ appId: "com.moneymap.financetracker.registered-id" }),
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: '[{"title":"Tip","meta":"Desc"}]' }] } }] }),
+    }),
+  });
+
+  await serve(matchingHandler, async (url) => {
+    const res = await fetch(url + "/v1/smart-tips", { method: "POST", headers, body: JSON.stringify(summary) });
+    assert.equal(res.status, 200);
+  });
+});
+
+test("isolates rate limiting across different client IPs", async () => {
+  const handler = createHandler({
+    apiKey: "synthetic",
+    verifyAppCheck: async () => ({ appId: "shared-app-id" }),
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: '[{"title":"Tip","meta":"Desc"}]' }] } }] }),
+    }),
+  });
+
+  await serve(handler, async (url) => {
+    const ip1Headers = { ...headers, "X-Forwarded-For": "203.0.113.1" };
+    const ip2Headers = { ...headers, "X-Forwarded-For": "203.0.113.2" };
+
+    // Max out IP 1 (8 requests)
+    for (let i = 0; i < 8; i++) {
+      const res = await fetch(url + "/v1/smart-tips", { method: "POST", headers: ip1Headers, body: JSON.stringify(summary) });
+      assert.equal(res.status, 200);
+    }
+    // 9th request from IP 1 is rate limited
+    const resIp1 = await fetch(url + "/v1/smart-tips", { method: "POST", headers: ip1Headers, body: JSON.stringify(summary) });
+    assert.equal(resIp1.status, 429);
+    assert.equal((await resIp1.json()).error, "rate_limited");
+
+    // IP 2 is NOT rate limited and succeeds
+    const resIp2 = await fetch(url + "/v1/smart-tips", { method: "POST", headers: ip2Headers, body: JSON.stringify(summary) });
+    assert.equal(resIp2.status, 200);
   });
 });

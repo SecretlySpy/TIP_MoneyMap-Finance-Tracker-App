@@ -53,14 +53,14 @@ No Gemini API credentials, private tokens, or transaction histories are shipped 
 
 ## 3. Security, Rate Limiting & Abuse Prevention
 
-1. **Mandatory App Check Attestation:**
-   Requests without `X-Firebase-AppCheck` or with invalid tokens return HTTP 401 (`app_check_required` or `app_check_invalid`) and never touch the Gemini API.
+1. **Mandatory App Check Attestation & App ID Verification:**
+   Requests without `X-Firebase-AppCheck` or with invalid tokens return HTTP 401 (`app_check_required` or `app_check_invalid`) and never reach the Gemini API. When `EXPECTED_FIREBASE_APP_ID` is configured, tokens minted for unrelated apps in the same Firebase project are rejected with HTTP 403 (`unauthorized_app`).
 2. **Consent Gating:**
    Requests without `X-MoneyMap-Consent: 1` return HTTP 403 (`consent_required`).
 3. **Payload Sanitization:**
    Incoming JSON is size-limited (max 8 KB) and schema-validated. Any unexpected fields trigger HTTP 422 (`invalid_summary`).
-4. **Per-Instance Abuse Brake:**
-   In-memory rate limiter caps each verified application (`appId`) to at most 8 requests per minute to prevent quota exhaustion. Exceeding requests return HTTP 429 (`rate_limited`).
+4. **Per-Client Abuse Brake:**
+   In-memory rate limiter caps requests to at most 8 requests per minute keyed by `${appId}:${clientIp}`. This prevents an individual user from exhausting the rate-limiting allowance for all other users. Exceeding requests return HTTP 429 (`rate_limited`).
 5. **Quota & AI Error Handling:**
    If Gemini returns HTTP 429, the proxy returns HTTP 429 `{"error":"quota_unavailable"}`. The mobile app cleanly falls back to offline rule-based tips.
 6. **No Remote Financial Ledger:**
@@ -103,7 +103,7 @@ gcloud run deploy moneymap-ai-proxy \
   --allow-unauthenticated \
   --service-account moneymap-ai-run@project-50d13184-689a-4396-ab2.iam.gserviceaccount.com \
   --set-secrets="GEMINI_API_KEY=moneymap-gemini-key:1" \
-  --set-env-vars="FIREBASE_PROJECT_ID=project-50d13184-689a-4396-ab2,GEMINI_MODEL=gemini-3.5-flash-lite" \
+  --set-env-vars="FIREBASE_PROJECT_ID=project-50d13184-689a-4396-ab2,GEMINI_MODEL=gemini-3.5-flash-lite,EXPECTED_FIREBASE_APP_ID=1:644502021888:android:b55d182b7c556e414f35e5" \
   --max-instances 1 \
   --memory 256Mi \
   --cpu 1 \
@@ -112,6 +112,9 @@ gcloud run deploy moneymap-ai-proxy \
 # 3. Copy the assigned Service URL and set it in your local mobile .env
 # EXPO_PUBLIC_MONEYMAP_AI_URL=https://moneymap-ai-proxy-<hash>-as.a.run.app
 ```
+
+> [!WARNING]
+> **Cost & Budget Limits:** Google Cloud budget alerts send notifications when spend approaches $1/month, but budget alerts are monitoring signals—they do NOT automatically terminate running services or hard-cap spend. Setting `--max-instances 1` and using Gemini Free Tier models (`gemini-3.5-flash-lite`) provides cost isolation, but service usage should be monitored via the Google Cloud Console.
 
 > [!IMPORTANT]
 > The service is protected at the application layer by Firebase App Check verification. Do NOT bypass App Check verification in production.

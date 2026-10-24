@@ -76,6 +76,24 @@ describe("firebaseAppCheck", () => {
     });
   });
 
+  it("strictly enforces playIntegrity in release mode without debug credentials", async () => {
+    const originalDev = global.__DEV__;
+    global.__DEV__ = false;
+    process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN = "custom-debug-token-guid";
+    try {
+      const { getMoneyMapAppCheckToken } = require("../src/remote/firebaseAppCheck");
+      await getMoneyMapAppCheckToken();
+
+      expect(mockConfigure).toHaveBeenCalledWith({
+        android: {
+          provider: "playIntegrity",
+        },
+      });
+    } finally {
+      global.__DEV__ = originalDev;
+    }
+  });
+
   it("reuses initialized App Check promise across multiple token requests", async () => {
     const { getMoneyMapAppCheckToken } = require("../src/remote/firebaseAppCheck");
 
