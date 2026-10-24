@@ -166,6 +166,32 @@ Apply these standards to authorized development of websites, systems, mobile app
 
 Automate the authorized path end to end where tools permit: inspect and plan; specify and prototype; implement in small slices; run tests, accessibility/security/performance checks relevant to the change; inspect failures; refine and document; prepare release and rollback. Preserve required human gates and platform controls. Do not claim CI, deployment, external integration, agent collaboration, or production readiness without observing it. If a tool or environment is unavailable, mark the stage UNVERIFIED, name the blocker, and hand over a concrete next check. Use bounded loops; stop at acceptance or a real blocker rather than revising indefinitely.
 
+### Mobile Attestation & Serverless AI Proxy Invariants
+
+When developing or maintaining mobile applications that proxy AI services through a serverless backend with app attestation (e.g., Firebase App Check):
+
+1. **Token Refresh Forwarding:**
+   - Client-side token provider registrations must accept and forward the `forceRefresh` boolean parameter to the underlying native SDK (`async (forceRefresh = false) => getAppCheckToken(forceRefresh)`).
+   - Upon receiving an HTTP 401 response from the proxy, the client must trigger exactly one retry with `forceRefresh = true` before failing closed to local offline heuristics.
+
+2. **Strict Development Debug Isolation:**
+   - Bundlers (such as Expo/Metro) inline build-time public environment variables. Debug tokens must never be configured unconditionally or referenced in production release builds.
+   - All debug token evaluation must be strictly scoped within `if (__DEV__)` blocks. Production release builds must explicitly configure native attestation (e.g. `playIntegrity`) with zero debug properties attached.
+
+3. **Backend App ID Cross-Verification:**
+   - In server proxies verifying attestation tokens, validating the cryptographic signature only confirms membership in the Firebase project.
+   - The backend MUST verify that `verified.appId === EXPECTED_APP_ID`. Requests from any other application in the same project must be rejected with HTTP 403 `unauthorized_app`.
+
+4. **Dual-Layer Anti-Spoofing Rate Limiting:**
+   - In-memory rate limiting must implement dual-tier protection:
+     - *Client Level:* Rate-limit individual clients by verified `appId:clientIp` (e.g. 8 req/min) to prevent user-to-user starvation.
+     - *Container / App Level:* Rate-limit total requests per application container (e.g. 60 req/min) to prevent attackers rotating spoofed `X-Forwarded-For` IPs from exhausting upstream API quotas.
+   - Sanitize all IP inputs with regex (`/^[\d.a-fA-F:]{3,45}$/`) and implement automatic TTL garbage collection to prevent memory leaks.
+
+5. **Model Lifecycle and Budget Guardrails:**
+   - Confirm active availability and free-tier eligibility of AI models (e.g., `gemini-3.5-flash-lite`); reject unlisted or retired models with HTTP 503.
+   - Cloud budget alerts (e.g., $1/mo alerts) must be documented as monitoring alarms, not automated kill-switches or guaranteed spending limits.
+
 ### Project Guidelines folder
 
 `Project Guidelines/` is an **optional project record**, used only when it fits the workspace project. For a new or existing project, assess the scope, expected duration, complexity, existing documentation, and need for shared architecture or handover records. Create the folder at the project root (or writable project-space equivalent) when the user asks for it or when substantive development, design, data, or operational work would benefit from durable project-specific guidance. An isolated small fix, brief exploration, or project whose existing documentation already covers the need may not warrant it. Do not create a folder or pages solely to satisfy a template inventory.
