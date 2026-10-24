@@ -243,3 +243,27 @@ test("isolates rate limiting across different client IPs", async () => {
     assert.equal(resIp2.status, 200);
   });
 });
+
+test("enforces app-level rate limiting against IP spoofing rotations", async () => {
+  const handler = createHandler({
+    apiKey: "synthetic",
+    verifyAppCheck: async () => ({ appId: "spoofing-target-app" }),
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: '[{"title":"Tip","meta":"Desc"}]' }] } }] }),
+    }),
+  });
+
+  await serve(handler, async (url) => {
+    for (let i = 1; i <= 60; i++) {
+      const spoofedHeaders = { ...headers, "X-Forwarded-For": `198.51.100.${i}` };
+      const res = await fetch(url + "/v1/smart-tips", { method: "POST", headers: spoofedHeaders, body: JSON.stringify(summary) });
+      assert.equal(res.status, 200);
+    }
+
+    const spoofed61 = { ...headers, "X-Forwarded-For": "198.51.100.61" };
+    const res61 = await fetch(url + "/v1/smart-tips", { method: "POST", headers: spoofed61, body: JSON.stringify(summary) });
+    assert.equal(res61.status, 429);
+    assert.equal((await res61.json()).error, "rate_limited");
+  });
+});

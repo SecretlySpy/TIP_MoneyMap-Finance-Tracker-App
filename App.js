@@ -14,11 +14,11 @@ void SplashScreen.preventAutoHideAsync();
 
 const MoneyMapRoot = lazy(() => import("./src/MoneyMapRoot"));
 
-registerAiAppCheckProvider(async () => {
+registerAiAppCheckProvider(async (forceRefresh = false) => {
   const { getMoneyMapAppCheckToken } =
     await import("./src/remote/firebaseAppCheck");
 
-  return getMoneyMapAppCheckToken();
+  return getMoneyMapAppCheckToken(forceRefresh);
 });
 
 export default function App() {

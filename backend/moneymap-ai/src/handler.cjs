@@ -82,17 +82,27 @@ function createHandler({apiKey,verifyAppCheck,fetchImpl=globalThis.fetch,model="
     if(!verified || !string(verified.appId,200)) return send(res,401,{error:"app_check_invalid"});
     if(expectedAppId && verified.appId!==expectedAppId) return send(res,403,{error:"unauthorized_app"});
 
-    // Per-client abuse brake; isolates rate-limit counters per client IP and appId.
-    const clientIp=String(req.headers["x-forwarded-for"]||req.socket?.remoteAddress||"").split(",")[0].trim();
+    // Dual-layer abuse brake: per-client IP isolation plus app-level anti-spoofing cap.
+    const rawIp=String(req.headers["x-forwarded-for"]||req.socket?.remoteAddress||"").split(",")[0].trim();
+    const clientIp=(/^[\d.a-fA-F:]{3,45}$/.test(rawIp))?rawIp:"";
     const rateKey=clientIp?`${verified.appId}:${clientIp}`:verified.appId;
+
     if(buckets.size>1000) {
       const current=now();
       for(const [k,v] of buckets.entries()){if(current>=v.until) buckets.delete(k);}
     }
+
+    const appBucketKey=`__app__:${verified.appId}`;
+    const appBucket=buckets.get(appBucketKey)||{until:now()+60000,count:0};
+    if(now()>=appBucket.until){appBucket.until=now()+60000;appBucket.count=0;}
+    if(appBucket.count>=60) return send(res,429,{error:"rate_limited"});
+
     const bucket=buckets.get(rateKey)||{until:now()+60000,count:0};
     if(now()>=bucket.until){bucket.until=now()+60000;bucket.count=0;}
+    if(bucket.count>=8) return send(res,429,{error:"rate_limited"});
+
     bucket.count++; buckets.set(rateKey,bucket);
-    if(bucket.count>8) return send(res,429,{error:"rate_limited"});
+    appBucket.count++; buckets.set(appBucketKey,appBucket);
 
     let input;
     try{input=await body(req);}catch(e){return send(res,e.message==="too_large"?413:400,{error:"invalid_json"});}
