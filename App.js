@@ -21,6 +21,12 @@ registerAiAppCheckProvider(async (forceRefresh = false) => {
   return getMoneyMapAppCheckToken(forceRefresh);
 });
 
+if (__DEV__) {
+  void import("./src/remote/firebaseAppCheck")
+    .then(({ getMoneyMapAppCheckToken }) => getMoneyMapAppCheckToken())
+    .catch(() => {});
+}
+
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({ Roboto_400Regular, Roboto_500Medium, Roboto_700Bold });
   const expoGo = isExpoGoRuntime();
