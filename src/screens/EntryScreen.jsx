@@ -11,7 +11,7 @@ import { SplitItemEditor } from "../components/SplitItemEditor";
 import { TextPromptModal } from "../components/TextPromptModal";
 import { accountChipLabel, categoriesForType, computeAccountBalances, toMonthYear } from "../domain/services/financeView";
 import { resolveDisplayEmoji } from "../domain/services/emoji";
-import { formatMinor, parseDecimalToMinor, updateMoneyInput } from "../domain/services/money";
+import { formatMinor, parseWholePesosToMinor, updateMoneyInput } from "../domain/services/money";
 import { buildSplitTransactions, computeSplitBreakdown, formatSplitEquation, validateSplitSum } from "../domain/services/splits";
 import { extractTags } from "../domain/services/tags";
 import { listAccountChips, useFinanceStore } from "../store/financeStore";
@@ -22,7 +22,7 @@ const keypadRows = [
     ["1", "2", "3"],
     ["4", "5", "6"],
     ["7", "8", "9"],
-    [".", "0", "⌫"],
+    ["", "0", "⌫"],
 ];
 function localNoonToday(now = new Date()) {
     return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0).getTime();
@@ -180,7 +180,7 @@ export function EntryScreen({ navigation }) {
     }, [typeCategories, selectedCategory]);
     const amountMinor = useMemo(() => {
         try {
-            return parseDecimalToMinor(amountInput);
+            return parseWholePesosToMinor(amountInput);
         }
         catch {
             return 0;
@@ -235,7 +235,7 @@ export function EntryScreen({ navigation }) {
                 if (s.id !== splitId) return s;
                 let parsedMinor = 0;
                 try {
-                    parsedMinor = parseDecimalToMinor(text);
+                    parsedMinor = parseWholePesosToMinor(text);
                 } catch {
                     parsedMinor = 0;
                 }
@@ -254,7 +254,7 @@ export function EntryScreen({ navigation }) {
             if (!activeSplit) return;
             const currentVal = activeSplit.rawAmount !== undefined
                 ? activeSplit.rawAmount
-                : (activeSplit.amountMinor === 0 ? "0" : (activeSplit.amountMinor % 100 === 0 ? String(activeSplit.amountMinor / 100) : (activeSplit.amountMinor / 100).toFixed(2)));
+                : String(activeSplit.amountMinor / 100);
             const nextVal = updateMoneyInput(currentVal, key);
             handleSplitAmountChange(activeSplitId, nextVal);
         } else {
@@ -786,7 +786,7 @@ export function EntryScreen({ navigation }) {
                   accessibilityRole="button"
                   onPress={() => {
                     if (!isSplitMode) {
-                      const half = Math.floor(amountMinor / 2);
+                      const half = Math.floor(amountMinor / 200) * 100;
                       const cat1 = typeCategories.find((c) => c.name === selectedCategory) || typeCategories[0] || { id: 1, name: "Expense" };
                       const cat2 = typeCategories.find((c) => c.id !== cat1.id) || typeCategories[1] || cat1;
                       const initialSplits = [
@@ -795,14 +795,14 @@ export function EntryScreen({ navigation }) {
                           categoryId: cat1.id,
                           categoryName: cat1.name,
                           amountMinor: half,
-                          rawAmount: half % 100 === 0 ? String(half / 100) : (half / 100).toFixed(2),
+                          rawAmount: String(half / 100),
                         },
                         {
                           id: "split-2",
                           categoryId: cat2.id,
                           categoryName: cat2.name,
                           amountMinor: amountMinor - half,
-                          rawAmount: (amountMinor - half) % 100 === 0 ? String((amountMinor - half) / 100) : ((amountMinor - half) / 100).toFixed(2),
+                          rawAmount: String((amountMinor - half) / 100),
                         },
                       ];
                       setSplits(initialSplits);
@@ -946,7 +946,7 @@ export function EntryScreen({ navigation }) {
 
       <View style={{ gap: theme.spacing.keyGap }}>
         {keypadRows.map((row, rowIndex) => (<View key={`keypad-row-${rowIndex}`} style={{ flexDirection: "row", gap: theme.spacing.keyGap }}>
-            {row.map((key) => (<Pressable accessibilityLabel={key === "⌫" ? "Delete digit" : key === "." ? "Decimal point" : key} accessibilityRole="button" key={key} onPress={() => handleKeypadPress(key)} style={{
+            {row.map((key) => (key ? <Pressable accessibilityLabel={key === "⌫" ? "Delete digit" : key} accessibilityRole="button" key={key} onPress={() => handleKeypadPress(key)} style={{
                     alignItems: "center",
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.outline,
@@ -959,7 +959,7 @@ export function EntryScreen({ navigation }) {
                 <Text style={{ color: theme.colors.text, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.keypad }}>
                   {key}
                 </Text>
-              </Pressable>))}
+              </Pressable> : <View key="empty-key" style={{ flex: 1 }} />))}
           </View>))}
       </View>
 

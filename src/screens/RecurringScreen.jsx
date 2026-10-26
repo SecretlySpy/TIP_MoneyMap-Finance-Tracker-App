@@ -18,7 +18,7 @@ import {
 } from "../domain/services/emoji";
 import { buildRecurringBills, categoriesForType, nextReminderPreview } from "../domain/services/financeView";
 import { detectRecurringCandidates } from "../domain/services/recurringDetection";
-import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
+import { formatMinor, minorToWholePesos, parseWholePesosToMinor } from "../domain/services/money";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -53,6 +53,7 @@ export function RecurringScreen({ navigation }) {
 
   const [activeBillId, setActiveBillId] = useState(null);
   const [dismissedKeys, setDismissedKeys] = useState([]);
+  const [editingCandidateMinor, setEditingCandidateMinor] = useState(null);
 
   const { categoriesById, accountsById } = useMemo(
     () => mapsFromState({ accounts, categories }),
@@ -85,6 +86,7 @@ export function RecurringScreen({ navigation }) {
     setDraftAmountText("");
     setDraftDueText(defaultDueDateISO(RECURRING_REMINDER_LEAD_DAYS));
     setActiveBillId(null);
+    setEditingCandidateMinor(null);
     setDraftFrequency("MONTHLY");
     setDraftCategory(expenseCategoryOptions[0]?.value ?? null);
     setDraftAccountId(activeAccounts[0]?.id ? String(activeAccounts[0].id) : null);
@@ -102,7 +104,9 @@ export function RecurringScreen({ navigation }) {
 
     let amountMinor = 0;
     try {
-      amountMinor = parseDecimalToMinor(draftAmountText.replace(/[₱$,\s]/g, "") || "0");
+      amountMinor = editingCandidateMinor != null && draftAmountText.trim() === String(minorToWholePesos(editingCandidateMinor))
+        ? editingCandidateMinor
+        : parseWholePesosToMinor(draftAmountText.trim());
       if (amountMinor <= 0) throw new Error("Enter a positive bill amount.");
     } catch (err) {
       Alert.alert("Invalid amount", err instanceof Error ? err.message : "Enter a valid amount.");
@@ -188,7 +192,8 @@ export function RecurringScreen({ navigation }) {
 
   const handleEditCandidate = (candidate) => {
     setDraftName(candidate.merchant);
-    setDraftAmountText((candidate.latestAmountMinor / 100).toFixed(2));
+    setDraftAmountText(String(minorToWholePesos(candidate.latestAmountMinor)));
+    setEditingCandidateMinor(candidate.latestAmountMinor);
     setDraftFrequency(candidate.frequency);
     if (candidate.accountId) setDraftAccountId(String(candidate.accountId));
     setIsAddOpen(true);
@@ -217,7 +222,10 @@ export function RecurringScreen({ navigation }) {
     if (activeBillId === null || busy) return;
     setBusy(true);
     try {
-      const amountMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
+      const originalMinor = recurringRules.find((rule) => rule.id === activeBillId)?.amountMinor;
+      const amountMinor = originalMinor != null && value.trim() === String(minorToWholePesos(originalMinor))
+        ? originalMinor
+        : parseWholePesosToMinor(value.trim());
       if (amountMinor <= 0) throw new Error("Enter a positive amount.");
       await updateRecurringRule(activeBillId, { amountMinor });
       setStep(null);
@@ -626,9 +634,9 @@ export function RecurringScreen({ navigation }) {
             </Text>
             <TextInput
               accessibilityLabel="Bill amount"
-              keyboardType="decimal-pad"
+              keyboardType="number-pad"
               onChangeText={setDraftAmountText}
-              placeholder="999.00"
+              placeholder="999"
               placeholderTextColor={theme.colors.sub}
               style={{
                 backgroundColor: theme.colors.surface,
@@ -755,14 +763,14 @@ export function RecurringScreen({ navigation }) {
       />
       <TextPromptModal
         confirmLabel="Save"
-        initialValue={activeRule ? (activeRule.amountMinor / 100).toFixed(2) : "1000.00"}
-        keyboardType="decimal-pad"
+        initialValue={activeRule ? String(minorToWholePesos(activeRule.amountMinor)) : "1000"}
+        keyboardType="number-pad"
         onCancel={() => {
           setStep(null);
           setActiveBillId(null);
         }}
         onConfirm={(value) => void handleEditAmount(value)}
-        placeholder="1000.00"
+        placeholder="1000"
         title="Edit amount"
         visible={step === "editAmount"}
       />

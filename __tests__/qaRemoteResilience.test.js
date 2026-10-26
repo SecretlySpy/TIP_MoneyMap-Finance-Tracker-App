@@ -2,7 +2,16 @@ import { clearPlacesCache, fetchNearbyEats } from "../src/remote/placesClient";
 import { assertAnonymizedPayload, clearSmartTipsCache, fetchSmartTipsFromGemini } from "../src/remote/smartTipsClient";
 import { clearEatsTipsCache, fetchEatsAiTips } from "../src/remote/eatsTipsClient";
 
-const payload = { period: "2026-09", currencySymbol: "₱", remainingBudgetMinor: 100, limitBudgetMinor: 200, spentBudgetMinor: 100, categorySpendRatios: [] };
+const payload = {
+  contractVersion: 2,
+  moneyUnit: "PHP_WHOLE_PESOS_V2",
+  period: "2026-09",
+  currencySymbol: "₱",
+  remainingBudgetPesos: 1,
+  limitBudgetPesos: 2,
+  spentBudgetPesos: 1,
+  categorySpendRatios: [],
+};
 const unavailable = () => ({ ok: false, status: 503 });
 // This fetch double observes AbortSignal; no request leaves the test process.
 const stall = (_url, options) => new Promise((_resolve, reject) => {
@@ -74,7 +83,7 @@ describe("QA remote boundary and deadline resilience", () => {
 
   it("returns offline eats tips after malformed Gemini response", async () => {
     const fetchImpl = jest.fn(async () => ({ ok: true, json: async () => { throw new SyntaxError("invalid JSON"); } }));
-    await expect(fetchEatsAiTips({ enabled: true, consentAccepted: true, places: [], fetchImpl, backendUrl: "https://example.test", appCheckToken: "synthetic-app-check-token" })).resolves.toBeNull();
+    await expect(fetchEatsAiTips({ enabled: true, consentAccepted: true, currencySymbol: "₱", places: [], fetchImpl, backendUrl: "https://example.test", appCheckToken: "synthetic-app-check-token" })).resolves.toBeNull();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 

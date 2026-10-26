@@ -55,7 +55,7 @@ describe("OnboardingScreen", () => {
     const screen = await render(<OnboardingScreen navigation={navigation} />);
 
     await fireEvent.changeText(screen.getByLabelText("Account name"), "Daily cash");
-    await fireEvent.changeText(screen.getByLabelText("Opening balance"), "125.50");
+    await fireEvent.changeText(screen.getByLabelText("Opening balance"), "125");
     await fireEvent.press(screen.getByRole("button", { name: "Save and continue" }));
 
     await waitFor(() => {
@@ -63,7 +63,7 @@ describe("OnboardingScreen", () => {
         id: 1,
         isArchived: false,
         name: "Daily cash",
-        startingBalanceMinor: 12_550,
+        startingBalanceMinor: 12_500,
       });
     });
     expect(mockFinanceState.createAccount).not.toHaveBeenCalled();
@@ -93,14 +93,14 @@ describe("OnboardingScreen", () => {
     });
     const screen = await render(<OnboardingScreen navigation={navigationDouble()} />);
 
-    await fireEvent.changeText(screen.getByLabelText("Expense amount"), "80.25");
+    await fireEvent.changeText(screen.getByLabelText("Expense amount"), "80");
     await fireEvent.changeText(screen.getByLabelText("Expense note"), "Lunch");
     await fireEvent.press(screen.getByRole("button", { name: "Add expense and continue" }));
 
     await waitFor(() => {
       expect(mockFinanceState.saveOnboardingExpense).toHaveBeenCalledWith({
         accountId: 1,
-        amountMinor: 8_025,
+        amountMinor: 8_000,
         categoryName: "Food",
         note: "Lunch",
         type: "EXPENSE",
@@ -127,5 +127,23 @@ describe("OnboardingScreen", () => {
     await waitFor(() => expect(mockFinanceState.saveOnboardingExpense).toHaveBeenCalledTimes(2));
     expect(mockFinanceState.saveOnboardingExpense.mock.calls.map(([input]) => input.amountMinor)).toEqual([10_000, 15_000]);
     await waitFor(() => expect(screen.getByText("Protect MoneyMap")).toBeTruthy());
+  });
+
+  it("rejects fractional opening balances and expenses without writing records", async () => {
+    const screen = await render(<OnboardingScreen navigation={navigationDouble()} />);
+    await fireEvent.changeText(screen.getByLabelText("Opening balance"), "125.50");
+    await fireEvent.press(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/whole-peso/i));
+    expect(mockFinanceState.updateAccount).not.toHaveBeenCalled();
+
+    mockUiState.onboardingDraft = mergeOnboardingDraft(createOnboardingDraft(), {
+      step: "expense", expense: { accountId: 1, accountType: "CASH", categoryName: "Food" },
+    });
+    screen.unmount();
+    const expenseScreen = await render(<OnboardingScreen navigation={navigationDouble()} />);
+    await fireEvent.changeText(expenseScreen.getByLabelText("Expense amount"), "80.25");
+    await fireEvent.press(expenseScreen.getByRole("button", { name: "Add expense and continue" }));
+    await waitFor(() => expect(expenseScreen.getByRole("alert")).toHaveTextContent(/whole-peso/i));
+    expect(mockFinanceState.saveOnboardingExpense).not.toHaveBeenCalled();
   });
 });

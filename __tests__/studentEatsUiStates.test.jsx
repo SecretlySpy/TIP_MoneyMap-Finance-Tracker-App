@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 import { StudentEatsScreen } from "../src/screens/StudentEatsScreen";
 import { useUiStore } from "../src/store/uiStore";
 import * as placesClient from "../src/remote/placesClient";
@@ -156,5 +156,25 @@ describe("StudentEatsScreen UI States and Online Personalization", () => {
       expect(screen.getByText("Campus-based discovery")).toBeTruthy();
       expect(screen.getByText("Use My Location")).toBeTruthy();
     });
+  });
+
+  it("does not revive places or AI tips from an in-flight request after consent withdrawal", async () => {
+    let resolvePlaces;
+    placesClient.fetchNearbyEats.mockImplementation(() => new Promise((done) => { resolvePlaces = done; }));
+    const screen = await render(<StudentEatsScreen navigation={mockNavigation} />);
+    await waitFor(() => expect(resolvePlaces).toBeDefined());
+    await act(async () => { useUiStore.setState({ onlinePersonalizationConsentAccepted: false, smartTipsConsentAccepted: true }); });
+    await act(async () => { resolvePlaces({ source: "google_places", places: [{ id: "late", name: "Stale Eatery" }] }); });
+    expect(screen.getByText("Consent Required")).toBeTruthy();
+    expect(screen.queryByText("Stale Eatery")).toBeNull();
+    expect(eatsTipsClient.fetchEatsAiTips).not.toHaveBeenCalled();
+  });
+
+  it("keeps places available but skips peso AI tips under a non-peso display setting", async () => {
+    useUiStore.setState({ currencySymbol: "$" });
+    const screen = await render(<StudentEatsScreen navigation={mockNavigation} />);
+    await waitFor(() => expect(screen.getByText("Campus Silog Express")).toBeTruthy());
+    expect(screen.getByText("AI food budget suggestions require the peso display setting. Nearby eateries remain available.")).toBeTruthy();
+    expect(eatsTipsClient.fetchEatsAiTips).not.toHaveBeenCalled();
   });
 });

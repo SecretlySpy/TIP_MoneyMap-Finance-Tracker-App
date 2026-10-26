@@ -1,6 +1,6 @@
 # Backend Functionalities
 
-Updated: 2026-10-19
+Updated: 2026-10-26
 
 ## Status
 
@@ -47,15 +47,16 @@ may run inside an open write transaction, so unrelated database calls wait for c
 
 ## Optional external clients
 
-- `smartTipsClient`: opt-in Gemini finance advice with a minimized aggregate payload.
+- `smartTipsClient`: opt-in Gemini finance advice. Contract v2 sends `contractVersion: 2`, `moneyUnit: "PHP_WHOLE_PESOS_V2"`, and whole-peso totals. The proxy rejects legacy centavo fields and non-`₱` requests. Structured `amountPesos` is the only trusted AI amount; numeric prose is discarded.
 - `placesClient`: bundled TIP QC catalog first; optional Overpass with Nominatim fallback around fixed
   TIP Quezon City coordinates; last live results may be stored in `app_metadata` key `eats-places-cache-v1`.
 - `eatsTipsClient`: optional Gemini explanation using place names, distance bands, and price levels—not
-  precise device coordinates.
+  precise device coordinates. Food budget is converted once to `dailyFoodBudgetPesos` on the same v2 contract.
 
-All external calls require bounded client-side handling. Offline Smart Tips remain available when network
-calls fail. Student Eats remains populated from the bundled catalog when live providers fail. No external
-provider result is treated as verified local finance data.
+All external calls require bounded client-side handling. Personalized Smart Tips and Student Eats tips
+require Online Personalization and do not fall back to generated offline advice. Local budget totals and
+the bundled Student Eats catalog remain available offline. No external provider result is treated as
+verified local finance data.
 
 QA update (2026-09-28): Overpass and its single Nominatim fallback share the same 18-second abort deadline; fallback errors resolve to the existing controlled error result. Smart Tips allows only its defined aggregate/ratio fields, validates real calendar months and finite ratios in [0,1], and rejects unexpected data before fetch. Remote resilience checks use a synthetic API key and local fetch doubles; they do not certify live providers. See [QA Verification Report](./QA%20Verification%20Report%202026-09-28.md).
 

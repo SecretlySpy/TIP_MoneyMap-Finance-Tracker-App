@@ -1,5 +1,15 @@
 # Decisions and Handover
 
+## Whole-peso presentation (2026-10-26)
+
+**ADR:** Keep SQLCipher minor-unit storage. Do not migrate historical centavos.
+
+**Decision:** PHP display, new inputs, and Gemini context use whole pesos. Rounding is half away from zero and happens only at the display or anonymized-summary boundary. Unchanged edits preserve the stored minor value. AI contract v2 requires `PHP_WHOLE_PESOS_V2` and structured `amountPesos`; the model is not trusted to print amounts. Online Personalization remains required for Smart Tips and Student Eats AI. Non-`₱` display symbols do not call the PHP proxy.
+
+**Deployment:** Redeploy `backend/moneymap-ai` before shipping the matching mobile build. Old clients sending centavo fields receive HTTP 422. No Cloud Console credential change is required by this code change.
+
+**Not verified:** Android device layout and live Gemini/Cloud Run.
+
 ## Academic demo offline Student Eats (2026-10-19)
 
 **Outcome:** Student Eats no longer depends on a live map API for an academic demonstration. The screen

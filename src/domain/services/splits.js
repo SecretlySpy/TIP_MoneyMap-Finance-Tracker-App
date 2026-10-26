@@ -31,7 +31,7 @@ export function validateSplitSum(splits, totalMinor, options = {}) {
         isValid: false,
         sumMinor,
         diffMinor: totalMinor - sumMinor,
-        error: `Split item ${i + 1} must have a positive integer minor amount.`,
+        error: `Split item ${i + 1} must have a positive amount.`,
       };
     }
     if (options.requireCategory && !item.categoryId && !item.categoryName) {
@@ -52,13 +52,13 @@ export function validateSplitSum(splits, totalMinor, options = {}) {
     isValid,
     sumMinor,
     diffMinor,
-    error: isValid ? null : `Splits total (${sumMinor}) does not equal transaction total (${totalMinor}). Difference: ${diffMinor}.`,
+    error: isValid ? null : "Split amounts do not equal the purchase total.",
   };
 }
 
 /**
  * Formats split equation string according to the mathematical invariant.
- * Example: "₱300 + ₱200 = ₱500" or with centavos "₱300.50 + ₱199.50 = ₱500.00"
+ * Example: "₱300 + ₱200 = ₱500".
  * @param {Array<{ amountMinor: number }>} splits
  * @param {number} totalMinor
  * @param {string} currencySymbol
@@ -68,6 +68,10 @@ export function validateSplitSum(splits, totalMinor, options = {}) {
 export function formatSplitEquation(splits, totalMinor, currencySymbol = "₱", options = {}) {
   const hasCentavos = (Array.isArray(splits) && splits.some((s) => (Number(s.amountMinor) || 0) % 100 !== 0)) || (Number(totalMinor) || 0) % 100 !== 0;
   const showCents = options.showCents ?? hasCentavos;
+  // Individually rounded historic allocations need not add to the rounded total.
+  if (currencySymbol === "₱" && hasCentavos) {
+    return `Split total ${formatMinor(totalMinor, { currencySymbol })}`;
+  }
   if (!Array.isArray(splits) || splits.length === 0) {
     return `${formatMinor(0, { currencySymbol, showCents })} = ${formatMinor(totalMinor, { currencySymbol, showCents })}`;
   }
@@ -327,5 +331,4 @@ export function groupTransactionsBySplit(transactions, transactionGroups = []) {
 
   return result;
 }
-
 

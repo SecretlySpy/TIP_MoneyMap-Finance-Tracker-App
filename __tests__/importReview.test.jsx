@@ -113,7 +113,7 @@ describe("Import review, duplicate detection, atomic commit, and rollback", () =
 
     // Check duplicate row display
     expect(screen.getByText("Possible duplicate")).toBeTruthy();
-    expect(screen.getByText(/Matches existing expense of ₱150\.00 on 2026-09-15/)).toBeTruthy();
+    expect(screen.getByText(/Matches existing expense of ₱150 on 2026-09-15/)).toBeTruthy();
 
     // Check invalid row display with reason
     expect(screen.getByText("Row 4")).toBeTruthy();

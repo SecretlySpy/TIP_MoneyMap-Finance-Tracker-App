@@ -202,15 +202,22 @@ export function validateBackup(backup) {
         if (!Array.isArray(backup.transactionGroups)) {
             throw new Error("Backup transactionGroups must be an array.");
         }
+        const groupIds = new Set();
         for (const group of backup.transactionGroups) {
-            if (group === null || typeof group !== "object" || !group.id) {
+            if (group === null || typeof group !== "object" || typeof group.id !== "string" || !group.id.trim() || groupIds.has(group.id)) {
                 throw new Error("Backup transactionGroups contains invalid identifier.");
             }
+            groupIds.add(group.id);
             if (!ids.get("accounts").has(group.accountId)) {
                 throw new Error("Backup transactionGroups contains an invalid account reference.");
             }
             assertValidEpochMillis(group.dateEpochMillis, "transaction group date");
             requireNote(group.title, "transaction group title");
+        }
+        for (const transaction of backup.transactions) {
+            if (transaction.splitGroupId != null && !groupIds.has(transaction.splitGroupId)) {
+                throw new Error("Backup transactions contains an invalid split group reference.");
+            }
         }
     }
 }

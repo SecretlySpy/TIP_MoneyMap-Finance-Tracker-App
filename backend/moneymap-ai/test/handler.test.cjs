@@ -5,19 +5,23 @@ const { createServer } = require("node:http");
 const { createHandler, budget, eats, output, ALLOWED_FREE_TIER_MODELS } = require("../src/handler.cjs");
 
 const summary = {
+  contractVersion: 2,
+  moneyUnit: "PHP_WHOLE_PESOS_V2",
   period: "2026-10",
   currencySymbol: "₱",
-  remainingBudgetMinor: 10000,
-  limitBudgetMinor: 20000,
-  spentBudgetMinor: 10000,
+  remainingBudgetPesos: 100,
+  limitBudgetPesos: 200,
+  spentBudgetPesos: 100,
   categorySpendRatios: [{ category: "Food", ratio: 0.5 }],
 };
 
 const eatsSummary = {
+  contractVersion: 2,
+  moneyUnit: "PHP_WHOLE_PESOS_V2",
   context: "student_eats_near_campus",
   areaHint: "TIP Quezon City vicinity",
   currencySymbol: "₱",
-  dailyFoodBudgetMinor: 15000,
+  dailyFoodBudgetPesos: 150,
   places: [
     {
       name: "Campus Diner",
@@ -50,7 +54,23 @@ test("rejects private fields and invalid responses", () => {
   assert.equal(budget(summary), true);
   assert.equal(budget({ ...summary, transactions: [{ note: "secret" }] }), false);
   assert.equal(budget({ ...summary, categorySpendRatios: [{ category: "Food", ratio: Infinity }] }), false);
+  assert.equal(budget({ ...summary, contractVersion: 1 }), false);
+  assert.equal(budget({ ...summary, contractVersion: "2" }), false);
+  assert.equal(budget({ ...summary, contractVersion: undefined }), false);
+  assert.equal(budget({ ...summary, moneyUnit: "PHP_MINOR" }), false);
+  assert.equal(budget({ ...summary, payloadVersion: 2 }), false);
+  assert.equal(budget({ ...summary, remainingBudgetMinor: 10000 }), false);
+  assert.equal(budget({ ...summary, remainingBudgetPesos: 1.5 }), false);
+  assert.equal(budget({ ...summary, limitBudgetPesos: -1 }), false);
+  assert.equal(budget({ ...summary, spentBudgetPesos: Number.MAX_SAFE_INTEGER }), false);
+  assert.equal(budget({ ...summary, currencySymbol: "$" }), false);
   assert.equal(eats(eatsSummary), true);
+  assert.equal(eats({ ...eatsSummary, dailyFoodBudgetPesos: null }), true);
+  assert.equal(eats({ ...eatsSummary, dailyFoodBudgetMinor: 15000 }), false);
+  assert.equal(eats({ ...eatsSummary, dailyFoodBudgetPesos: 15.5 }), false);
+  assert.equal(eats({ ...eatsSummary, contractVersion: 1 }), false);
+  assert.equal(eats({ ...eatsSummary, moneyUnit: "PHP_MINOR" }), false);
+  assert.equal(eats({ ...eatsSummary, currencySymbol: "$" }), false);
   assert.equal(eats({ ...eatsSummary, places: [{ latitude: 14.6 }] }), false);
   assert.equal(output('[{"title":"Tip","meta":"Save daily"}]').length, 1);
   assert.equal(output('[{"title":"Tip","meta":"Save daily","notes":"secret"}]'), null);
@@ -137,13 +157,14 @@ test("rejects invalid App Check token", async () => {
 
 test("returns validated summaries for both smart-tips and eats-tips", async () => {
   const response = '[{"title":"Pack lunch","meta":"Reduce food expenses","tag":"Food"}]';
+  const prompts = [];
   const handler = createHandler({
     apiKey: "synthetic",
     verifyAppCheck: async () => ({ appId: "registered-app" }),
-    fetchImpl: async () => ({
-      ok: true,
-      json: async () => ({ candidates: [{ content: { parts: [{ text: response }] } }] }),
-    }),
+    fetchImpl: async (_url, opts) => {
+      prompts.push(JSON.parse(opts.body).contents[0].parts[0].text);
+      return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: response }] } }] }) };
+    },
   });
   await serve(handler, async (url) => {
     const res1 = await fetch(url + "/v1/smart-tips", { method: "POST", headers, body: JSON.stringify(summary) });
@@ -153,6 +174,51 @@ test("returns validated summaries for both smart-tips and eats-tips", async () =
     const res2 = await fetch(url + "/v1/eats-tips", { method: "POST", headers, body: JSON.stringify(eatsSummary) });
     assert.equal(res2.status, 200);
     assert.equal((await res2.json()).tips[0].title, "Pack lunch");
+    assert.match(prompts[0], /integer whole pesos/);
+    assert.match(prompts[0], /amountPesos/);
+    assert.doesNotMatch(prompts[0], /remainingBudgetMinor|amountMinor/);
+    assert.match(prompts[1], /Budget: 150 pesos\/day/);
+    assert.doesNotMatch(prompts[1], /dailyFoodBudgetMinor/);
+  });
+});
+
+test("rejects legacy units or unsupported currency before Gemini", async () => {
+  let calls = 0;
+  const handler = createHandler({
+    apiKey: "synthetic",
+    verifyAppCheck: async () => ({ appId: "registered-app" }),
+    fetchImpl: async () => { calls++; },
+  });
+  await serve(handler, async (url) => {
+    for (const [path, payload] of [
+      ["/v1/smart-tips", { ...summary, contractVersion: 1 }],
+      ["/v1/smart-tips", { ...summary, moneyUnit: "PHP_MINOR" }],
+      ["/v1/smart-tips", { ...summary, limitBudgetMinor: 20000 }],
+      ["/v1/smart-tips", { ...summary, currencySymbol: "$" }],
+      ["/v1/eats-tips", { ...eatsSummary, dailyFoodBudgetMinor: 15000 }],
+      ["/v1/eats-tips", { ...eatsSummary, dailyFoodBudgetPesos: "150" }],
+    ]) {
+      const res = await fetch(url + path, { method: "POST", headers, body: JSON.stringify(payload) });
+      assert.equal(res.status, 422);
+      assert.equal((await res.json()).error, "invalid_summary");
+    }
+    assert.equal(calls, 0);
+  });
+});
+
+test("fails closed on ungrounded AI money text without returning model prose", async () => {
+  const handler = createHandler({
+    apiKey: "synthetic",
+    verifyAppCheck: async () => ({ appId: "registered-app" }),
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: '[{"title":"Save ₱10,000","meta":"Reduce food spend","amountPesos":20,"isEstimate":true}]' }] } }] }),
+    }),
+  });
+  await serve(handler, async (url) => {
+    const res = await fetch(url + "/v1/smart-tips", { method: "POST", headers, body: JSON.stringify(summary) });
+    assert.equal(res.status, 503);
+    assert.deepEqual(await res.json(), { error: "ai_unavailable" });
   });
 });
 
@@ -339,19 +405,40 @@ test("enforces places-nearby endpoint validation, gating, and response mapping",
 });
 
 test("structured output validator enforces financial grounding and rejects unreasonable amounts", () => {
-  const budgetInput = { limitBudgetMinor: 20000 };
-  // Valid tips with amount <= limitBudgetMinor
-  const valid = output('[{"title":"Budget groceries","meta":"Save on snacks","amountMinor":5000,"tag":"Food","emoji":"🍎"}]', budgetInput);
+  const budgetInput = { limitBudgetPesos: 200 };
+  // Valid tips with amount <= limitBudgetPesos
+  const valid = output('[{"title":"Budget groceries","meta":"Save on snacks","amountPesos":50,"isEstimate":true,"tag":"Food","emoji":"🍎"}]', budgetInput);
   assert.equal(valid.length, 1);
-  assert.equal(valid[0].amountMinor, 5000);
+  assert.equal(valid[0].amountPesos, 50);
 
-  // Reject tip claiming amount > limitBudgetMinor (e.g. 500,000 centavos on 20,000 budget)
-  const excessive = output('[{"title":"Fake savings","meta":"Save big","amountMinor":500000}]', budgetInput);
+  // Reject tip claiming amount > limitBudgetPesos
+  const excessive = output('[{"title":"Fake savings","meta":"Save big","amountPesos":5000,"isEstimate":true}]', budgetInput);
   assert.equal(excessive, null);
 
   // Reject negative amounts
-  const negative = output('[{"title":"Fake savings","meta":"Save big","amountMinor":-500}]', budgetInput);
+  const negative = output('[{"title":"Fake savings","meta":"Save big","amountPesos":-5,"isEstimate":true}]', budgetInput);
   assert.equal(negative, null);
+  assert.equal(output('[{"title":"Tip","meta":"Save","amountMinor":5000}]', budgetInput), null);
+  assert.equal(output('[{"title":"Tip","meta":"Save","amountPesos":1.5,"isEstimate":true}]', budgetInput), null);
+  assert.equal(output('[{"title":"Tip","meta":"Save","amountPesos":"50","isEstimate":true}]', budgetInput), null);
+  assert.equal(output('[{"title":"Tip","meta":"Save","amountPesos":10000000001,"isEstimate":true}]'), null);
+  assert.equal(output('[{"title":"Tip","meta":"Save","amountPesos":50}]', budgetInput), null);
+  assert.equal(output('[{"title":"Tip","meta":"Save","amountPesos":50,"isEstimate":false}]', budgetInput), null);
+  assert.equal(output('[{"title":"Tip","meta":"Save","amountPesos":50,"isEstimate":true}]', { dailyFoodBudgetPesos: null }), null);
+  assert.equal(output('[{"title":"Tip","meta":"Save","amountPesos":50,"isEstimate":true}]', { dailyFoodBudgetPesos: 40 }), null);
+  assert.equal(output('[{"title":"Tip","meta":"Save","amountPesos":40,"isEstimate":true}]', { dailyFoodBudgetPesos: 40 })[0].amountPesos, 40);
+  for (const [field, text] of [
+    ["title", "Save ₱5,000"],
+    ["meta", "Save PHP 500 daily"],
+    ["meta", "Save 5k each week"],
+    ["meta", "Save five hundred pesos"],
+    ["meta", "Save limang daan"],
+    ["meta", "Save some ₱"],
+    ["tag", "Food 50"],
+    ["category", "Food 50"],
+  ]) {
+    assert.equal(output(JSON.stringify([{ title: "Tip", meta: "Save", [field]: text, amountPesos: 50, isEstimate: true }]), budgetInput), null);
+  }
 
   // Grounding for eats: reject tips referencing unverified places
   const eatsInput = { places: [{ id: "place-real", name: "Real Canteen" }] };
@@ -360,5 +447,11 @@ test("structured output validator enforces financial grounding and rejects unrea
 
   const fabricated = output('[{"placeId":"place-fake-unverified","title":"Eat at Fake Restaurant","meta":"Great food"}]', eatsInput);
   assert.equal(fabricated, null);
-});
 
+  // Smart Tips bug fix: Reject raw centavo text (e.g. 1120000) and accept structured whole pesos (11,200)
+  const tip11200Input = { limitBudgetPesos: 11200 };
+  assert.equal(output('[{"title":"Track every centavo","meta":"Monitor your 1120000 limit"}]', tip11200Input), null);
+  const valid11200 = output('[{"title":"Stay within your budget","meta":"Monitor your spending limit","amountPesos":11200,"isEstimate":true}]', tip11200Input);
+  assert.equal(valid11200.length, 1);
+  assert.equal(valid11200[0].amountPesos, 11200);
+});

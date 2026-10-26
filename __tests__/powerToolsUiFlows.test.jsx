@@ -313,7 +313,7 @@ describe("P1B, P1C, and P2 Power Tools UI Flows", () => {
       await waitFor(() => {
         expect(split1AmountInput.props.value).toBe("300");
         // Split #1 is 300, Split #2 is 250 -> Total 550, parent 500 -> 50 over-allocation
-        expect(screen.getByText(/₱50 over-allocation/)).toBeTruthy();
+         expect(screen.getByText(/Split amounts do not equal the purchase total/)).toBeTruthy();
       });
 
       // Edit Split #2 to 200 -> 300 + 200 = 500 (exact sum verified)
@@ -329,14 +329,14 @@ describe("P1B, P1C, and P2 Power Tools UI Flows", () => {
       fireEvent.changeText(split2AmountInput, "150");
 
       await waitFor(() => {
-        expect(screen.getByText(/₱50 remaining/)).toBeTruthy();
+         expect(screen.getByText(/Split amounts do not equal the purchase total/)).toBeTruthy();
       });
 
       // Set combined splits to 550: edit Split #2 to 250 -> 50 over-allocation, save disabled
       fireEvent.changeText(split2AmountInput, "250");
 
       await waitFor(() => {
-        expect(screen.getByText(/₱50 over-allocation/)).toBeTruthy();
+         expect(screen.getByText(/Split amounts do not equal the purchase total/)).toBeTruthy();
       });
 
       // Return to valid 300 + 200 = 500
@@ -361,18 +361,18 @@ describe("P1B, P1C, and P2 Power Tools UI Flows", () => {
       fireEvent.changeText(split1AmountInput, "0");
 
       await waitFor(() => {
-        expect(screen.getByText(/Split item 1 must have a positive integer minor amount/)).toBeTruthy();
+         expect(screen.getByText(/Split item 1 must have a positive amount/)).toBeTruthy();
       });
 
       // Enter invalid text
       fireEvent.changeText(split1AmountInput, "invalid");
 
       await waitFor(() => {
-        expect(screen.getByText(/Split item 1 must have a positive integer minor amount/)).toBeTruthy();
+         expect(screen.getByText(/Split item 1 must have a positive amount/)).toBeTruthy();
       });
     });
 
-    it("preserves exact monetary precision with centavos", async () => {
+    it("rejects fractional input for new split allocations", async () => {
       const screen = await render(<EntryScreen navigation={navigation} />);
 
       // Enter 500
@@ -382,20 +382,16 @@ describe("P1B, P1C, and P2 Power Tools UI Flows", () => {
       await fireEvent.press(screen.getByRole("button", { name: "Split transaction" }));
 
       const split1AmountInput = screen.getByTestId("split-amount-0");
-      const split2AmountInput = screen.getByTestId("split-amount-1");
-
-      // Set 300.50 and 199.50
-      fireEvent.changeText(split1AmountInput, "300.50");
+       // A newly entered split cannot contain fractional pesos.
+       fireEvent.changeText(split1AmountInput, "300.50");
       await waitFor(() => {
         expect(split1AmountInput.props.value).toBe("300.50");
       });
 
-      fireEvent.changeText(split2AmountInput, "199.50");
-
-      await waitFor(() => {
-        expect(screen.getByText("₱300.50 + ₱199.50 = ₱500.00")).toBeTruthy();
-        expect(screen.getByText("✓ Exact sum verified")).toBeTruthy();
-      });
+       await waitFor(() => {
+         expect(screen.getByText(/Split item 1 must have a positive amount/)).toBeTruthy();
+         expect(screen.queryByText("✓ Exact sum verified")).toBeNull();
+       });
     });
 
     it("recalculates validation when parent amount changes during split mode", async () => {
@@ -419,7 +415,7 @@ describe("P1B, P1C, and P2 Power Tools UI Flows", () => {
 
       await waitFor(() => {
         // Parent amount is now ₱5,000; splits sum is ₱500; diff is ₱4,500 remaining
-        expect(screen.getByText(/₱4,500 remaining/)).toBeTruthy();
+         expect(screen.getByText(/Split amounts do not equal the purchase total/)).toBeTruthy();
       });
     });
 
@@ -500,7 +496,7 @@ describe("P1B, P1C, and P2 Power Tools UI Flows", () => {
 
       // Incomplete amount on Split #3 -> validation error displayed and save disabled
       await waitFor(() => {
-        expect(screen.getByText(/Split item 3 must have a positive integer minor amount/)).toBeTruthy();
+         expect(screen.getByText(/Split item 3 must have a positive amount/)).toBeTruthy();
       });
 
       // Tap + Add Split again -> Split #4 appears
@@ -582,7 +578,7 @@ describe("P1B, P1C, and P2 Power Tools UI Flows", () => {
       expect(screen.getByTestId("split-amount-1").props.value).toBe("350");
 
       // Amounts were NOT silently redistributed: total is now 400 + 350 = 750 (250 remaining)
-      expect(screen.getByText(/₱250 remaining/)).toBeTruthy();
+      expect(screen.getByText(/Split amounts do not equal the purchase total/)).toBeTruthy();
 
       // Now exactly 2 splits remain -> Removal must be disabled on both
       const rem0 = screen.getByTestId("split-remove-0");
@@ -707,4 +703,3 @@ describe("P1B, P1C, and P2 Power Tools UI Flows", () => {
     });
   });
 });
-

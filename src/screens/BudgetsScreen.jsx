@@ -13,7 +13,7 @@ import { BUDGET_BILL_EMOJI_PRESETS } from "../domain/services/emoji";
 import { budgetSummary, buildBudgetCards, formatMonthChip, shiftMonthYear } from "../domain/services/financeView";
 import { computeCategoryRollover, formatRolloverEquation, getBudgetsToCopy } from "../domain/services/rollover";
 import { BudgetTemplateModal } from "../components/BudgetTemplateModal";
-import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
+import { formatMinor, minorToWholePesos, parseWholePesosToMinor } from "../domain/services/money";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -35,7 +35,7 @@ export function BudgetsScreen({ navigation }) {
   const [sheetStep, setSheetStep] = useState(null); // name | limit
   const [pendingCategoryName, setPendingCategoryName] = useState("");
   const [pendingEmoji, setPendingEmoji] = useState(BUDGET_BILL_EMOJI_PRESETS[0]);
-  const [pendingLimitInput, setPendingLimitInput] = useState("1500.00");
+  const [pendingLimitInput, setPendingLimitInput] = useState("1500");
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [editingLimitName, setEditingLimitName] = useState(null);
   const [renameModalVisible, setRenameModalVisible] = useState(false);
@@ -70,7 +70,7 @@ export function BudgetsScreen({ navigation }) {
   const beginAddBudget = () => {
     setPendingCategoryName("");
     setPendingEmoji(BUDGET_BILL_EMOJI_PRESETS[0]);
-    setPendingLimitInput("1500.00");
+    setPendingLimitInput("1500");
     setEditingLimitName(null);
     setSheetStep("name");
   };
@@ -105,7 +105,12 @@ export function BudgetsScreen({ navigation }) {
     if (busy) return;
     setBusy(true);
     try {
-      const limitMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
+      const originalLimit = editingLimitName
+        ? cards.find((card) => card.name === editingLimitName)?.limitMinor
+        : null;
+      const limitMinor = originalLimit != null && value.trim() === String(minorToWholePesos(originalLimit))
+        ? originalLimit
+        : parseWholePesosToMinor(value.trim());
       if (limitMinor <= 0) {
         throw new Error("Enter a positive budget limit.");
       }
@@ -172,7 +177,7 @@ export function BudgetsScreen({ navigation }) {
               onPress: () => {
                 setEditingLimitName(budget.name);
                 setPendingCategoryName(budget.name);
-                setPendingLimitInput(((budget.limitMinor) / 100).toFixed(2));
+                setPendingLimitInput(String(minorToWholePesos(budget.limitMinor)));
                 setSheetStep("limit");
               },
             },
@@ -217,14 +222,6 @@ export function BudgetsScreen({ navigation }) {
       },
     ]);
   };
-
-  const limitInitial = (() => {
-    if (editingLimitName) {
-      const card = cards.find((c) => c.name === editingLimitName);
-      return ((card?.limitMinor ?? 500_000) / 100).toFixed(2);
-    }
-    return "5000.00";
-  })();
 
   return (
     <ScreenContainer contentContainerStyle={{ gap: theme.spacing.lg }} testID="budgets-screen">
@@ -358,9 +355,9 @@ export function BudgetsScreen({ navigation }) {
         <TextInput
           accessibilityLabel="Monthly limit"
           autoFocus
-          keyboardType="decimal-pad"
+          keyboardType="number-pad"
           onChangeText={setPendingLimitInput}
-          placeholder="1500.00"
+          placeholder="1500"
           placeholderTextColor={theme.colors.sub}
           style={{
             backgroundColor: theme.colors.bg,

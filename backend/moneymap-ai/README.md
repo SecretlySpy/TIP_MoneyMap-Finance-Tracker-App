@@ -28,11 +28,13 @@ No Gemini API credentials, private tokens, or transaction histories are shipped 
   - `X-MoneyMap-Consent: 1`
   - `X-Firebase-AppCheck: <valid-app-check-token>`
 - **Payload Schema:**
+  - `contractVersion`: exactly `2` (required on both AI endpoints)
+  - `moneyUnit`: exactly `"PHP_WHOLE_PESOS_V2"`
   - `period`: string (`YYYY-MM`)
-  - `currencySymbol`: string (e.g., `₱`)
-  - `remainingBudgetMinor`: integer centavos
-  - `limitBudgetMinor`: integer centavos
-  - `spentBudgetMinor`: integer centavos
+  - `currencySymbol`: exactly `₱` (PHP-only endpoint)
+  - `remainingBudgetPesos`: nonnegative whole-peso integer
+  - `limitBudgetPesos`: nonnegative whole-peso integer
+  - `spentBudgetPesos`: nonnegative whole-peso integer
   - `categorySpendRatios`: array of `{ category: string, ratio: number }` (max 16)
   - **Strictly Forbidden:** transactions, notes, personal memos, accounts, rule IDs.
 
@@ -42,12 +44,16 @@ No Gemini API credentials, private tokens, or transaction histories are shipped 
   - `X-MoneyMap-Consent: 1`
   - `X-Firebase-AppCheck: <valid-app-check-token>`
 - **Payload Schema:**
+  - `contractVersion`: exactly `2`
+  - `moneyUnit`: exactly `"PHP_WHOLE_PESOS_V2"`
   - `context`: `"student_eats_near_campus"`
   - `areaHint`: `"TIP Quezon City vicinity"`
-  - `currencySymbol`: string
-  - `dailyFoodBudgetMinor`: integer centavos or null
+  - `currencySymbol`: exactly `₱`
+  - `dailyFoodBudgetPesos`: nonnegative whole-peso integer or null
   - `places`: array of up to 8 places with coarse distance bands (`very_near`, `near`, `walkable`, `farther`).
   - **Strictly Forbidden:** latitude, longitude, device coordinates.
+
+Both AI endpoints reject legacy centavo fields, missing/unsupported versions or units, non-integer or out-of-range peso amounts, and unsupported currency symbols with HTTP 422 `invalid_summary`. AI tips may return optional structured `amountPesos` (nonnegative whole-peso integer bounded by the submitted budget and requiring `isEstimate: true`; no numeric amount when the daily food budget is unset). Numeric claims in model-generated prose are rejected, causing HTTP 503 `ai_unavailable` so the client can use offline tips. Clients should display money from `amountPesos`, never parse a price from the AI title or description. If the user selects a non-PHP display symbol, use offline tips rather than submitting a mislabeled PHP summary.
 
 ---
 

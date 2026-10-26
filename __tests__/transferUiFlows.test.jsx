@@ -225,7 +225,7 @@ describe("Transfer UI Flows (Phase 2 & Phase 3 Slice)", () => {
       await waitFor(() => {
         expect(screen.getByText("Top up student card")).toBeTruthy();
         expect(screen.getByText("Cash Wallet → Student Card")).toBeTruthy();
-        expect(screen.getByText("₱200.00")).toBeTruthy();
+        expect(screen.getByText("₱200")).toBeTruthy();
       });
 
       // Tap to view detail
@@ -288,7 +288,7 @@ describe("Transfer UI Flows (Phase 2 & Phase 3 Slice)", () => {
       await waitFor(() => {
         expect(screen.getByText("Account Transfer")).toBeTruthy();
         expect(screen.getByText("Top up student card")).toBeTruthy();
-        expect(screen.getByText("₱200.00")).toBeTruthy();
+        expect(screen.getByText("₱200")).toBeTruthy();
         expect(screen.getByText("Transfer · Neutral Ledger")).toBeTruthy();
       });
 
@@ -315,11 +315,11 @@ describe("Transfer UI Flows (Phase 2 & Phase 3 Slice)", () => {
       });
 
       // Edit note and amount
-      await fireEvent.changeText(screen.getByLabelText("Transfer amount"), "350.00");
+      await fireEvent.changeText(screen.getByLabelText("Transfer amount"), "350");
       await fireEvent.changeText(screen.getByLabelText("Transfer note"), "Updated top up note");
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Transfer amount").props.value).toBe("350.00");
+        expect(screen.getByLabelText("Transfer amount").props.value).toBe("350");
         expect(screen.getByLabelText("Transfer note").props.value).toBe("Updated top up note");
       });
 

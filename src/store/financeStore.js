@@ -1692,7 +1692,10 @@ export const useFinanceStore = create((set, get) => ({
         for (const cat of target.categories) {
             const catName = cat.name?.trim();
             if (!catName) continue;
-            const limitMinor = Number(cat.amountMinor ?? cat.limitMinor ?? 0);
+            const templateMinor = Number(cat.amountMinor ?? cat.limitMinor ?? 0);
+            const limitMinor = target.period === "SEMESTER"
+                ? Math.round(templateMinor / 5)
+                : templateMinor;
             if (limitMinor <= 0) continue;
 
             const icon = cat.icon ?? cat.emoji ?? "📊";

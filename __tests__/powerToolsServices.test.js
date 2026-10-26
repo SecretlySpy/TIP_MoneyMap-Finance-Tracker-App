@@ -42,14 +42,14 @@ describe("P2 Power Tools Domain Services", () => {
       expect(result.isValid).toBe(false);
       expect(result.sumMinor).toBe(45_000);
       expect(result.diffMinor).toBe(5_000);
-      expect(result.error).toContain("Difference: 5000");
+      expect(result.error).toBe("Split amounts do not equal the purchase total.");
     });
 
     it("rejects non-positive and non-integer split amounts", () => {
       const splits = [{ categoryId: 1, amountMinor: -5_000 }];
       const result = validateSplitSum(splits, 5_000);
       expect(result.isValid).toBe(false);
-      expect(result.error).toContain("positive integer");
+      expect(result.error).toContain("positive amount");
     });
 
     it("formats split equation accurately", () => {
@@ -73,13 +73,13 @@ describe("P2 Power Tools Domain Services", () => {
       expect(breakdown.items[0].percentage).toBe(60);
     });
 
-    it("formats split equation with centavo precision when cents exist", () => {
+    it("preserves exact fractional splits while showing a truthful rounded total", () => {
       const splits = [
         { amountMinor: 30_050 }, // ₱300.50
         { amountMinor: 19_950 }, // ₱199.50
       ];
       const eq = formatSplitEquation(splits, 50_000, "₱");
-      expect(eq).toBe("₱300.50 + ₱199.50 = ₱500.00");
+      expect(eq).toBe("Split total ₱500");
     });
 
     it("validates split items have categories when requireCategory option is enabled", () => {
@@ -167,7 +167,7 @@ describe("P2 Power Tools Domain Services", () => {
       expect(result.diffMinor).toBe(0);
 
       const eq = formatSplitEquation(splits, 100_055, "₱");
-      expect(eq).toBe("₱200.11 + ₱200.11 + ₱200.11 + ₱200.11 + ₱200.11 = ₱1,000.55");
+      expect(eq).toBe("Split total ₱1,001");
     });
 
     it("correctly identifies under-allocation and over-allocation across multi-splits", () => {

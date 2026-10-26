@@ -280,7 +280,7 @@ export function ImportScreen({ navigation }) {
     if (parsed?.rows && parsed.rows.length > 0) {
       return parsed.rows.slice(0, 3).map((r) => ({
         date: formatLocalDateISO(r.dateEpochMillis),
-        amount: (r.amountMinor / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        amount: formatMinor(r.amountMinor, { currencySymbol }),
         type: r.type,
       }));
     }
@@ -292,11 +292,11 @@ export function ImportScreen({ navigation }) {
       }));
     }
     return [
-      { date: "2026-09-01", amount: "15,000.00", type: "INCOME" },
-      { date: "2026-09-02", amount: "120.00", type: "EXPENSE" },
-      { date: "2026-09-02", amount: "40.00", type: "EXPENSE" },
+      { date: "2026-09-01", amount: `${currencySymbol}15,000`, type: "INCOME" },
+      { date: "2026-09-02", amount: `${currencySymbol}120`, type: "EXPENSE" },
+      { date: "2026-09-02", amount: `${currencySymbol}40`, type: "EXPENSE" },
     ];
-  }, [grid, mappings, parsed]);
+  }, [grid, mappings, parsed, currencySymbol]);
 
   const selectedDuplicateCount = duplicateRows.filter((item) => selectedDuplicateIndices.has(item.originalIndex)).length;
   const selectedCount = readyRows.length + selectedDuplicateCount;

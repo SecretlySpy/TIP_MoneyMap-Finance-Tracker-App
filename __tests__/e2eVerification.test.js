@@ -16,7 +16,7 @@ describe("MoneyMap End-to-End System & Backend Integrity", () => {
     });
 
     it("formats minor units cleanly into localized strings", () => {
-      expect(formatMinor(1500050, { currencySymbol: "₱", showCents: true })).toBe("₱15,000.50");
+      expect(formatMinor(1500050, { currencySymbol: "₱", showCents: true })).toBe("₱15,001");
       expect(formatMinor(1500000, { currencySymbol: "$", showCents: false })).toBe("$15,000");
     });
   });

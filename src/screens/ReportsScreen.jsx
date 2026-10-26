@@ -5,7 +5,7 @@ import { Chip } from "../components/Chip";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { computeAccountBalances, formatMonthChip } from "../domain/services/financeView";
-import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
+import { formatMinor, parseWholePesosToMinor } from "../domain/services/money";
 import { calculateDebtPayoffSchedule, computeCashFlowTrends } from "../domain/services/reports";
 import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -22,9 +22,9 @@ export function ReportsScreen({ navigation }) {
   const [showTableView, setShowTableView] = useState(false);
 
   // Debt calculator state
-  const [debtPrincipalInput, setDebtPrincipalInput] = useState("1200.00");
+  const [debtPrincipalInput, setDebtPrincipalInput] = useState("1200");
   const [debtInterestInput, setDebtInterestInput] = useState("0");
-  const [monthlyPaymentInput, setMonthlyPaymentInput] = useState("400.00");
+  const [monthlyPaymentInput, setMonthlyPaymentInput] = useState("400");
 
   const cashFlowTrends = useMemo(
     () => computeCashFlowTrends({ transactions, months: 6 }),
@@ -48,29 +48,32 @@ export function ReportsScreen({ navigation }) {
 
   const debtPrincipalMinor = useMemo(() => {
     try {
-      return parseDecimalToMinor(debtPrincipalInput.replace(/[^0-9.]/g, "") || "0");
+      return parseWholePesosToMinor(debtPrincipalInput.trim());
     } catch {
-      return 0;
+      return null;
     }
   }, [debtPrincipalInput]);
 
   const monthlyPaymentMinor = useMemo(() => {
     try {
-      return parseDecimalToMinor(monthlyPaymentInput.replace(/[^0-9.]/g, "") || "0");
+      return parseWholePesosToMinor(monthlyPaymentInput.trim());
     } catch {
-      return 0;
+      return null;
     }
   }, [monthlyPaymentInput]);
 
-  const debtInterestRate = Number(debtInterestInput.replace(/[^0-9.]/g, "") || "0");
+  const debtInterestRate = /^\d+(?:\.\d+)?$/.test(debtInterestInput.trim())
+    ? Number(debtInterestInput.trim()) : NaN;
 
   const payoffResult = useMemo(
     () =>
-      calculateDebtPayoffSchedule({
-        principalMinor: debtPrincipalMinor,
-        annualInterestRatePercent: debtInterestRate,
-        monthlyPaymentMinor,
-      }),
+      debtPrincipalMinor === null || monthlyPaymentMinor === null || !Number.isFinite(debtInterestRate)
+        ? { canPayoff: false, error: "Enter valid whole-peso balances and a valid interest rate." }
+        : calculateDebtPayoffSchedule({
+            principalMinor: debtPrincipalMinor,
+            annualInterestRatePercent: debtInterestRate,
+            monthlyPaymentMinor,
+          }),
     [debtPrincipalMinor, debtInterestRate, monthlyPaymentMinor]
   );
 
@@ -377,13 +380,13 @@ export function ReportsScreen({ navigation }) {
                 QUICK PRESETS
               </Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.xs }}>
-                <Chip onPress={() => applyDebtPreset("1200.00", "0", "400.00")}>
+                <Chip onPress={() => applyDebtPreset("1200", "0", "400")}>
                   SPayLater 0% (₱1.2k)
                 </Chip>
-                <Chip onPress={() => applyDebtPreset("15000.00", "0", "3000.00")}>
+                <Chip onPress={() => applyDebtPreset("15000", "0", "3000")}>
                   Tuition Plan (₱15k)
                 </Chip>
-                <Chip onPress={() => applyDebtPreset("5000.00", "24", "1000.00")}>
+                <Chip onPress={() => applyDebtPreset("5000", "24", "1000")}>
                   Card 24% (₱5k)
                 </Chip>
               </View>

@@ -3,7 +3,7 @@ import { Pressable, TextInput, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { PrimaryButton } from "../components/Buttons";
 import { ScreenContainer } from "../components/ScreenContainer";
-import { parseDecimalToMinor } from "../domain/services/money";
+import { minorToWholePesos, parseWholePesosToMinor } from "../domain/services/money";
 import {
   createOnboardingDraft,
   mergeOnboardingDraft,
@@ -179,12 +179,14 @@ export function OnboardingScreen({ navigation }) {
       return;
     }
 
+    const reusable = accounts.find((account) => account.type === draft.account.type && !account.isArchived)
+      ?? accounts.find((account) => account.type === draft.account.type);
     let startingBalanceMinor;
     try {
-      startingBalanceMinor = parseDecimalToMinor(
-        draft.account.openingBalanceInput.replace(/[₱$,\s]/g, "") || "0",
-        { allowNegative: true },
-      );
+      const entered = draft.account.openingBalanceInput.trim();
+      startingBalanceMinor = reusable && entered === String(minorToWholePesos(reusable.startingBalanceMinor))
+        ? reusable.startingBalanceMinor
+        : parseWholePesosToMinor(entered, { allowNegative: true });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Enter a valid opening balance.");
       return;
@@ -194,8 +196,6 @@ export function OnboardingScreen({ navigation }) {
     setError(null);
     try {
       // Reuse an active account first, then revive an archived one before creating a duplicate type.
-      const reusable = accounts.find((account) => account.type === draft.account.type && !account.isArchived)
-        ?? accounts.find((account) => account.type === draft.account.type);
       const savedAccount = reusable
         ? await updateAccount({
             id: reusable.id,
@@ -240,7 +240,7 @@ export function OnboardingScreen({ navigation }) {
     if (busy) return;
     let amountMinor;
     try {
-      amountMinor = parseDecimalToMinor(draft.expense.amountInput.replace(/[₱$,\s]/g, ""));
+      amountMinor = parseWholePesosToMinor(draft.expense.amountInput.trim());
       if (amountMinor <= 0) {
         throw new RangeError("Expense amount must be greater than zero.");
       }
@@ -337,7 +337,7 @@ export function OnboardingScreen({ navigation }) {
               ))}
             </View>
             <Text style={fieldLabelStyle}>Opening balance</Text>
-            <Field accessibilityLabel="Opening balance" keyboardType="decimal-pad" onChangeText={(openingBalanceInput) => patchDraft({ account: { openingBalanceInput } })} placeholder="0.00" value={draft.account.openingBalanceInput} />
+             <Field accessibilityLabel="Opening balance" keyboardType="numbers-and-punctuation" onChangeText={(openingBalanceInput) => patchDraft({ account: { openingBalanceInput } })} placeholder="0" value={draft.account.openingBalanceInput} />
           </View>
           <PrimaryButton disabled={busy} onPress={() => void handleAccountContinue()}>{busy ? "Saving…" : "Save and continue"}</PrimaryButton>
         </>
@@ -348,7 +348,7 @@ export function OnboardingScreen({ navigation }) {
           <StepHeading emoji="🧾" subtitle="Add one real expense to see MoneyMap update. This step is optional." title="Add your first expense" />
           <View style={panelStyle}>
             <Text style={fieldLabelStyle}>Amount</Text>
-            <Field accessibilityLabel="Expense amount" keyboardType="decimal-pad" onChangeText={(amountInput) => patchDraft({ expense: { amountInput } })} placeholder="80.00" value={draft.expense.amountInput} />
+             <Field accessibilityLabel="Expense amount" keyboardType="number-pad" onChangeText={(amountInput) => patchDraft({ expense: { amountInput } })} placeholder="80" value={draft.expense.amountInput} />
             <Text style={fieldLabelStyle}>Category</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm }}>
               {expenseCategories.map((name) => (

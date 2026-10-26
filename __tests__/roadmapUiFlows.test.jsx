@@ -106,7 +106,7 @@ describe("Roadmap UI Flows", () => {
     const screen = await render(<TransactionDetailScreen navigation={navigation} route={route} />);
 
     expect(screen.getByText("Account Transfer")).toBeTruthy();
-    expect(screen.getByText("₱200.00")).toBeTruthy();
+    expect(screen.getByText("₱200")).toBeTruthy();
     expect(screen.getByText("Top up student card")).toBeTruthy();
     expect(screen.getByText("Delete Transfer")).toBeTruthy();
 
@@ -139,7 +139,7 @@ describe("Roadmap UI Flows", () => {
     // Input matching statement balance
     const input = screen.getByLabelText("Statement balance");
     // Starting balance 1,000 - expense 80 - outbound transfer 200 = 720
-    fireEvent.changeText(input, "720.00");
+    fireEvent.changeText(input, "720");
 
     await waitFor(() => {
       expect(screen.getByText("Finish & Save Reconciliation")).toBeTruthy();

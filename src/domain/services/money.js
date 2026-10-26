@@ -6,10 +6,29 @@ function assertMinorUnits(value) {
 function groupThousands(value) {
     return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
+// Only presentation and API summaries round: the ledger keeps exact minor units.
+// Ties round away from zero (e.g. 50 centavos -> ₱1, -50 -> -₱1).
+export function minorToWholePesos(amountMinor) {
+    assertMinorUnits(amountMinor);
+    const magnitude = Math.abs(amountMinor);
+    const whole = Math.floor(magnitude / 100) + (magnitude % 100 >= 50 ? 1 : 0);
+    return amountMinor < 0 ? -whole : whole;
+}
+export function formatPesos(amountPesos, options = {}) {
+    if (!Number.isSafeInteger(amountPesos)) {
+        throw new RangeError("Peso values must be safe whole integers.");
+    }
+    const { currencySymbol = "₱", sign = "auto" } = options;
+    const prefix = sign === "never" ? "" : amountPesos < 0 ? "-" : sign === "always" ? "+" : "";
+    return `${prefix}${currencySymbol}${groupThousands(Math.abs(amountPesos))}`;
+}
 // Formatting is the only boundary where integer minor units become display text.
 export function formatMinor(amountMinor, options = {}) {
     assertMinorUnits(amountMinor);
-    const { currencySymbol = "₱", showCents = true, sign = "auto" } = options;
+    const { currencySymbol = "₱", showCents = currencySymbol !== "₱", sign = "auto" } = options;
+    if (currencySymbol === "₱" || !showCents) {
+        return formatPesos(minorToWholePesos(amountMinor), { currencySymbol, sign });
+    }
     const isNegative = amountMinor < 0;
     const absoluteMinor = Math.abs(amountMinor);
     const cents = absoluteMinor % 100;
@@ -20,7 +39,7 @@ export function formatMinor(amountMinor, options = {}) {
     return `${visiblePrefix}${currencySymbol}${groupThousands(whole)}${decimal}`;
 }
 // Transaction signs come from the domain type; stored amounts remain positive.
-export function formatTransactionAmount(amountMinor, type, showCents = true, currencySymbol = "₱") {
+export function formatTransactionAmount(amountMinor, type, showCents = false, currencySymbol = "₱") {
     assertMinorUnits(amountMinor);
     if (amountMinor < 0) {
         throw new RangeError("Stored transaction amounts must always be positive.");
@@ -50,20 +69,33 @@ export function parseDecimalToMinor(input, options = {}) {
     assertMinorUnits(amountMinor);
     return amountMinor;
 }
-// This finite-state keypad update caps input and preserves at most two decimals.
+// New PHP entries accept only whole pesos; historical/import decimal parsing stays separate.
+export function parseWholePesosToMinor(input, options = {}) {
+    const normalized = input.trim();
+    const { allowNegative = false } = options;
+    const pattern = allowNegative ? /^-?\d+$/ : /^\d+$/;
+    if (!pattern.test(normalized)) {
+        throw new RangeError("Enter a whole-peso amount without decimal places.");
+    }
+    const minor = Number(normalized) * 100;
+    assertMinorUnits(minor);
+    return minor;
+}
+// An untouched rounded edit field must not replace an exact historical value.
+export function parseEditedWholePesosToMinor(input, originalMinor, options = {}) {
+    assertMinorUnits(originalMinor);
+    if (input.trim() === String(minorToWholePesos(originalMinor))) {
+        return originalMinor;
+    }
+    return parseWholePesosToMinor(input, options);
+}
+// This finite-state keypad update caps input at whole-peso digits.
 export function updateMoneyInput(current, key) {
     if (key === "⌫") {
         const shortened = current.slice(0, -1);
         return shortened === "" ? "0" : shortened;
     }
-    if (key === ".") {
-        return current.includes(".") ? current : `${current}.`;
-    }
     if (!/^\d$/.test(key)) {
-        return current;
-    }
-    const decimalIndex = current.indexOf(".");
-    if (decimalIndex >= 0 && current.length - decimalIndex > 2) {
         return current;
     }
     const next = current === "0" ? key : `${current}${key}`;

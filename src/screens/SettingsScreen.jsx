@@ -89,6 +89,7 @@ export function SettingsScreen({ navigation }) {
     const accounts = useFinanceStore((state) => state.accounts);
     const categories = useFinanceStore((state) => state.categories);
     const transactions = useFinanceStore((state) => state.transactions);
+    const transactionGroups = useFinanceStore((state) => state.transactionGroups);
     const transfers = useFinanceStore((state) => state.transfers);
     const budgets = useFinanceStore((state) => state.budgets);
     const recurringRules = useFinanceStore((state) => state.recurringRules);
@@ -155,7 +156,7 @@ export function SettingsScreen({ navigation }) {
                     text: "Share Backup",
                     onPress: async () => {
                         try {
-                            const backup = buildBackup({ accounts, categories, transactions, transfers, budgets, recurringRules, goals });
+                             const backup = buildBackup({ accounts, categories, transactions, transactionGroups, transfers, budgets, recurringRules, goals });
                             await shareDocument(
                                 "MoneyMap backup",
                                 exportFileName("moneymap-backup", "json"),

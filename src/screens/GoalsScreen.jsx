@@ -10,7 +10,7 @@ import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
 import { formatLocalDateISO, parseLocalDateToNoonEpoch } from "../domain/services/emoji";
 import { applyGoalContribution, sortGoalsForDisplay } from "../domain/services/goals";
-import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
+import { formatMinor, minorToWholePesos, parseWholePesosToMinor } from "../domain/services/money";
 import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -55,7 +55,7 @@ export function GoalsScreen({ navigation }) {
     }
     let targetMinor = 0;
     try {
-      targetMinor = parseDecimalToMinor(draftTargetText.replace(/[₱$,\s]/g, "") || "0");
+      targetMinor = parseWholePesosToMinor(draftTargetText.trim());
       if (targetMinor <= 0) throw new Error("Enter a positive target amount.");
     } catch (err) {
       Alert.alert("Invalid target", err instanceof Error ? err.message : "Enter a valid target amount.");
@@ -111,7 +111,7 @@ export function GoalsScreen({ navigation }) {
     if (contributeId === null || busy) return;
     setBusy(true);
     try {
-      const amountMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
+      const amountMinor = parseWholePesosToMinor(value.trim());
       if (amountMinor <= 0) throw new Error("Enter a positive amount.");
       const goal = (goals ?? []).find((g) => g.id === contributeId);
       const outcome = goal ? applyGoalContribution(goal, amountMinor) : null;
@@ -149,7 +149,10 @@ export function GoalsScreen({ navigation }) {
     if (targetId === null || busy) return;
     setBusy(true);
     try {
-      const targetMinor = parseDecimalToMinor(value.replace(/[₱$,\s]/g, "") || "0");
+      const originalMinor = (goals ?? []).find((goal) => goal.id === targetId)?.targetMinor;
+      const targetMinor = originalMinor != null && value.trim() === String(minorToWholePesos(originalMinor))
+        ? originalMinor
+        : parseWholePesosToMinor(value.trim());
       if (targetMinor <= 0) throw new Error("Enter a positive target.");
       await updateGoal(targetId, { targetMinor });
       setTargetId(null);
@@ -319,9 +322,9 @@ export function GoalsScreen({ navigation }) {
             </Text>
             <TextInput
               accessibilityLabel="Target amount"
-              keyboardType="decimal-pad"
+              keyboardType="number-pad"
               onChangeText={setDraftTargetText}
-              placeholder="35,000.00"
+              placeholder="35000"
               placeholderTextColor={theme.colors.sub}
               style={{
                 backgroundColor: theme.colors.surface,
@@ -384,12 +387,12 @@ export function GoalsScreen({ navigation }) {
       <TextPromptModal
         confirmLabel="Add"
         disabled={busy}
-        initialValue="100.00"
-        keyboardType="decimal-pad"
+        initialValue="100"
+        keyboardType="number-pad"
         message="Track your savings progress (progress tracker only; does not transfer cash between accounts)."
         onCancel={() => setContributeId(null)}
         onConfirm={(value) => void handleContribute(value)}
-        placeholder="100.00"
+        placeholder="100"
         title="Contribute"
         visible={contributeId !== null}
       />
@@ -404,11 +407,11 @@ export function GoalsScreen({ navigation }) {
       />
       <TextPromptModal
         confirmLabel="Save"
-        initialValue={targetGoal ? (targetGoal.targetMinor / 100).toFixed(2) : "5000.00"}
-        keyboardType="decimal-pad"
+        initialValue={targetGoal ? String(minorToWholePesos(targetGoal.targetMinor)) : "5000"}
+        keyboardType="number-pad"
         onCancel={() => setTargetId(null)}
         onConfirm={(value) => void handleTarget(value)}
-        placeholder="5000.00"
+        placeholder="5000"
         title="Edit target"
         visible={targetId !== null}
       />

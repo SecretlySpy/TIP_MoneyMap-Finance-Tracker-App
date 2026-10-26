@@ -16,7 +16,8 @@ import { AppText as Text } from "./AppText";
 import { PrimaryButton } from "./Buttons";
 import { Chip } from "./Chip";
 import { useFinanceStore } from "../store/financeStore";
-import { formatMinor } from "../domain/services/money";
+import { useUiStore } from "../store/uiStore";
+import { formatMinor, minorToWholePesos, parseWholePesosToMinor } from "../domain/services/money";
 import {
   DEFAULT_STUDENT_TEMPLATES,
   calculateTemplateTotal,
@@ -35,6 +36,7 @@ const COMMON_STUDENT_EMOJIS = [
  */
 export function BudgetTemplateModal({ visible, onClose, targetMonthYear }) {
   const theme = useTheme();
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
   const insets = useSafeAreaInsets();
 
   const storeBudgetTemplates = useFinanceStore((s) => s.budgetTemplates);
@@ -338,7 +340,8 @@ export function BudgetTemplateModal({ visible, onClose, targetMonthYear }) {
                 const totals = calculateTemplateTotal(tpl);
                 const periodDetails = formatTemplatePeriodDetails(
                   tpl.period || "MONTHLY",
-                  totals.totalMinor
+                  totals.totalMinor,
+                  currencySymbol
                 );
 
                 return (
@@ -496,7 +499,7 @@ export function BudgetTemplateModal({ visible, onClose, targetMonthYear }) {
                                 fontSize: theme.typeScale.tiny,
                               }}
                             >
-                              {icon} {c.name}: {formatMinor(amt, { showCents: false })}
+                              {icon} {c.name}: {formatMinor(amt, { currencySymbol, showCents: false })}
                             </Text>
                           </View>
                         );
@@ -651,7 +654,7 @@ export function BudgetTemplateModal({ visible, onClose, targetMonthYear }) {
               onClose();
               Alert.alert(
                 "Template Applied",
-                `Successfully applied ${res.appliedCategories.length} categories (${formatMinor(res.totalMinor, { showCents: false })}) to ${effectiveMonthYear}.`
+                `Successfully applied ${res.appliedCategories.length} categories (${formatMinor(res.totalMinor, { currencySymbol, showCents: false })}) to ${effectiveMonthYear}.`
               );
             } catch (err) {
               Alert.alert(
@@ -708,6 +711,7 @@ export function BudgetTemplateModal({ visible, onClose, targetMonthYear }) {
  * Complies with Phase 7: Explicit user action, preview of target month, categories, and total.
  */
 function TemplateApplyReviewSheet({ visible, template, monthYear, onConfirm, onCancel }) {
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
   const theme = useTheme();
   const totals = useMemo(() => calculateTemplateTotal(template), [template]);
 
@@ -807,7 +811,7 @@ function TemplateApplyReviewSheet({ visible, template, monthYear, onConfirm, onC
                   fontSize: theme.typeScale.cardHeader,
                 }}
               >
-                {formatMinor(totals.monthlyEquivalentMinor, { showCents: false })}
+                {formatMinor(totals.monthlyEquivalentMinor, { currencySymbol, showCents: false })}
               </Text>
             </View>
           </View>
@@ -853,7 +857,7 @@ function TemplateApplyReviewSheet({ visible, template, monthYear, onConfirm, onC
                       fontSize: theme.typeScale.body,
                     }}
                   >
-                    {formatMinor(amt, { showCents: false })}
+                    {formatMinor(amt, { currencySymbol, showCents: false })}
                   </Text>
                 </View>
               );
@@ -921,6 +925,7 @@ function TemplateEditorSheet({
   onCancel,
 }) {
   const theme = useTheme();
+  const currencySymbol = useUiStore((state) => state.currencySymbol);
 
   const isEditing = Boolean(initialTemplate);
   const isSystem = Boolean(initialTemplate?.isSystem);
@@ -937,7 +942,8 @@ function TemplateEditorSheet({
       return initialTemplate.categories.map((c, i) => ({
         id: `row-${i}-${Date.now()}`,
         name: c.name || "",
-        amountString: String(Math.round(Number(c.amountMinor ?? c.limitMinor ?? 0) / 100)),
+        amountString: String(minorToWholePesos(Number(c.amountMinor ?? c.limitMinor ?? 0))),
+        originalMinor: Number(c.amountMinor ?? c.limitMinor ?? 0),
         emoji: c.emoji ?? c.icon ?? "📊",
         icon: c.icon ?? c.emoji ?? "📊",
       }));
@@ -958,10 +964,11 @@ function TemplateEditorSheet({
   const liveTotals = useMemo(() => {
     let totalCents = 0;
     for (const row of categoryRows) {
-      const val = parseFloat(row.amountString);
-      if (!isNaN(val) && val > 0) {
-        totalCents += Math.round(val * 100);
-      }
+      try {
+        const unchanged = row.originalMinor != null && row.amountString === String(minorToWholePesos(row.originalMinor));
+        const minor = unchanged ? row.originalMinor : parseWholePesosToMinor(row.amountString);
+        if (minor > 0) totalCents += minor;
+      } catch { /* Invalid draft amounts are reported by validation below. */ }
     }
     const isSemester = period === "SEMESTER";
     const monthlyEquivalent = isSemester
@@ -997,8 +1004,15 @@ function TemplateEditorSheet({
       if (seen.has(lower)) return `Duplicate category "${rName}".`;
       seen.add(lower);
 
-      const val = parseFloat(r.amountString);
-      if (isNaN(val) || val <= 0) {
+      let minor;
+      try {
+        minor = r.originalMinor != null && r.amountString === String(minorToWholePesos(r.originalMinor))
+          ? r.originalMinor
+          : parseWholePesosToMinor(r.amountString);
+      } catch {
+        return `Category "${rName}" must have a valid positive whole-peso amount.`;
+      }
+      if (minor <= 0) {
         return `Category "${rName}" must have a valid positive amount.`;
       }
     }
@@ -1006,10 +1020,8 @@ function TemplateEditorSheet({
   }, [name, categoryRows]);
 
   const handleRowAmountChange = (id, text) => {
-    // Only allow numbers and decimal point
-    const sanitized = text.replace(/[^0-9.]/g, "");
     setCategoryRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, amountString: sanitized } : r))
+      prev.map((r) => (r.id === id ? { ...r, amountString: text } : r))
     );
   };
 
@@ -1075,7 +1087,9 @@ function TemplateEditorSheet({
 
     const compiledCategories = categoryRows.map((r) => ({
       name: r.name.trim(),
-      amountMinor: Math.round(parseFloat(r.amountString) * 100),
+      amountMinor: r.originalMinor != null && r.amountString === String(minorToWholePesos(r.originalMinor))
+        ? r.originalMinor
+        : parseWholePesosToMinor(r.amountString),
       emoji: r.emoji,
       icon: r.emoji,
     }));
@@ -1273,7 +1287,7 @@ function TemplateEditorSheet({
                     period === "MONTHLY"
                       ? liveTotals.totalMinor
                       : liveTotals.semesterTotalMinor,
-                    { showCents: false }
+                    { currencySymbol, showCents: false }
                   )}
                 </Text>
               </View>
@@ -1292,7 +1306,7 @@ function TemplateEditorSheet({
                     period === "MONTHLY"
                       ? liveTotals.semesterTotalMinor
                       : liveTotals.monthlyEquivalentMinor,
-                    { showCents: false }
+                    { currencySymbol, showCents: false }
                   )}
                 </Text>
               </View>
@@ -1520,7 +1534,7 @@ function TemplateEditorSheet({
                   />
 
                   <View style={styles.amountInputWrap}>
-                    <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>₱</Text>
+                     <Text style={{ color: theme.colors.sub, fontSize: theme.typeScale.small }}>{currencySymbol}</Text>
                     <TextInput
                       accessibilityLabel={`Category ${idx + 1} amount`}
                       keyboardType="numeric"

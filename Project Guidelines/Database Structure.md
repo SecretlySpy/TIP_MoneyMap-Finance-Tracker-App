@@ -1,7 +1,7 @@
 # Database Structure
 
-Updated: 2026-10-19
-Engine: SQLite via OP-SQLite with SQLCipher; schema version 8
+Updated: 2026-10-26
+Engine: SQLite via OP-SQLite with SQLCipher; schema version 9
 
 ## Data model
 
@@ -64,6 +64,12 @@ erDiagram
 - Optional Student Eats live results may be stored under `app_metadata` key `eats-places-cache-v1`. This is
   not a schema version bump. The bundled campus catalog does not depend on that row. Local reset deletes it
   with the database.
+
+## Whole-peso presentation, exact storage
+
+No schema migration was added for the peso display change. Every persisted money column remains an exact integer minor unit (`*_minor`). New PHP inputs are whole pesos and are stored as `pesos * 100`. Historical fractional rows are not rewritten.
+
+Display and anonymized AI summaries convert once with half-away-from-zero rounding (`50` centavos becomes `₱1`; `-50` becomes `-₱1`). An edit field that is saved unchanged keeps the original minor value, including a fractional remainder. CSV import still accepts up to two decimal places so older exports round-trip exactly. JSON backup version 3 still stores raw minor integers. Settings backup now includes `transactionGroups`, and restore rejects a transaction whose `splitGroupId` has no matching group.
 
 ## Lifecycle, privacy, and recovery
 

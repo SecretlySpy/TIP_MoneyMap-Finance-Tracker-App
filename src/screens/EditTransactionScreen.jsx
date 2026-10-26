@@ -9,7 +9,7 @@ import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { categoryEmoji, resolveDisplayEmoji } from "../domain/services/emoji";
 import { accountChipLabel, categoriesForType, computeAccountBalances } from "../domain/services/financeView";
-import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
+import { formatMinor, minorToWholePesos, parseEditedWholePesosToMinor, parseWholePesosToMinor } from "../domain/services/money";
 import {
   computeSplitBreakdown,
   extractParentNote,
@@ -210,7 +210,7 @@ function EditTransactionForm({
   // Form State
   const [type, setType] = useState(transaction.type);
   const [amountStr, setAmountStr] = useState(
-    (transaction.amountMinor / 100).toFixed(2).replace(/\.00$/, ""),
+    String(minorToWholePesos(transaction.amountMinor)),
   );
   const [categoryId, setCategoryId] = useState(transaction.categoryId);
   const [accountId, setAccountId] = useState(transaction.accountId);
@@ -247,8 +247,14 @@ function EditTransactionForm({
   });
 
   const handleSave = async () => {
-    const cleaned = amountStr.trim().replace(/[₱$,\s]/g, "");
-    const amountMinor = parseDecimalToMinor(cleaned);
+    let amountMinor;
+    try {
+      const cleaned = amountStr.trim().replace(/[₱$,\s]/g, "");
+      amountMinor = parseEditedWholePesosToMinor(cleaned, transaction.amountMinor);
+    } catch {
+      setSaveError("Enter a whole-peso amount without decimals.");
+      return;
+    }
     if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
       setSaveError("Please enter a valid amount greater than zero.");
       return;
@@ -454,7 +460,7 @@ function EditTransactionForm({
           </Text>
           <TextInput
             accessibilityLabel="Transaction amount"
-            keyboardType="decimal-pad"
+            keyboardType="number-pad"
             onChangeText={(val) => setAmountStr(val)}
             placeholder="0.00"
             placeholderTextColor={theme.colors.sub}
@@ -742,7 +748,7 @@ function EditTransferForm({
   updateAccountTransfer,
 }) {
   const [amountStr, setAmountStr] = useState(
-    (transfer.amountMinor / 100).toFixed(2).replace(/\.00$/, ""),
+    String(minorToWholePesos(transfer.amountMinor)),
   );
   const [fromAccountId, setFromAccountId] = useState(transfer.fromAccountId);
   const [toAccountId, setToAccountId] = useState(transfer.toAccountId);
@@ -761,7 +767,7 @@ function EditTransferForm({
   const parsedAmountMinor = useMemo(() => {
     try {
       const cleaned = amountStr.trim().replace(/[₱$,\s]/g, "");
-      return parseDecimalToMinor(cleaned);
+      return parseEditedWholePesosToMinor(cleaned, transfer.amountMinor);
     } catch {
       return 0;
     }
@@ -941,7 +947,7 @@ function EditTransferForm({
           </Text>
           <TextInput
             accessibilityLabel="Transfer amount"
-            keyboardType="decimal-pad"
+            keyboardType="number-pad"
             onChangeText={(val) => setAmountStr(val)}
             placeholder="0.00"
             placeholderTextColor={theme.colors.sub}
@@ -1147,7 +1153,7 @@ function EditSplitPurchaseForm({
   const initialTotalMinor = groupAllocations.reduce((sum, a) => sum + (Number(a.amountMinor) || 0), 0);
   const [totalMinor, setTotalMinor] = useState(initialTotalMinor);
   const [totalStr, setTotalStr] = useState(
-    initialTotalMinor % 100 === 0 ? String(initialTotalMinor / 100) : (initialTotalMinor / 100).toFixed(2)
+    String(minorToWholePesos(initialTotalMinor))
   );
 
   let initialTitle = groupMeta?.title?.trim() || "";
@@ -1173,7 +1179,8 @@ function EditSplitPurchaseForm({
         categoryId: a.categoryId,
         categoryName: cat?.name ?? "Other",
         amountMinor: a.amountMinor,
-        rawAmount: a.amountMinor % 100 === 0 ? String(a.amountMinor / 100) : (a.amountMinor / 100).toFixed(2),
+        rawAmount: String(minorToWholePesos(a.amountMinor)),
+        originalMinor: a.amountMinor,
         note: stripSplitSuffix(a.note) || "",
       };
     })
@@ -1211,22 +1218,30 @@ function EditSplitPurchaseForm({
   const handleTotalChange = (text) => {
     setTotalStr(text);
     const cleaned = text.trim().replace(/[₱$,\s]/g, "");
-    const parsed = parseDecimalToMinor(cleaned);
-    if (Number.isInteger(parsed) && parsed >= 0) {
-      setTotalMinor(parsed);
+    try {
+      setTotalMinor(parseEditedWholePesosToMinor(cleaned, initialTotalMinor));
+    } catch {
+      setTotalMinor(0);
     }
   };
 
   const handleSplitAmountChange = (splitId, text) => {
     const cleaned = text.trim().replace(/[₱$,\s]/g, "");
-    const parsed = parseDecimalToMinor(cleaned);
     setSplits((prev) =>
       prev.map((s) => {
         if (s.id !== splitId) return s;
+        let amountMinor = 0;
+        try {
+          amountMinor = s.originalMinor !== undefined
+            ? parseEditedWholePesosToMinor(cleaned, s.originalMinor)
+            : parseWholePesosToMinor(cleaned);
+        } catch {
+          // Invalid drafts remain visible but cannot be saved.
+        }
         return {
           ...s,
           rawAmount: text,
-          amountMinor: Number.isInteger(parsed) && parsed >= 0 ? parsed : 0,
+          amountMinor,
         };
       })
     );
@@ -1245,7 +1260,7 @@ function EditSplitPurchaseForm({
       categoryId: nextCat?.id,
       categoryName: nextCat?.name ?? "Other",
       amountMinor: remaining,
-      rawAmount: remaining % 100 === 0 ? String(remaining / 100) : (remaining / 100).toFixed(2),
+      rawAmount: String(minorToWholePesos(remaining)),
       note: "",
     };
 
@@ -1386,7 +1401,7 @@ function EditSplitPurchaseForm({
           </Text>
           <TextInput
             accessibilityLabel="Total purchase amount"
-            keyboardType="decimal-pad"
+            keyboardType="number-pad"
             onChangeText={handleTotalChange}
             placeholder="0.00"
             placeholderTextColor={theme.colors.sub}

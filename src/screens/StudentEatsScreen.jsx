@@ -9,10 +9,10 @@ import {
   formatDistance,
   TIP_QC_CAMPUS,
 } from "../domain/services/eatsRanking";
-import { formatMinor } from "../domain/services/money";
+import { formatMinor, formatPesos } from "../domain/services/money";
 import { deriveSmartTips } from "../domain/services/tips";
-import { fetchEatsAiTips } from "../remote/eatsTipsClient";
-import { fetchNearbyEats } from "../remote/placesClient";
+import { clearEatsTipsCache, fetchEatsAiTips } from "../remote/eatsTipsClient";
+import { clearPlacesCache, fetchNearbyEats } from "../remote/placesClient";
 import {
   requestEatsLocationPermission,
   resolveEatsOrigin,
@@ -30,11 +30,11 @@ export function StudentEatsScreen({ navigation }) {
   const theme = useTheme();
   const currencySymbol = useUiStore((state) => state.currencySymbol);
   const onlinePersonalizationEnabled = Boolean(
-    useUiStore((state) => state.onlinePersonalizationEnabled || state.smartTipsEnabled),
+    useUiStore((state) => state.onlinePersonalizationEnabled ?? state.smartTipsEnabled),
   );
   const onlinePersonalizationConsentAccepted = Boolean(
     useUiStore(
-      (state) => state.onlinePersonalizationConsentAccepted || state.smartTipsConsentAccepted,
+      (state) => state.onlinePersonalizationConsentAccepted ?? state.smartTipsConsentAccepted,
     ),
   );
 
@@ -56,6 +56,8 @@ export function StudentEatsScreen({ navigation }) {
   const [attribution, setAttribution] = useState("Powered by Google");
   const [aiTips, setAiTips] = useState(null);
   const [aiStatus, setAiStatus] = useState("idle");
+  const requestId = useRef(0);
+  const hasPlaces = useRef(false);
 
   const lastRequestRef = useRef({
     latitude: 0,
@@ -85,17 +87,24 @@ export function StudentEatsScreen({ navigation }) {
 
   const load = useCallback(
     async (force = false) => {
+      const currentRequest = ++requestId.current;
       if (!onlinePersonalizationEnabled) {
+        clearEatsTipsCache();
+        clearPlacesCache();
         setStatus("disabled");
         setPlaces([]);
         setAiTips(null);
+        hasPlaces.current = false;
         return;
       }
 
       if (!onlinePersonalizationConsentAccepted) {
+        clearEatsTipsCache();
+        clearPlacesCache();
         setStatus("consent_required");
         setPlaces([]);
         setAiTips(null);
+        hasPlaces.current = false;
         return;
       }
 
@@ -103,6 +112,7 @@ export function StudentEatsScreen({ navigation }) {
       setStatus("loading");
 
       const nextOrigin = await resolveEatsOrigin();
+      if (currentRequest !== requestId.current) return;
       setOrigin(nextOrigin);
 
       // Deduplication check: Avoid repeat fetches if origin and budget haven't materially changed
@@ -113,7 +123,7 @@ export function StudentEatsScreen({ navigation }) {
       const budgetDiff = dailyFoodBudgetMinor !== last.dailyBudget;
       const isFresh = now - last.timestamp < 15_000;
 
-      if (!force && !budgetDiff && isFresh && latDiff < 0.002 && lonDiff < 0.002 && places.length > 0) {
+      if (!force && !budgetDiff && isFresh && latDiff < 0.002 && lonDiff < 0.002 && hasPlaces.current) {
         setStatus("ready");
         return;
       }
@@ -135,8 +145,10 @@ export function StudentEatsScreen({ navigation }) {
         enabled: onlinePersonalizationEnabled,
         consentAccepted: onlinePersonalizationConsentAccepted,
       });
+      if (currentRequest !== requestId.current) return;
 
       if (result.source === "disabled") {
+        hasPlaces.current = false;
         setStatus("disabled");
         setPlaces([]);
         setAiTips(null);
@@ -144,6 +156,7 @@ export function StudentEatsScreen({ navigation }) {
       }
 
       if (result.source === "unavailable") {
+        hasPlaces.current = false;
         setStatus("error");
         setPlaces([]);
         setErrorMessage(result.errorMessage ?? "Google Places is temporarily unavailable.");
@@ -152,16 +165,16 @@ export function StudentEatsScreen({ navigation }) {
       }
 
       const returnedPlaces = result.places ?? [];
+      hasPlaces.current = returnedPlaces.length > 0;
       setPlaces(returnedPlaces);
       setAttribution(result.attribution || "Powered by Google");
       setErrorMessage(result.errorMessage);
       setStatus("ready");
-      if (returnedPlaces.length > 0 && !selectedPlaceId) {
-        setSelectedPlaceId(returnedPlaces[0].id);
-      }
+      setSelectedPlaceId((current) => returnedPlaces.some((place) => place.id === current)
+        ? current : (returnedPlaces[0]?.id ?? null));
 
       // Fetch grounded AI recommendations for verified places
-      if (returnedPlaces.length > 0) {
+      if (returnedPlaces.length > 0 && currencySymbol === "₱") {
         setAiStatus("loading");
         try {
           const tips = await fetchEatsAiTips({
@@ -171,9 +184,11 @@ export function StudentEatsScreen({ navigation }) {
             currencySymbol,
             dailyFoodBudgetMinor,
           });
+          if (currentRequest !== requestId.current) return;
           setAiTips(tips);
           setAiStatus(tips && tips.length > 0 ? "ready" : "idle");
         } catch {
+          if (currentRequest !== requestId.current) return;
           setAiStatus("error");
           setAiTips(null);
         }
@@ -187,13 +202,12 @@ export function StudentEatsScreen({ navigation }) {
       dailyFoodBudgetMinor,
       onlinePersonalizationConsentAccepted,
       onlinePersonalizationEnabled,
-      places.length,
-      selectedPlaceId,
     ],
   );
 
   useEffect(() => {
     void load();
+    return () => { requestId.current += 1; };
   }, [load]);
 
   const handleRequestLocation = async () => {
@@ -608,6 +622,11 @@ export function StudentEatsScreen({ navigation }) {
           ) : null}
 
           {/* Grounded AI Recommendations */}
+          {currencySymbol !== "₱" && status === "ready" ? (
+            <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
+              AI food budget suggestions require the peso display setting. Nearby eateries remain available.
+            </Text>
+          ) : null}
           {aiStatus === "loading" ? (
             <View
               style={{
@@ -692,6 +711,11 @@ export function StudentEatsScreen({ navigation }) {
                   >
                     {tip.meta}
                   </Text>
+                  {tip.amountPesos != null ? (
+                    <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                      {tip.isEstimate ? "~" : ""}{formatPesos(tip.amountPesos, { currencySymbol })}
+                    </Text>
+                  ) : null}
                 </SectionCard>
               ))}
             </View>

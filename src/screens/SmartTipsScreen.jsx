@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { EmptyState } from "../components/EmptyState";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { deriveSmartTips } from "../domain/services/tips";
-import { formatMinor } from "../domain/services/money";
-import { loadOnlineSmartTips } from "../remote/smartTipsClient";
+import { formatMinor, formatPesos } from "../domain/services/money";
+import { clearSmartTipsCache, loadOnlineSmartTips } from "../remote/smartTipsClient";
 import { isAiProxyConfigured } from "../remote/aiProxyClient";
 import { mapsFromState, useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
@@ -16,9 +16,14 @@ function formatCopy(copy, currencySymbol) {
   if (typeof copy === "string") {
     return copy;
   }
-  if (copy && typeof copy === "object" && typeof copy.amountMinor === "number") {
+  if (copy && typeof copy === "object") {
     const prefix = copy.approximate === true ? "~" : "";
-    return `${copy.before || ""}${prefix}${formatMinor(copy.amountMinor, { currencySymbol, showCents: false })}${copy.after || ""}`;
+    if (typeof copy.amountPesos === "number") {
+      return `${copy.before || ""}${prefix}${formatPesos(copy.amountPesos, { currencySymbol })}${copy.after || ""}`;
+    }
+    if (typeof copy.amountMinor === "number") {
+      return `${copy.before || ""}${prefix}${formatMinor(copy.amountMinor, { currencySymbol, showCents: false })}${copy.after || ""}`;
+    }
   }
   return String(copy ?? "");
 }
@@ -26,8 +31,8 @@ function formatCopy(copy, currencySymbol) {
 export function SmartTipsScreen({ navigation }) {
   const theme = useTheme();
   const currencySymbol = useUiStore((state) => state.currencySymbol);
-  const onlinePersonalizationEnabled = useUiStore((state) => Boolean(state.onlinePersonalizationEnabled || state.smartTipsEnabled));
-  const onlinePersonalizationConsentAccepted = useUiStore((state) => Boolean(state.onlinePersonalizationConsentAccepted || state.smartTipsConsentAccepted));
+  const onlinePersonalizationEnabled = useUiStore((state) => Boolean(state.onlinePersonalizationEnabled ?? state.smartTipsEnabled));
+  const onlinePersonalizationConsentAccepted = useUiStore((state) => Boolean(state.onlinePersonalizationConsentAccepted ?? state.smartTipsConsentAccepted));
   const budgets = useFinanceStore((state) => state.budgets);
   const categories = useFinanceStore((state) => state.categories);
   const transactions = useFinanceStore((state) => state.transactions);
@@ -35,6 +40,7 @@ export function SmartTipsScreen({ navigation }) {
 
   const [aiTips, setAiTips] = useState(null);
   const [aiStatus, setAiStatus] = useState("idle"); // idle | loading | ready | offline
+  const requestId = useRef(0);
 
   const { categoriesById } = useMemo(
     () => mapsFromState({ accounts: [], categories }),
@@ -53,15 +59,24 @@ export function SmartTipsScreen({ navigation }) {
   );
 
   const loadTips = useCallback(async () => {
+    const currentRequest = ++requestId.current;
     if (!onlinePersonalizationEnabled) {
+      clearSmartTipsCache();
       setAiTips(null);
       setAiStatus("idle");
       return;
     }
 
     if (!onlinePersonalizationConsentAccepted) {
+      clearSmartTipsCache();
       setAiTips(null);
       setAiStatus("idle");
+      return;
+    }
+
+    if (currencySymbol !== "₱") {
+      setAiTips(null);
+      setAiStatus("currency_unsupported");
       return;
     }
 
@@ -79,6 +94,7 @@ export function SmartTipsScreen({ navigation }) {
         categoriesById,
       });
 
+      if (currentRequest !== requestId.current) return;
       if (online === null || online.length === 0) {
         setAiTips(null);
         setAiStatus("offline");
@@ -88,6 +104,7 @@ export function SmartTipsScreen({ navigation }) {
       setAiTips(online);
       setAiStatus("ready");
     } catch {
+      if (currentRequest !== requestId.current) return;
       setAiTips(null);
       setAiStatus("offline");
     }
@@ -103,6 +120,7 @@ export function SmartTipsScreen({ navigation }) {
 
   useEffect(() => {
     void loadTips();
+    return () => { requestId.current += 1; };
   }, [loadTips]);
 
   const statusInfo = useMemo(() => {
@@ -110,21 +128,28 @@ export function SmartTipsScreen({ navigation }) {
       return {
         badge: "Online personalization disabled",
         emoji: "📱",
-        description: "Tips are computed from your own spending and stay on-device. Online personalization is optional.",
+        description: "Your budget totals stay on this device. Personalized tips need Online Personalization.",
+      };
+    }
+    if (currencySymbol !== "₱") {
+      return {
+        badge: "Peso tips only",
+        emoji: "₱",
+        description: "Online budget suggestions require the peso display setting. Your local budget overview remains available.",
       };
     }
     if (!isAiProxyConfigured()) {
       return {
         badge: "Online personalization not configured",
         emoji: "⚙️",
-        description: "Offline recommendations available. Secure online personalization is not configured yet.",
+        description: "Secure online personalization is not configured yet. Your local budget totals remain available.",
       };
     }
     if (aiStatus === "ready") {
       return {
         badge: "Online recommendations available",
         emoji: "✨",
-        description: "Personalized suggestions when online · rules-based tips always available offline.",
+        description: "Personalized suggestions from your anonymized budget summary.",
       };
     }
     if (aiStatus === "loading") {
@@ -138,7 +163,7 @@ export function SmartTipsScreen({ navigation }) {
       return {
         badge: "Online service unavailable",
         emoji: "⚠️",
-        description: "Online service unavailable. Offline recommendations available.",
+        description: "Online service unavailable. Retry when you are connected.",
       };
     }
     return {
@@ -146,7 +171,7 @@ export function SmartTipsScreen({ navigation }) {
       emoji: "✨",
       description: "Personalized suggestions when online.",
     };
-  }, [aiStatus, onlinePersonalizationEnabled, onlinePersonalizationConsentAccepted]);
+  }, [aiStatus, currencySymbol, onlinePersonalizationEnabled, onlinePersonalizationConsentAccepted]);
 
   const remainingMinor = offlineSnapshot.remainingMinor;
   const limitMinor = offlineSnapshot.limitMinor > 0 ? offlineSnapshot.limitMinor : Math.max(remainingMinor, 1);
@@ -291,6 +316,14 @@ export function SmartTipsScreen({ navigation }) {
           onAction={() => navigation.navigate("Settings")}
           title="Consent required"
         />
+      ) : currencySymbol !== "₱" ? (
+        <EmptyState
+          actionLabel="Open Settings"
+          emoji="₱"
+          message="Online budget suggestions use Philippine pesos only. Select ₱ in Settings to use this service."
+          onAction={() => navigation.navigate("Settings")}
+          title="Peso tips only"
+        />
       ) : aiStatus === "loading" ? (
         <View style={{ alignItems: "center", gap: theme.spacing.md, paddingVertical: theme.spacing.xl }}>
           <ActivityIndicator accessibilityLabel="Loading personalized tips" color={theme.colors.primary} size="large" />
@@ -338,10 +371,10 @@ export function SmartTipsScreen({ navigation }) {
               <Text numberOfLines={2} style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
                 {formatCopy(tip.meta, currencySymbol)}
               </Text>
-              {tip.amountMinor != null && (
+              {tip.amountPesos != null && (
                 <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
                   {tip.isEstimate ? "~" : ""}
-                  {formatMinor(tip.amountMinor, { currencySymbol, showCents: false })}
+                  {formatPesos(tip.amountPesos, { currencySymbol })}
                   {tip.category ? ` · ${tip.category}` : ""}
                 </Text>
               )}

@@ -176,7 +176,7 @@ describe("Transaction History UX Redesign and Split Grouping", () => {
       // Collapsed state: Title, meta, and expand button present
       expect(screen.getByText("School supplies")).toBeTruthy();
       expect(screen.getByText("2 categories · Cash")).toBeTruthy();
-      expect(screen.getByText("-₱588.00")).toBeTruthy();
+       expect(screen.getByText("-₱588")).toBeTruthy();
 
       const expandButton = screen.getByRole("button", { name: "Expand split breakdown" });
       expect(expandButton).toBeTruthy();
@@ -362,8 +362,8 @@ describe("Transaction History UX Redesign and Split Grouping", () => {
       const now = testDate(19);
       await useFinanceStore.getState().addSplitTransactions(
         [
-          { categoryId: 1, amountMinor: 20_000, note: "Backup Split 1" },
-          { categoryId: 2, amountMinor: 30_000, note: "Backup Split 2" },
+           { categoryId: 1, amountMinor: 20_055, note: "Backup Split 1" },
+           { categoryId: 2, amountMinor: 29_945, note: "Backup Split 2" },
         ],
         { accountId: 1, dateEpochMillis: now, groupTitle: "Backup Group" }
       );
@@ -385,8 +385,15 @@ describe("Transaction History UX Redesign and Split Grouping", () => {
       const serialized = serializeBackup(backupObj);
       const parsed = parseBackup(serialized);
       expect(parsed.transactionGroups).toBeDefined();
-      expect(parsed.transactionGroups.length).toBeGreaterThan(0);
-      expect(parsed.transactions.some((t) => t.splitGroupId)).toBe(true);
+       expect(parsed.transactionGroups.length).toBeGreaterThan(0);
+       expect(parsed.transactions.some((t) => t.splitGroupId)).toBe(true);
+       await store.restoreBackup(parsed);
+       const restored = useFinanceStore.getState();
+       expect(restored.transactions.filter((t) => t.splitGroupId).map((t) => t.amountMinor).sort()).toEqual([20_055, 29_945]);
+       expect(restored.transactionGroups).toHaveLength(parsed.transactionGroups.length);
+
+       const missingGroups = { ...parsed, transactionGroups: [] };
+       expect(() => validateBackup(missingGroups)).toThrow(/split group reference/);
     });
   });
 

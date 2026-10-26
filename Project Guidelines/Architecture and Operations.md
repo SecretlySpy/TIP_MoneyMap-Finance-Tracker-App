@@ -1,6 +1,6 @@
 # Architecture and Operations
 
-Updated: 2026-10-19
+Updated: 2026-10-26
 
 ## Runtime context
 
@@ -22,7 +22,7 @@ flowchart LR
 
 ## Boundaries and decisions
 
-- Finance values are integer minor units. Domain calculations stay pure where practical.
+- Finance values stay exact integer minor units in SQLite and domain math. PHP screens and AI summaries convert once to whole pesos; they do not exchange currencies.
 - Screens depend on store actions and view models; repositories own validation and SQL.
 - Income, expense, and transfer are distinct ledger semantics. A transfer is one atomic row and conserves
   total value across owned accounts; it never masquerades as income or spending.

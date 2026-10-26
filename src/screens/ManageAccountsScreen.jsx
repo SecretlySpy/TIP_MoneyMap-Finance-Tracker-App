@@ -9,7 +9,7 @@ import { ScreenContainer } from "../components/ScreenContainer";
 import { SectionCard } from "../components/SectionCard";
 import { TextPromptModal } from "../components/TextPromptModal";
 import { accountChipLabel, computeAccountBalances } from "../domain/services/financeView";
-import { formatMinor, parseDecimalToMinor } from "../domain/services/money";
+import { formatMinor, minorToWholePesos, parseWholePesosToMinor } from "../domain/services/money";
 import { useFinanceStore } from "../store/financeStore";
 import { useUiStore } from "../store/uiStore";
 import { useTheme } from "../theme/tokens";
@@ -144,7 +144,7 @@ export function ManageAccountsScreen({ navigation }) {
 
   const parsedStatementMinor = useMemo(() => {
     try {
-      return parseDecimalToMinor(statementBalanceInput.replace(/[₱$,\s]/g, "") || "0", { allowNegative: true });
+      return parseWholePesosToMinor(statementBalanceInput.trim(), { allowNegative: true });
     } catch {
       return null;
     }
@@ -190,11 +190,11 @@ export function ManageAccountsScreen({ navigation }) {
   const handleBalance = async (value) => {
     if (balanceId === null) return;
     try {
-      // A card account can legitimately open in debt.
-      const amountMinor = parseDecimalToMinor(
-        value.replace(/[₱$,\s]/g, "") || "0",
-        { allowNegative: true },
-      );
+      const originalMinor = accounts.find((account) => account.id === balanceId)?.startingBalanceMinor;
+      // A card account can legitimately open in debt; unchanged legacy centavos stay exact.
+      const amountMinor = originalMinor != null && value.trim() === String(minorToWholePesos(originalMinor))
+        ? originalMinor
+        : parseWholePesosToMinor(value.trim(), { allowNegative: true });
       await updateAccount({ id: balanceId, startingBalanceMinor: amountMinor });
       setBalanceId(null);
     } catch (error) {
@@ -412,13 +412,13 @@ export function ManageAccountsScreen({ navigation }) {
         initialValue={(() => {
           const account = active.find((item) => item.id === balanceId);
           if (account === undefined) return "0";
-          return (account.startingBalanceMinor / 100).toFixed(2);
+           return String(minorToWholePesos(account.startingBalanceMinor));
         })()}
-        keyboardType="decimal-pad"
-        message="Starting balance is added to your total balance. Use a leading minus for card debt, e.g. -1500.00."
+         keyboardType="numbers-and-punctuation"
+         message="Starting balance is added to your total balance. Use a leading minus for card debt, e.g. -1500."
         onCancel={() => setBalanceId(null)}
         onConfirm={(value) => void handleBalance(value)}
-        placeholder="0.00"
+         placeholder="0"
         title="Starting balance"
         visible={balanceId !== null}
       />
@@ -633,9 +633,9 @@ export function ManageAccountsScreen({ navigation }) {
               </Text>
               <TextInput
                 accessibilityLabel="Statement balance"
-                keyboardType="decimal-pad"
+                 keyboardType="numbers-and-punctuation"
                 onChangeText={setStatementBalanceInput}
-                placeholder="0.00"
+                 placeholder="0"
                 placeholderTextColor={theme.colors.sub}
                 style={{
                   backgroundColor: theme.colors.bg,
@@ -668,7 +668,7 @@ export function ManageAccountsScreen({ navigation }) {
                   Finish & Save Reconciliation
                 </PrimaryButton>
               </View>
-            ) : statementBalanceInput.trim().length > 0 ? (
+             ) : statementBalanceInput.trim().length > 0 && parsedStatementMinor !== null ? (
               <View style={{ backgroundColor: theme.colors.amberBg, borderRadius: theme.radii.chip, padding: theme.spacing.md }}>
                 <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.medium, fontSize: theme.typeScale.small }}>
                   Discrepancy: Difference of {formatMinor(Math.abs((detailAccountCalculated?.balanceMinor ?? 0) - (parsedStatementMinor ?? 0)), { currencySymbol })}

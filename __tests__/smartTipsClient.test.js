@@ -6,6 +6,11 @@ import {
   normalizeAiTip,
   parseGeminiTipsText,
 } from "../src/remote/smartTipsClient";
+import { requestAiProxyTips } from "../src/remote/aiProxyClient";
+import { useUiStore } from "../src/store/uiStore";
+import { budget } from "../backend/moneymap-ai/src/handler.cjs";
+
+jest.mock("../src/remote/aiProxyClient", () => ({ requestAiProxyTips: jest.fn() }));
 
 const categoriesById = new Map([
   [1, { id: 1, name: "Food", icon: "restaurant", colorHex: "#EA580C", type: "EXPENSE", isCustom: false }],
@@ -13,7 +18,7 @@ const categoriesById = new Map([
 ]);
 
 describe("buildAnonymizedSmartTipsPayload", () => {
-  it("includes only period, budget totals, ratios, and currency — never raw rows", () => {
+  it("sends only versioned whole-peso totals and ratios, never raw rows", () => {
     const payload = buildAnonymizedSmartTipsPayload({
       monthYear: "2026-08",
       currencySymbol: "₱",
@@ -36,10 +41,16 @@ describe("buildAnonymizedSmartTipsPayload", () => {
     });
 
     expect(assertAnonymizedPayload(payload)).toEqual({ ok: true });
+    expect(budget(payload)).toBe(true);
     expect(payload).toEqual(
       expect.objectContaining({
         period: "2026-08",
         currencySymbol: "₱",
+        contractVersion: 2,
+        moneyUnit: "PHP_WHOLE_PESOS_V2",
+        limitBudgetPesos: 3000,
+        spentBudgetPesos: 150,
+        remainingBudgetPesos: 2850,
       }),
     );
     expect(payload).not.toHaveProperty("transactions");
@@ -49,7 +60,7 @@ describe("buildAnonymizedSmartTipsPayload", () => {
     expect(JSON.stringify(payload)).not.toContain("accountId");
     expect(JSON.stringify(payload)).not.toMatch(/"id":\s*99/);
     expect(Array.isArray(payload.categorySpendRatios)).toBe(true);
-    expect(Number.isSafeInteger(payload.remainingBudgetMinor)).toBe(true);
+    expect(payload).not.toHaveProperty("remainingBudgetMinor");
   });
 
   it("rejects payloads that smuggle raw data", () => {
@@ -63,12 +74,53 @@ describe("buildAnonymizedSmartTipsPayload", () => {
     expect(assertAnonymizedPayload({ ...base, transactions: [{ note: "x" }] }).ok).toBe(false);
     expect(assertAnonymizedPayload({ ...base, notes: ["hi"] }).ok).toBe(false);
     expect(assertAnonymizedPayload({ ...base, accountName: "Cash" }).ok).toBe(false);
+    expect(assertAnonymizedPayload({ ...base, contractVersion: 1 }).ok).toBe(false);
+    expect(assertAnonymizedPayload({ ...base, moneyUnit: "CENTAVOS" }).ok).toBe(false);
+    expect(assertAnonymizedPayload({ ...base, spentBudgetMinor: 100 }).ok).toBe(false);
+    expect(assertAnonymizedPayload({ ...base, currencySymbol: "$" }).ok).toBe(false);
   });
 });
 
 describe("fetchSmartTipsFromGemini gating", () => {
   beforeEach(() => {
     clearSmartTipsCache();
+    requestAiProxyTips.mockReset();
+  });
+
+  const payload = {
+    contractVersion: 2,
+    moneyUnit: "PHP_WHOLE_PESOS_V2",
+    period: "2026-08",
+    currencySymbol: "₱",
+    remainingBudgetPesos: 100,
+    limitBudgetPesos: 200,
+    spentBudgetPesos: 100,
+    categorySpendRatios: [],
+  };
+
+  it("sends v2 pesos, reuses cache and invalidates it on consent withdrawal", async () => {
+    useUiStore.setState({ onlinePersonalizationConsentAccepted: true });
+    requestAiProxyTips.mockResolvedValue([{ title: "Pack lunch", amountPesos: 25, isEstimate: true }]);
+    const options = { enabled: true, consentAccepted: true, payload };
+    expect(await fetchSmartTipsFromGemini(options)).toEqual([expect.objectContaining({ amountPesos: 25 })]);
+    expect(await fetchSmartTipsFromGemini(options)).toHaveLength(1);
+    expect(requestAiProxyTips).toHaveBeenCalledTimes(1);
+    expect(requestAiProxyTips.mock.calls[0][0].payload).toEqual(payload);
+    useUiStore.setState({ onlinePersonalizationConsentAccepted: false });
+    expect(await fetchSmartTipsFromGemini({ ...options, consentAccepted: false })).toBeNull();
+    useUiStore.setState({ onlinePersonalizationConsentAccepted: true });
+    await fetchSmartTipsFromGemini(options);
+    expect(requestAiProxyTips).toHaveBeenCalledTimes(2);
+  });
+
+  it("discards in-flight tips if consent is withdrawn", async () => {
+    useUiStore.setState({ onlinePersonalizationConsentAccepted: true });
+    let resolve;
+    requestAiProxyTips.mockImplementation(() => new Promise((done) => { resolve = done; }));
+    const pending = fetchSmartTipsFromGemini({ enabled: true, consentAccepted: true, payload });
+    useUiStore.setState({ onlinePersonalizationConsentAccepted: false });
+    resolve([{ title: "Pack lunch", amountPesos: 25, isEstimate: true }]);
+    expect(await pending).toBeNull();
   });
 
   it("makes zero network calls when disabled", async () => {
@@ -79,9 +131,11 @@ describe("fetchSmartTipsFromGemini gating", () => {
       payload: {
         period: "2026-08",
         currencySymbol: "₱",
-        remainingBudgetMinor: 100,
-        limitBudgetMinor: 200,
-        spentBudgetMinor: 100,
+        contractVersion: 2,
+        moneyUnit: "PHP_WHOLE_PESOS_V2",
+        remainingBudgetPesos: 100,
+        limitBudgetPesos: 200,
+        spentBudgetPesos: 100,
         categorySpendRatios: [],
       },
       fetchImpl,
@@ -98,9 +152,11 @@ describe("fetchSmartTipsFromGemini gating", () => {
       payload: {
         period: "2026-08",
         currencySymbol: "₱",
-        remainingBudgetMinor: 100,
-        limitBudgetMinor: 200,
-        spentBudgetMinor: 100,
+        contractVersion: 2,
+        moneyUnit: "PHP_WHOLE_PESOS_V2",
+        remainingBudgetPesos: 100,
+        limitBudgetPesos: 200,
+        spentBudgetPesos: 100,
         categorySpendRatios: [],
       },
       fetchImpl,
@@ -120,9 +176,11 @@ describe("fetchSmartTipsFromGemini gating", () => {
       payload: {
         period: "2026-08",
         currencySymbol: "₱",
-        remainingBudgetMinor: 100,
-        limitBudgetMinor: 200,
-        spentBudgetMinor: 100,
+        contractVersion: 2,
+        moneyUnit: "PHP_WHOLE_PESOS_V2",
+        remainingBudgetPesos: 100,
+        limitBudgetPesos: 200,
+        spentBudgetPesos: 100,
         categorySpendRatios: [],
       },
       fetchImpl,
@@ -140,8 +198,8 @@ describe("fetchSmartTipsFromGemini gating", () => {
 
   describe("normalizeAiTip financial accuracy and currency validation", () => {
     const context = {
-      limitBudgetMinor: 150_000, // ₱1,500.00
-      remainingBudgetMinor: 50_000,
+      limitBudgetPesos: 1500,
+      remainingBudgetPesos: 500,
       currencySymbol: "₱",
     };
 
@@ -152,16 +210,16 @@ describe("fetchSmartTipsFromGemini gating", () => {
           meta: "Save on afternoon meals",
           tag: "Food",
           emoji: "🍱",
-          amountMinor: 30_000, // ₱300
-          category: "Food",
+          amountPesos: 300,
           isEstimate: true,
+          category: "Food",
         },
         0,
         context,
       );
       expect(tip).not.toBeNull();
       expect(tip.title).toBe("Pack lunch twice a week");
-      expect(tip.amountMinor).toBe(30_000);
+      expect(tip.amountPesos).toBe(300);
       expect(tip.isEstimate).toBe(true);
       expect(tip.category).toBe("Food");
       expect(tip.source).toBe("ai");
@@ -171,8 +229,9 @@ describe("fetchSmartTipsFromGemini gating", () => {
       const tip = normalizeAiTip(
         {
           title: "Save on textbooks",
-          meta: "Save ₱5,000 this week",
-          amountMinor: 500_000, // ₱5,000 on a ₱1,500 budget!
+          meta: "Save on costs",
+          amountPesos: 5000,
+          isEstimate: true,
         },
         0,
         context,
@@ -185,7 +244,8 @@ describe("fetchSmartTipsFromGemini gating", () => {
         {
           title: "Transport savings",
           meta: "Negative savings",
-          amountMinor: -10_000,
+          amountPesos: -100,
+          isEstimate: true,
         },
         0,
         context,
@@ -193,7 +253,7 @@ describe("fetchSmartTipsFromGemini gating", () => {
       expect(tip).toBeNull();
     });
 
-    it("rejects AI tips that confuse raw centavos with pesos in text", () => {
+    it("rejects AI tips containing unverified numeric claims or legacy amounts", () => {
       const tip = normalizeAiTip(
         {
           title: "You have ₱150000 left",
@@ -203,25 +263,76 @@ describe("fetchSmartTipsFromGemini gating", () => {
         context,
       );
       expect(tip).toBeNull();
+      expect(normalizeAiTip({ title: "Save two pesos", amountPesos: 2 }, 0, context)).toBeNull();
+      expect(normalizeAiTip({ title: "Eat out", amountMinor: 200 }, 0, context)).toBeNull();
+      expect(normalizeAiTip({ title: "Eat out", amountPesos: 200, isEstimate: false }, 0, context)).toBeNull();
     });
 
-    it("handles different currencies correctly ($ and €)", () => {
-      const dollarContext = {
-        limitBudgetMinor: 10_000, // $100.00
-        currencySymbol: "$",
+    it("rejects monetary claims in tag and category too", () => {
+      expect(normalizeAiTip({ title: "Cook breakfast", tag: "₱20", amountPesos: 20 }, 0, context)).toBeNull();
+      expect(normalizeAiTip({ title: "Cook breakfast", category: "Food 2", amountPesos: 20 }, 0, context)).toBeNull();
+    });
+
+    it("rejects raw centavo leakage like 1120000 in prose while accepting validated amountPesos 11200", () => {
+      const budgetContext = {
+        limitBudgetPesos: 11_200,
+        remainingBudgetPesos: 11_200,
+        currencySymbol: "₱",
       };
-      const tip = normalizeAiTip(
+      // Raw 1120000 centavos in prose must be rejected
+      expect(
+        normalizeAiTip(
+          {
+            title: "Track every centavo",
+            meta: "Monitor your 1120000 limit",
+          },
+          0,
+          budgetContext,
+        ),
+      ).toBeNull();
+
+      // Legacy amountMinor must be rejected
+      expect(
+        normalizeAiTip(
+          {
+            title: "Stay within your budget",
+            meta: "Monitor your limit",
+            amountMinor: 1_120_000,
+          },
+          0,
+          budgetContext,
+        ),
+      ).toBeNull();
+
+      // Excessive amountPesos must be rejected
+      expect(
+        normalizeAiTip(
+          {
+            title: "Stay within your budget",
+            meta: "Monitor your limit",
+            amountPesos: 1_120_000,
+            isEstimate: true,
+          },
+          0,
+          budgetContext,
+        ),
+      ).toBeNull();
+
+      // Validated whole-peso amountPesos passes
+      const validTip = normalizeAiTip(
         {
-          title: "Cook breakfast",
-          meta: "Save $20",
-          amountMinor: 2_000,
+          title: "Stay within your budget",
+          meta: "Monitor your spending limit",
+          tag: "Budget",
+          amountPesos: 11_200,
+          isEstimate: true,
         },
         0,
-        dollarContext,
+        budgetContext,
       );
-      expect(tip).not.toBeNull();
-      expect(tip.amountMinor).toBe(2_000);
+      expect(validTip).not.toBeNull();
+      expect(validTip.amountPesos).toBe(11_200);
+      expect(validTip.title).toBe("Stay within your budget");
     });
   });
 });
-

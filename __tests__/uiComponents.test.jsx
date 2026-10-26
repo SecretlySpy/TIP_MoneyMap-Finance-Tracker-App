@@ -68,7 +68,7 @@ describe("Figma reusable UI states", () => {
             />,
         );
         expect(screen.getByText("Monthly allowance")).toBeTruthy();
-        expect(screen.getByText("+₱1,500.00")).toBeTruthy();
+        expect(screen.getByText("+₱1,500")).toBeTruthy();
         expect(screen.queryByRole("button")).toBeNull();
     });
 });

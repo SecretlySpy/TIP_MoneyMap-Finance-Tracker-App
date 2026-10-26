@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { AppText as Text } from "./AppText";
 import { resolveDisplayEmoji } from "../domain/services/emoji";
-import { formatMinor } from "../domain/services/money";
+import { formatMinor, minorToWholePesos } from "../domain/services/money";
 import { useTheme } from "../theme/tokens";
 
 /**
@@ -33,9 +33,7 @@ export function SplitItemEditor({
       ? split.rawAmount
       : split.amountMinor === 0
       ? "0"
-      : split.amountMinor % 100 === 0
-      ? String(split.amountMinor / 100)
-      : (split.amountMinor / 100).toFixed(2);
+       : String(minorToWholePesos(split.amountMinor));
 
   return (
     <Pressable
@@ -175,7 +173,7 @@ export function SplitItemEditor({
           </Text>
           <TextInput
             accessibilityLabel={`Split #${index + 1} amount`}
-            keyboardType="decimal-pad"
+             keyboardType="number-pad"
             onChangeText={onAmountChange}
             onFocus={() => {
               onSelect?.();

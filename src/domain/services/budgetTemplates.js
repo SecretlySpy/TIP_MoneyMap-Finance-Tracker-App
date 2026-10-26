@@ -108,7 +108,11 @@ export function calculateTemplateTotal(template) {
 
   const isSemester = template.period === "SEMESTER";
   const monthlyEquivalentMinor = isSemester
-    ? Math.round(totalMinor / SEMESTER_MONTH_COUNT)
+    ? template.categories.reduce((sum, cat) => {
+        const amount = Number(cat.amountMinor ?? cat.limitMinor ?? 0);
+        return sum + (Number.isSafeInteger(amount) && amount > 0
+          ? Math.round(amount / SEMESTER_MONTH_COUNT) : 0);
+      }, 0)
     : totalMinor;
   const semesterTotalMinor = isSemester
     ? totalMinor
