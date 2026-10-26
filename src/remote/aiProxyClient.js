@@ -81,3 +81,57 @@ export async function requestAiProxyTips({ path, payload, enabled, consentAccept
     if (timer !== null) clearTimeout(timer);
   }
 }
+
+export async function requestAiProxyPlaces({ payload, enabled, consentAccepted, fetchImpl, backendUrl, appCheckToken }) {
+  if (!enabled || !consentAccepted) return null;
+  const base = String(backendUrl || getAiProxyUrl()).replace(/\/+$/, "");
+  if (!/^https:\/\/[^/\s]+$/.test(base)) return null;
+  let token = appCheckToken;
+  if (!token && appCheckProvider) {
+    try { token = await appCheckProvider(false); } catch { return null; }
+  }
+  if (typeof token !== "string" || token.length < 16) return null;
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS) : null;
+  try {
+    let response = await (fetchImpl || globalThis.fetch)(base + "/v1/places-nearby", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-MoneyMap-Consent": "1",
+        "X-Firebase-AppCheck": token,
+      },
+      body: JSON.stringify(payload),
+      signal: controller?.signal,
+    });
+
+    if (response.status === 401 && !appCheckToken && typeof appCheckProvider === "function") {
+      try {
+        const refreshedToken = await appCheckProvider(true);
+        if (typeof refreshedToken === "string" && refreshedToken.length >= 16) {
+          response = await (fetchImpl || globalThis.fetch)(base + "/v1/places-nearby", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-MoneyMap-Consent": "1",
+              "X-Firebase-AppCheck": refreshedToken,
+            },
+            body: JSON.stringify(payload),
+            signal: controller?.signal,
+          });
+        }
+      } catch {
+        // Fall back cleanly to null
+      }
+    }
+
+    if (!response.ok) return null;
+    const body = await response.json();
+    return Array.isArray(body?.places) ? body : null;
+  } catch {
+    return null;
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+  }
+}
+

@@ -27,9 +27,10 @@ function resolveApiKey() {
 }
 
 const apiKey = resolveApiKey();
+const placesApiKey = (process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY || apiKey).trim();
 const model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const expectedAppId = (process.env.EXPECTED_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || "").trim();
-const handler = createHandler({ verifyAppCheck, apiKey, model, expectedAppId });
+const handler = createHandler({ verifyAppCheck, apiKey, placesApiKey, model, expectedAppId });
 const port = Number(process.env.PORT || 8080);
 
 createServer(handler).listen(port, "0.0.0.0", () => {

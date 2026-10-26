@@ -3,7 +3,9 @@ export const DEFAULT_PREFERENCES = {
     appLockEnabled: false,
     currencySymbol: "₱",
     remindersEnabled: true,
-    // Spec default OFF — user must opt in (FR-10).
+    // Spec default OFF — user must opt in.
+    onlinePersonalizationEnabled: false,
+    onlinePersonalizationConsentAccepted: false,
     smartTipsEnabled: false,
     smartTipsConsentAccepted: false,
     themePreference: "system",
@@ -18,14 +20,22 @@ export function normalizePreferences(raw) {
         return DEFAULT_PREFERENCES;
     }
     const record = raw;
+    const personalizationEnabled = record.onlinePersonalizationEnabled !== undefined
+        ? record.onlinePersonalizationEnabled === true
+        : record.smartTipsEnabled === true;
+    const consentAccepted = record.onlinePersonalizationConsentAccepted !== undefined
+        ? record.onlinePersonalizationConsentAccepted === true
+        : record.smartTipsConsentAccepted === true;
     return {
         appLockEnabled: record.appLockEnabled === true,
         currencySymbol: typeof record.currencySymbol === "string" && record.currencySymbol.trim().length > 0
             ? record.currencySymbol.trim().slice(0, 4)
             : DEFAULT_PREFERENCES.currencySymbol,
         remindersEnabled: record.remindersEnabled !== false,
-        smartTipsEnabled: record.smartTipsEnabled === true,
-        smartTipsConsentAccepted: record.smartTipsConsentAccepted === true,
+        onlinePersonalizationEnabled: personalizationEnabled,
+        onlinePersonalizationConsentAccepted: consentAccepted,
+        smartTipsEnabled: personalizationEnabled,
+        smartTipsConsentAccepted: consentAccepted,
         themePreference: isThemePreference(record.themePreference)
             ? record.themePreference
             : DEFAULT_PREFERENCES.themePreference,

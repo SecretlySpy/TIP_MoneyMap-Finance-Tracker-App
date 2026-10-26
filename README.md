@@ -21,7 +21,7 @@ The Pages site is the polished setup guide: root [`index.html`](./index.html) (s
 | Task 17 polish | Done |
 | Task 18 release prep docs | Done (EAS project ID still placeholder until `eas init`) |
 | Dark-mode theme consistency | Done (`useTheme` reads `themePreference`) |
-| Student Eats Near Me | Done (bundled TIP QC catalog offline; optional Overpass/Nominatim refresh + ranking + optional AI) |
+| Student Eats Near Me | Done (interactive Google Maps + Google Places discovery via secure Cloud Run proxy + grounded AI recommendations) |
 | Settings pickers + Dashboard polish | Done (theme/currency chips, empties, tips teaser) |
 | Safe-to-Spend + Savings Goals | Done (pure calc + schema v2 + Goals screen); goal deadlines added |
 | Entry quick chips + MoM trend | Done |
@@ -74,23 +74,23 @@ Full walkthrough (Windows / macOS / Linux): **[index.html](./index.html)** or th
 - Money is always **integer minor units** (`src/domain/services/money.js`)
 - Theme tokens only (`src/theme/tokens.js`) — no hardcoded hex in screens
 - Bare `useTheme()` reads `themePreference` from `uiStore` (shared components stay dark-mode correct)
-- Outbound HTTPS only from `src/remote/*` (`smartTipsClient`, `placesClient`, `eatsTipsClient`); Student Eats listings also ship in `src/data/tipCampusEatsCatalog.js`
+- Outbound HTTPS only from `src/remote/*` (`smartTipsClient`, `placesClient`, `eatsTipsClient`) via stateless Cloud Run AI proxy.
 
-## Smart Tips privacy
+## Online Personalization (Smart Tips & Student Eats)
 
-- Default **off**. First enable shows a consent sheet.
-- Offline: `deriveSmartTips` from local budgets/transactions.
-- Online (after opt-in, Firebase App Check setup, and deployment): minimized summary only (period, totals, category ratios, currency) through the secured Cloud Run proxy to Gemini. Never send raw transactions. See [backend setup](./backend/moneymap-ai/README.md) and [Firebase App Check & Cloud Run Guide](./docs/firebase-app-check-cloud-run.md).
-- Never: raw transactions, notes, account names/IDs.
+- Unified setting in **Settings → Online Personalization** with explicit informed consent.
+- Default **off**. When disabled, all optional AI and online discovery calls cease, and recommendation cards are hidden.
+- Core financial calculations (budgets, balances, ledger, safe-to-spend) remain 100% **offline-first**.
+- Online Smart Tips: Minimized, anonymized summary (period, minor totals, spend ratios, currency) sent through Cloud Run proxy to Google Gemini with Firebase App Check. No raw ledger rows, notes, or account IDs are ever sent.
+- Structured output validation ensures realistic, grounded amounts (minor unit handling) adapted to Metro Manila student budgeting.
 
 ## Student Eats Near Me
 
-- Dashboard → **Student Eats**; rankings use the fixed TIP Quezon City campus origin and request no location permission.
-- Core listings ship in the bundled campus catalog and work with no network. Google Maps is not used.
-- Optional live refresh uses OpenStreetMap Overpass (Nominatim fallback). Last successful live results can be stored in encrypted `app_metadata` for a later offline session.
-- Mini-map is an on-device relative plot (no map SDK).
-- Origin: TIP Quezon City campus. The app does not read or persist device coordinates.
-- Optional AI tips reuse Smart Tips consent; payload uses distance **bands** only (no lat/lon).
+- Real-time nearby restaurant discovery using **Google Places API (New)** via Cloud Run proxy.
+- Interactive **Google Maps** integration using `react-native-maps` on Android with actual street tiles, synchronized markers, and external directions links.
+- Location: Optional foreground location permission. When permission is denied or undetermined, discovery defaults cleanly to the fixed TIP Quezon City campus origin with clear labeling. Coordinates are never continuously tracked or sent to Gemini.
+- Grounded AI Recommendations: Gemini recommendations reference only verified places returned by Google Places.
+- Provider Compliance: In-memory session caching (10 min TTL) complies with Google Maps Platform Terms of Service without long-term offline database persistence.
 
 ## Release
 

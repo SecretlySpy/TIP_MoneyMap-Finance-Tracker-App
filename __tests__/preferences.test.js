@@ -20,12 +20,18 @@ describe("preferences", () => {
             appLockEnabled: true,
             currencySymbol: "$",
             remindersEnabled: false,
+            onlinePersonalizationEnabled: false,
+            onlinePersonalizationConsentAccepted: false,
             smartTipsEnabled: false,
             smartTipsConsentAccepted: false,
             themePreference: "dark",
         });
+        expect(normalizePreferences({ smartTipsEnabled: true }).onlinePersonalizationEnabled).toBe(true);
         expect(normalizePreferences({ smartTipsEnabled: true }).smartTipsEnabled).toBe(true);
-        expect(normalizePreferences({ smartTipsConsentAccepted: true }).smartTipsConsentAccepted).toBe(true);
+        expect(normalizePreferences({ onlinePersonalizationEnabled: true }).smartTipsEnabled).toBe(true);
+        expect(normalizePreferences({ onlinePersonalizationEnabled: true }).onlinePersonalizationEnabled).toBe(true);
+        expect(normalizePreferences({ smartTipsConsentAccepted: true }).onlinePersonalizationConsentAccepted).toBe(true);
+        expect(normalizePreferences({ onlinePersonalizationConsentAccepted: true }).smartTipsConsentAccepted).toBe(true);
     });
     it("distinguishes missing, malformed, and unreadable secure preferences", async () => {
         SecureStore.getItemAsync.mockResolvedValueOnce(null);

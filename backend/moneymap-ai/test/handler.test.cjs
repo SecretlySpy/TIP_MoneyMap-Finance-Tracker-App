@@ -270,3 +270,95 @@ test("enforces app-level rate limiting against IP spoofing rotations", async () 
     assert.equal((await res61.json()).error, "rate_limited");
   });
 });
+
+test("enforces places-nearby endpoint validation, gating, and response mapping", async () => {
+  const syntheticPlacesResponse = {
+    places: [
+      {
+        id: "place-123",
+        displayName: { text: "Mang Inasal Anonas" },
+        location: { latitude: 14.626, longitude: 121.062 },
+        formattedAddress: "Anonas St, Quezon City",
+        primaryType: "restaurant",
+        priceLevel: "PRICE_LEVEL_INEXPENSIVE",
+        rating: 4.2,
+        googleMapsUri: "https://maps.google.com/?cid=123",
+      },
+    ],
+  };
+
+  const handler = createHandler({
+    apiKey: "synthetic-gemini-key",
+    placesApiKey: "synthetic-places-key",
+    verifyAppCheck: async () => ({ appId: "registered-app" }),
+    fetchImpl: async (url, opts) => {
+      assert.equal(url.includes("places:searchNearby"), true);
+      assert.equal(opts.headers["X-Goog-Api-Key"], "synthetic-places-key");
+      assert.equal(opts.headers["X-Goog-FieldMask"].includes("places.id"), true);
+      return {
+        ok: true,
+        json: async () => syntheticPlacesResponse,
+      };
+    },
+  });
+
+  await serve(handler, async (url) => {
+    // Missing consent rejected (403)
+    const noConsent = await fetch(url + "/v1/places-nearby", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-MoneyMap-Consent": "0", "X-Firebase-AppCheck": "token-1234567890123456" },
+      body: JSON.stringify({ latitude: 14.625, longitude: 121.061 }),
+    });
+    assert.equal(noConsent.status, 403);
+
+    // Invalid location rejected (422)
+    const invalidLoc = await fetch(url + "/v1/places-nearby", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ latitude: 999, longitude: 121.061 }),
+    });
+    assert.equal(invalidLoc.status, 422);
+
+    // Valid search returns mapped places with attribution
+    const res = await fetch(url + "/v1/places-nearby", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ latitude: 14.625, longitude: 121.061, radiusM: 1500, maxResults: 10 }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.source, "google_places");
+    assert.equal(body.attribution, "Powered by Google");
+    assert.equal(body.places.length, 1);
+    assert.equal(body.places[0].id, "place-123");
+    assert.equal(body.places[0].name, "Mang Inasal Anonas");
+    assert.equal(body.places[0].priceLevel, 1);
+    assert.equal(typeof body.places[0].distanceM, "number");
+    assert.equal(typeof body.places[0].score, "number");
+  });
+});
+
+test("structured output validator enforces financial grounding and rejects unreasonable amounts", () => {
+  const budgetInput = { limitBudgetMinor: 20000 };
+  // Valid tips with amount <= limitBudgetMinor
+  const valid = output('[{"title":"Budget groceries","meta":"Save on snacks","amountMinor":5000,"tag":"Food","emoji":"🍎"}]', budgetInput);
+  assert.equal(valid.length, 1);
+  assert.equal(valid[0].amountMinor, 5000);
+
+  // Reject tip claiming amount > limitBudgetMinor (e.g. 500,000 centavos on 20,000 budget)
+  const excessive = output('[{"title":"Fake savings","meta":"Save big","amountMinor":500000}]', budgetInput);
+  assert.equal(excessive, null);
+
+  // Reject negative amounts
+  const negative = output('[{"title":"Fake savings","meta":"Save big","amountMinor":-500}]', budgetInput);
+  assert.equal(negative, null);
+
+  // Grounding for eats: reject tips referencing unverified places
+  const eatsInput = { places: [{ id: "place-real", name: "Real Canteen" }] };
+  const grounded = output('[{"placeId":"place-real","title":"Eat at Real Canteen","meta":"Affordable combo"}]', eatsInput);
+  assert.equal(grounded.length, 1);
+
+  const fabricated = output('[{"placeId":"place-fake-unverified","title":"Eat at Fake Restaurant","meta":"Great food"}]', eatsInput);
+  assert.equal(fabricated, null);
+});
+

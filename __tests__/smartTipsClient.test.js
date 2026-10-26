@@ -3,6 +3,7 @@ import {
   buildAnonymizedSmartTipsPayload,
   clearSmartTipsCache,
   fetchSmartTipsFromGemini,
+  normalizeAiTip,
   parseGeminiTipsText,
 } from "../src/remote/smartTipsClient";
 
@@ -136,4 +137,91 @@ describe("fetchSmartTipsFromGemini gating", () => {
     expect(tips[0].title).toBe("Cook at home");
     expect(tips[0].source).toBe("ai");
   });
+
+  describe("normalizeAiTip financial accuracy and currency validation", () => {
+    const context = {
+      limitBudgetMinor: 150_000, // ₱1,500.00
+      remainingBudgetMinor: 50_000,
+      currencySymbol: "₱",
+    };
+
+    it("accepts valid structured AI tips within budget limits", () => {
+      const tip = normalizeAiTip(
+        {
+          title: "Pack lunch twice a week",
+          meta: "Save on afternoon meals",
+          tag: "Food",
+          emoji: "🍱",
+          amountMinor: 30_000, // ₱300
+          category: "Food",
+          isEstimate: true,
+        },
+        0,
+        context,
+      );
+      expect(tip).not.toBeNull();
+      expect(tip.title).toBe("Pack lunch twice a week");
+      expect(tip.amountMinor).toBe(30_000);
+      expect(tip.isEstimate).toBe(true);
+      expect(tip.category).toBe("Food");
+      expect(tip.source).toBe("ai");
+    });
+
+    it("rejects AI tips with unreasonable claimed amounts exceeding the budget", () => {
+      const tip = normalizeAiTip(
+        {
+          title: "Save on textbooks",
+          meta: "Save ₱5,000 this week",
+          amountMinor: 500_000, // ₱5,000 on a ₱1,500 budget!
+        },
+        0,
+        context,
+      );
+      expect(tip).toBeNull();
+    });
+
+    it("rejects AI tips with negative amounts", () => {
+      const tip = normalizeAiTip(
+        {
+          title: "Transport savings",
+          meta: "Negative savings",
+          amountMinor: -10_000,
+        },
+        0,
+        context,
+      );
+      expect(tip).toBeNull();
+    });
+
+    it("rejects AI tips that confuse raw centavos with pesos in text", () => {
+      const tip = normalizeAiTip(
+        {
+          title: "You have ₱150000 left",
+          meta: "Spend wisely",
+        },
+        0,
+        context,
+      );
+      expect(tip).toBeNull();
+    });
+
+    it("handles different currencies correctly ($ and €)", () => {
+      const dollarContext = {
+        limitBudgetMinor: 10_000, // $100.00
+        currencySymbol: "$",
+      };
+      const tip = normalizeAiTip(
+        {
+          title: "Cook breakfast",
+          meta: "Save $20",
+          amountMinor: 2_000,
+        },
+        0,
+        dollarContext,
+      );
+      expect(tip).not.toBeNull();
+      expect(tip.amountMinor).toBe(2_000);
+    });
+  });
 });
+

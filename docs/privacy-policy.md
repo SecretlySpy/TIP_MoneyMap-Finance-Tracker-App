@@ -1,84 +1,70 @@
 # MoneyMap Privacy Policy
 
-**Last updated:** 2026-10-23  
+**Last updated:** 2026-10-26  
 **App:** MoneyMap Finance Tracker  
 **Audience:** Students (personal finance, single-device)
 
 ## Summary
 
-MoneyMap is **offline-first**. Your financial records stay on your device. Optional network use is **Smart Tips** (budget suggestions after you turn the feature on and accept consent) and an optional **Student Eats** live refresh of campus food listings. Core finance and Student Eats listings remain available offline.
+MoneyMap is **offline-first** for all core financial tracking, transactions, accounts, budgets, and reports. Your personal financial ledger always stays encrypted on your device.
+
+Optional network features are unified under **Online Personalization** (which includes AI-powered Smart Tips and nearby Student Eats eatery discovery via Google Maps Platform). When Online Personalization is disabled, no AI or place discovery requests are made, and recommendations are hidden.
 
 ## Data we store on your device
 
-- Accounts, categories, transactions, budgets, and recurring rules in an **encrypted SQLite (SQLCipher)** database
-- App preferences (theme, currency symbol, reminder toggle, Smart Tips toggle/consent)
-- Optional **PIN** (stored as a salted hash) and biometric unlock via the OS
-- The SQLCipher database key in the platform secure store (Android Keystore)
+- Accounts, categories, transactions, budgets, goals, and recurring rules in an **encrypted SQLite (SQLCipher)** database.
+- App preferences (theme, currency symbol, reminder toggle, Online Personalization toggle/consent).
+- Optional **PIN** (stored as a salted hash) and biometric unlock via the OS.
+- The SQLCipher database key in the platform secure store (Android Keystore).
 
-We do **not** operate a MoneyMap account server. There is no cloud sync of your ledger in v1.
+We do **not** operate a MoneyMap account server. There is no cloud sync of your raw financial ledger.
 
 ## Permissions
 
 | Permission | Why |
 |---|---|
-| Internet | Optional Smart Tips (Gemini), optional Student Eats live refresh (OpenStreetMap Overpass/Nominatim), and optional AI meal tips. Core finance features and the bundled Student Eats catalog work offline. |
+| Internet | Optional Online Personalization: AI Smart Tips (Gemini via Cloud Run proxy) and Student Eats eatery discovery (Google Places via Cloud Run proxy + Google Maps tiles). Core finance functions remain 100% offline. |
+| Location (`ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`) | **Optional.** Used strictly in the foreground when the user explicitly requests nearby eatery discovery around their current location. If permission is denied or undetermined, discovery automatically defaults to the fixed TIP Quezon City campus origin. Location coordinates are never continuously tracked, never persisted, and never sent to Gemini. |
 | Notifications | Local bill reminders only (not push/FCM marketing). |
 | Biometric / fingerprint | Optional app unlock. |
-| Location | **Not requested.** Student Eats ranks meals around the fixed TIP Quezon City campus origin. Device GPS is unused. |
 
 ## Student Eats Near Me
 
-- Opened from the Dashboard. **No location permission is requested.**
-- Core place data is a bundled TIP Quezon City campus catalog stored in the app. Optional live refresh uses OpenStreetMap Overpass, with Nominatim as a last online fallback.
-- Ranking (distance, price level, rating, student heuristics) runs on-device.
-- Optional AI meal tips use the same Smart Tips consent gate and send only an **anonymized** list (place names, distance bands like “near/walkable”, price levels, cuisine labels, optional daily food budget minor units). **Never** latitude/longitude.
-- Device coordinates are never stored. Optional last-live place results may be saved in the encrypted local database so the screen still has a previous live snapshot after restart.
+- Opened from the Dashboard.
+- **Location:** If location permission is granted, searches around the user's current coordinates. If permission is denied or withheld, searches around the fixed TIP Quezon City campus reference origin.
+- **Provider:** Real-time restaurant discovery is powered by the Google Places API (New) and rendered on native Google Maps.
+- **Attribution & Compliance:** Follows Google Maps Platform Terms of Service: places content uses temporary in-memory session caching (10 minutes) and is never persisted into offline databases.
+- **AI Recommendations:** Optional Gemini meal recommendations use the unified Online Personalization consent and send only an **anonymized** summary (place names, Place IDs, distance bands like “near/walkable”, price levels, primary types, and optional daily food budget minor units). **Never** latitude/longitude or raw financial records. Recommendations are strictly grounded in verified Google Places.
 
-## Smart Tips (optional, opt-in)
+## Smart Tips (Online Personalization)
 
-- **Default:** off.
-- **Offline:** tips are computed on-device from your budgets and transactions. Nothing is sent.
-- **Online (after consent, configuration, and app verification):** MoneyMap may send a **minimized summary** through a stateless Google Cloud Run proxy to **Google Gemini**:
+- **Default:** Off.
+- **Online-Only:** When Online Personalization is enabled and consented, Smart Tips retrieves structured, grounded financial tips from Google Gemini via the secure Cloud Run AI proxy. No locally fabricated advice or offline recommendation cards are substituted.
+- **Data Minimization:** MoneyMap sends only a **minimized, anonymized summary**:
   - budget period (e.g. `YYYY-MM`)
-  - remaining / limit / spent totals (integer minor units)
+  - remaining / limit / spent totals (integer minor units, e.g. centavos)
   - per-category **spend ratios** and category labels
   - currency symbol
-- **Never sent:** raw transaction lists, notes/memos, account names or IDs, recurring-rule identifiers, contacts, or location.
+- **Never sent:** Raw transaction histories, notes/memos, account names, account IDs, recurring-rule identifiers, contacts, or location coordinates.
 
-Gemini credentials are stored server-side in Secret Manager. The backend requires a valid Firebase App Check token; there is no cloud ledger sync. Users should review Gemini Free Tier data-use terms before opting in with real financial summaries. If the device is offline, secure app verification is not set up, the request fails, or the model/quota is unavailable, MoneyMap falls back to offline tips. You will not see a broken empty state caused by network errors alone.
+Gemini credentials are kept securely server-side in Google Secret Manager. The backend requires a valid Firebase App Check token. If the device is offline or the proxy is unavailable, an informative unavailable/retry state is displayed. Core budgets, accounts, balances, and ledger calculations remain fully operational offline.
 
-You can turn Smart Tips off at any time in Settings. Turning it off stops further network requests for tips.
+You can disable Online Personalization at any time in Settings. Disabling it immediately clears and hides online recommendations and halts all optional AI/Places requests.
 
 ## Local notifications
 
-Recurring bill reminders are **local** schedules on your device. They are cancelled when you disable reminders. Tapping a reminder opens the Recurring screen inside the app.
+Recurring bill reminders are **local** schedules on your device. They are cancelled when you disable reminders.
 
 ## Backups and import/export
 
-CSV export, JSON backup/restore, and CSV/Excel import are **user-initiated** and processed on-device. Files you share leave the device only through the system share sheet you choose (email, Drive, etc.). MoneyMap does not upload those files to a MoneyMap server.
-
-## Children
-
-MoneyMap is aimed at students and is not directed at children under 13. Do not use the app if you are not allowed to under local law.
-
-## Data deletion
-
-Uninstalling the app removes local app data on typical Android configurations. Encrypted backups you exported remain under your control until you delete those files.
+CSV export, JSON backup/restore, and CSV/Excel import are **user-initiated** and processed on-device. Files leave the device only through the Android system share sheet you choose.
 
 ## Play Data safety (declarative summary)
 
 When completing Google Play’s Data safety form, declare:
 
-- **Financial info** collected/processed **on device** (not shared with MoneyMap as a developer backend — there is none).
-- **Optional** summary processed through Cloud Run and **Google Gemini** only if Smart Tips is enabled, consented, and authenticated app verification is configured: approximate budget summary / category ratios (not full transaction history).
-- **Data encrypted in transit** for that optional API call (HTTPS).
-- **Data encrypted at rest** on device (SQLCipher).
-- Users can stop optional sharing by disabling Smart Tips.
-
-## Contact
-
-For privacy questions about this open-source student project, open an issue on the project repository associated with your distribution build.
-
-## Changes
-
-We may update this policy as features change. Material changes to optional network use will be reflected in-app consent copy and this document.
+- **Financial info:** Processed on-device. Optional anonymized summary (ratios and budget totals, not full transaction history) transmitted via HTTPS only when Online Personalization is enabled and consented.
+- **Location:** Optional approximate or precise location used for live nearby eatery search; not stored or shared with AI models.
+- **Data encrypted in transit:** HTTPS with Firebase App Check.
+- **Data encrypted at rest:** SQLCipher AES-256 on device.
+- Users can disable optional online features at any time in Settings.

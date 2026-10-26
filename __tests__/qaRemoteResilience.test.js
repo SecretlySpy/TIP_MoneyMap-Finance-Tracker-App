@@ -14,36 +14,45 @@ describe("QA remote boundary and deadline resilience", () => {
   beforeEach(() => { clearPlacesCache(); clearSmartTipsCache(); clearEatsTipsCache(); });
   afterEach(() => jest.useRealTimers());
 
-  it("returns the bundled campus catalog when both HTTP providers fail", async () => {
+  it("returns unavailable state with zero offline fallback when HTTP proxy fails", async () => {
     const fetchImpl = jest.fn(async () => unavailable());
-    const result = await fetchNearbyEats({ fetchImpl });
-    expect(result).toMatchObject({ source: "bundled", fromCache: false });
-    expect(result.places.length).toBeGreaterThan(0);
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    const result = await fetchNearbyEats({
+      fetchImpl,
+      backendUrl: "https://example.test",
+      appCheckToken: "synthetic-app-check-token",
+    });
+    expect(result).toMatchObject({ source: "unavailable", fromCache: false, places: [] });
+    expect(result.errorMessage).toBeTruthy();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("aborts a stalled Nominatim fallback within the original 18-second deadline", async () => {
+  it("aborts a stalled Google Places request within the timeout deadline", async () => {
     jest.useFakeTimers();
-    const fetchImpl = jest.fn().mockResolvedValueOnce(unavailable()).mockImplementation(stall);
-    const result = fetchNearbyEats({ fetchImpl });
-    await jest.advanceTimersByTimeAsync(18_000);
-    expect(fetchImpl.mock.calls[1][1].signal?.aborted).toBe(true);
-    await expect(result).resolves.toMatchObject({ source: "bundled" });
+    const fetchImpl = jest.fn(stall);
+    const result = fetchNearbyEats({
+      fetchImpl,
+      backendUrl: "https://example.test",
+      appCheckToken: "synthetic-app-check-token",
+    });
+    await jest.advanceTimersByTimeAsync(12_000);
+    expect(fetchImpl.mock.calls[0][1].signal?.aborted).toBe(true);
+    await expect(result).resolves.toMatchObject({ source: "unavailable", places: [] });
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it("falls back after malformed Overpass JSON and releases its timer", async () => {
+  it("returns unavailable after malformed Places JSON and releases its timer", async () => {
     jest.useFakeTimers();
-    const fetchImpl = jest.fn().mockResolvedValueOnce({ ok: true, json: async () => { throw new SyntaxError("invalid JSON"); } }).mockResolvedValueOnce({
+    const fetchImpl = jest.fn(async () => ({
       ok: true,
-      json: async () => [{
-        place_id: 7,
-        lat: "14.62648",
-        lon: "121.06135",
-        display_name: "Fallback Rice Bowl, Quezon City",
-      }],
-    });
-    await expect(fetchNearbyEats({ fetchImpl })).resolves.toMatchObject({ source: "nominatim" });
+      json: async () => {
+        throw new SyntaxError("invalid JSON");
+      },
+    }));
+    await expect(fetchNearbyEats({
+      fetchImpl,
+      backendUrl: "https://example.test",
+      appCheckToken: "synthetic-app-check-token",
+    })).resolves.toMatchObject({ source: "unavailable", places: [] });
     expect(jest.getTimerCount()).toBe(0);
   });
 

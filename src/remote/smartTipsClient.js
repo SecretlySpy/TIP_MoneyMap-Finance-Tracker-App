@@ -183,7 +183,7 @@ export function parseGeminiTipsText(text) {
   return [];
 }
 
-function normalizeAiTip(item, index) {
+export function normalizeAiTip(item, index, context = {}) {
   if (item === null || typeof item !== "object") {
     return null;
   }
@@ -196,18 +196,44 @@ function normalizeAiTip(item, index) {
   if (title.length === 0) {
     return null;
   }
+
+  // Validate amountMinor against budget context
+  let amountMinor = null;
+  const maxAllowed = context.limitBudgetMinor ?? (1_000_000_000_000);
+  if (item.amountMinor !== undefined && item.amountMinor !== null) {
+    if (!Number.isSafeInteger(item.amountMinor) || item.amountMinor < 0 || item.amountMinor > maxAllowed) {
+      // Reject invalid, negative, or unreasonable claimed amount that exceeds the budget
+      return null;
+    }
+    amountMinor = item.amountMinor;
+  }
+
+  // Sanitize text if Gemini hallucinated raw centavos as pesos:
+  // e.g. if the budget was 150000 centavos (₱1,500), but text said ₱150,000 or 150,000 pesos
+  const limitMinor = context.limitBudgetMinor ?? 0;
+  if (limitMinor > 0 && limitMinor < 10_000_000) {
+    const currency = context.currencySymbol || "₱";
+    const rawCentavoPattern = new RegExp(`(?:\\${currency}|PHP|Php|₱)\\s*${limitMinor}\\b`, "i");
+    if (rawCentavoPattern.test(title) || rawCentavoPattern.test(meta)) {
+      return null;
+    }
+  }
+
   return {
-    id: `ai-${index}-${title.slice(0, 12).replace(/\s+/g, "-").toLowerCase()}`,
+    id: `ai-${index}-${title.slice(0, 12).replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`,
     emoji: typeof item.emoji === "string" && item.emoji.length > 0 ? item.emoji : "✨",
     title,
     meta: meta || "AI suggestion from your budget summary",
     tag: typeof item.tag === "string" && item.tag.length > 0 ? item.tag : "AI",
+    amountMinor,
+    category: typeof item.category === "string" ? item.category.trim() : null,
+    isEstimate: typeof item.isEstimate === "boolean" ? item.isEstimate : false,
     source: "ai",
   };
 }
 
 /**
- * Request AI tips. Returns null on any failure so callers fall back to offline tips.
+ * Request AI tips. Returns null on any failure so callers show appropriate unavailable state.
  *
  * @param {{
  *   enabled: boolean,
@@ -242,7 +268,7 @@ export async function fetchSmartTipsFromGemini(options) {
     appCheckToken: options.appCheckToken,
   });
   if (!result?.length) return null;
-  const tips = result.map((tip, index) => normalizeAiTip(tip, index)).filter(Boolean);
+  const tips = result.map((tip, index) => normalizeAiTip(tip, index, options.payload)).filter(Boolean);
   if (tips.length === 0) return null;
   responseCache.set(cacheKey(options.payload), {
     expiresAt: (options.now ?? Date.now()) + CACHE_TTL_MS,

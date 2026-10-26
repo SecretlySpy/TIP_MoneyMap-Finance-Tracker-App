@@ -16,12 +16,20 @@ export function registerFinanceSnapshotProvider(provider) {
     financeSnapshotProvider = provider;
 }
 function preferencesFromState(state) {
+    const personalizationEnabled = state.onlinePersonalizationEnabled !== undefined
+        ? state.onlinePersonalizationEnabled
+        : state.smartTipsEnabled;
+    const consentAccepted = state.onlinePersonalizationConsentAccepted !== undefined
+        ? state.onlinePersonalizationConsentAccepted
+        : state.smartTipsConsentAccepted;
     return {
         appLockEnabled: state.appLockEnabled,
         currencySymbol: state.currencySymbol,
         remindersEnabled: state.remindersEnabled,
-        smartTipsEnabled: state.smartTipsEnabled,
-        smartTipsConsentAccepted: state.smartTipsConsentAccepted,
+        onlinePersonalizationEnabled: personalizationEnabled,
+        onlinePersonalizationConsentAccepted: consentAccepted,
+        smartTipsEnabled: personalizationEnabled,
+        smartTipsConsentAccepted: consentAccepted,
         themePreference: state.themePreference,
     };
 }
@@ -291,14 +299,36 @@ export const useUiStore = create((set, get) => ({
             },
         );
     },
+    setOnlinePersonalizationEnabled: async (enabled) => {
+        await updatePreferenceWithRollback(set, get, {
+            onlinePersonalizationEnabled: enabled,
+            smartTipsEnabled: enabled,
+        });
+    },
+    acceptOnlinePersonalizationConsent: async () => {
+        await updatePreferenceWithRollback(set, get, {
+            onlinePersonalizationConsentAccepted: true,
+            onlinePersonalizationEnabled: true,
+            smartTipsConsentAccepted: true,
+            smartTipsEnabled: true,
+        });
+    },
+    declineOnlinePersonalizationConsent: async () => {
+        await updatePreferenceWithRollback(set, get, {
+            onlinePersonalizationConsentAccepted: false,
+            onlinePersonalizationEnabled: false,
+            smartTipsConsentAccepted: false,
+            smartTipsEnabled: false,
+        });
+    },
     setSmartTipsEnabled: async (enabled) => {
-        await updatePreferenceWithRollback(set, get, { smartTipsEnabled: enabled });
+        await get().setOnlinePersonalizationEnabled(enabled);
     },
     acceptSmartTipsConsent: async () => {
-        await updatePreferenceWithRollback(set, get, { smartTipsConsentAccepted: true, smartTipsEnabled: true });
+        await get().acceptOnlinePersonalizationConsent();
     },
     declineSmartTipsConsent: async () => {
-        await updatePreferenceWithRollback(set, get, { smartTipsConsentAccepted: false, smartTipsEnabled: false });
+        await get().declineOnlinePersonalizationConsent();
     },
     setThemePreference: async (theme) => {
         await updatePreferenceWithRollback(set, get, { themePreference: theme });

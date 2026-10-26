@@ -1,44 +1,107 @@
-import { getBundledCampusPlaces } from "../src/data/tipCampusEatsCatalog";
 import { TIP_QC_CAMPUS } from "../src/domain/services/eatsRanking";
 import { clearPlacesCache, fetchNearbyEats } from "../src/remote/placesClient";
 
-describe("placesClient", () => {
+describe("placesClient Google Places Integration", () => {
   beforeEach(() => {
     clearPlacesCache();
   });
 
-  it("ranks Overpass JSON through the shared pipeline", async () => {
+  it("returns disabled state and makes zero network calls when disabled", async () => {
+    const fetchImpl = jest.fn();
+    const result = await fetchNearbyEats({
+      origin: TIP_QC_CAMPUS,
+      radiusM: 1500,
+      enabled: false,
+      consentAccepted: true,
+      fetchImpl,
+      backendUrl: "https://moneymap-ai-proxy.run.app",
+      appCheckToken: "dummy-token-1234567890",
+    });
+
+    expect(result.source).toBe("disabled");
+    expect(result.places).toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("returns disabled state and makes zero network calls when consent is missing", async () => {
+    const fetchImpl = jest.fn();
+    const result = await fetchNearbyEats({
+      origin: TIP_QC_CAMPUS,
+      radiusM: 1500,
+      enabled: true,
+      consentAccepted: false,
+      fetchImpl,
+      backendUrl: "https://moneymap-ai-proxy.run.app",
+      appCheckToken: "dummy-token-1234567890",
+    });
+
+    expect(result.source).toBe("disabled");
+    expect(result.places).toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("fetches nearby Google Places and caches them in session memory", async () => {
+    const mockPlaces = [
+      {
+        id: "ChIJ12345",
+        name: "Campus Eatery",
+        latitude: TIP_QC_CAMPUS.latitude + 0.001,
+        longitude: TIP_QC_CAMPUS.longitude,
+        distanceM: 120,
+        priceLevel: 1,
+        rating: 4.5,
+        primaryType: "restaurant",
+        googleMapsUri: "https://maps.google.com/?cid=12345",
+      },
+    ];
+
     const fetchImpl = jest.fn(async () => ({
       ok: true,
+      status: 200,
       json: async () => ({
-        elements: [
-          {
-            id: 10,
-            lat: TIP_QC_CAMPUS.latitude + 0.001,
-            lon: TIP_QC_CAMPUS.longitude,
-            tags: { name: "Campus Lugaw", amenity: "fast_food" },
-          },
-        ],
+        places: mockPlaces,
+        attribution: "Powered by Google",
       }),
     }));
 
     const result = await fetchNearbyEats({
       origin: TIP_QC_CAMPUS,
       radiusM: 1500,
+      enabled: true,
+      consentAccepted: true,
       fetchImpl,
+      backendUrl: "https://moneymap-ai-proxy.run.app",
+      appCheckToken: "dummy-token-1234567890",
       now: 1_000,
     });
 
     expect(result.fromCache).toBe(false);
-    expect(result.source).toBe("overpass");
+    expect(result.source).toBe("google_places");
+    expect(result.attribution).toBe("Powered by Google");
     expect(result.places).toHaveLength(1);
-    expect(result.places[0].name).toBe("Campus Lugaw");
+    expect(result.places[0].name).toBe("Campus Eatery");
+    expect(result.places[0].googleMapsUri).toBe("https://maps.google.com/?cid=12345");
     expect(fetchImpl).toHaveBeenCalledTimes(1);
 
+    // Verify request payload
+    const calledUrl = fetchImpl.mock.calls[0][0];
+    const calledOpts = fetchImpl.mock.calls[0][1];
+    expect(calledUrl).toBe("https://moneymap-ai-proxy.run.app/v1/places-nearby");
+    expect(calledOpts.headers["X-MoneyMap-Consent"]).toBe("1");
+    expect(calledOpts.headers["X-Firebase-AppCheck"]).toBe("dummy-token-1234567890");
+    const sentBody = JSON.parse(calledOpts.body);
+    expect(sentBody.latitude).toBe(TIP_QC_CAMPUS.latitude);
+    expect(sentBody.longitude).toBe(TIP_QC_CAMPUS.longitude);
+
+    // Second call should hit in-memory cache
     const cached = await fetchNearbyEats({
       origin: TIP_QC_CAMPUS,
       radiusM: 1500,
+      enabled: true,
+      consentAccepted: true,
       fetchImpl,
+      backendUrl: "https://moneymap-ai-proxy.run.app",
+      appCheckToken: "dummy-token-1234567890",
       now: 2_000,
     });
     expect(cached.fromCache).toBe(true);
@@ -46,104 +109,37 @@ describe("placesClient", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("falls back when Overpass fails", async () => {
-    const fetchImpl = jest
-      .fn()
-      .mockResolvedValueOnce({ ok: false, status: 504 })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => [
-          {
-            place_id: 99,
-            lat: String(TIP_QC_CAMPUS.latitude + 0.001),
-            lon: String(TIP_QC_CAMPUS.longitude),
-            display_name: "Near TIP Rice Bowl, Quezon City",
-          },
-        ],
-      });
+  it("returns unavailable error state without offline fallback when network fails", async () => {
+    const fetchImpl = jest.fn(async () => {
+      throw new Error("Network unreachable");
+    });
 
     const result = await fetchNearbyEats({
       origin: TIP_QC_CAMPUS,
+      radiusM: 1500,
+      enabled: true,
+      consentAccepted: true,
       fetchImpl,
+      backendUrl: "https://moneymap-ai-proxy.run.app",
+      appCheckToken: "dummy-token-1234567890",
       now: 5_000,
     });
-    expect(result.source).toBe("nominatim");
-    expect(result.places[0].name).toContain("Near TIP Rice Bowl");
+
+    expect(result.source).toBe("unavailable");
+    expect(result.places).toEqual([]);
+    expect(result.errorMessage).toBe("Nearby places are temporarily unavailable.");
   });
 
-  it("returns the bundled campus catalog when no network client exists", async () => {
+  it("returns unavailable when skipNetwork is true, without falling back to catalog", async () => {
     const result = await fetchNearbyEats({
       origin: TIP_QC_CAMPUS,
       skipNetwork: true,
-      now: 9_000,
+      enabled: true,
+      consentAccepted: true,
     });
-    const bundled = getBundledCampusPlaces(TIP_QC_CAMPUS, { maxDistanceM: 1500, limit: 25 });
-    expect(result.source).toBe("bundled");
-    expect(result.fromCache).toBe(false);
-    expect(result.places.length).toBe(bundled.length);
-    expect(result.places[0].name).toBe(bundled[0].name);
-    expect(result.places.every((place) => place.distanceM <= 1500)).toBe(true);
-  });
 
-  it("uses persisted live results after a network failure", async () => {
-    const saved = [
-      {
-        id: "saved-1",
-        name: "Saved Lugaw",
-        latitude: TIP_QC_CAMPUS.latitude,
-        longitude: TIP_QC_CAMPUS.longitude,
-        distanceM: 80,
-        priceLevel: 1,
-        rating: 4,
-        cuisine: "filipino",
-        amenity: "fast_food",
-        score: 90,
-      },
-    ];
-    const persistentCache = {
-      get: jest.fn(async () => ({ places: saved, origin: TIP_QC_CAMPUS })),
-      set: jest.fn(async () => true),
-    };
-    const fetchImpl = jest.fn(async () => ({ ok: false, status: 503 }));
-    const result = await fetchNearbyEats({
-      origin: TIP_QC_CAMPUS,
-      fetchImpl,
-      persistentCache,
-      now: 12_000,
-    });
-    expect(result.source).toBe("persisted");
-    expect(result.fromCache).toBe(true);
-    expect(result.places[0].name).toBe("Saved Lugaw");
-    expect(persistentCache.set).not.toHaveBeenCalled();
-  });
-
-  it("persists successful Overpass results for a later restart", async () => {
-    const persistentCache = {
-      get: jest.fn(async () => null),
-      set: jest.fn(async () => true),
-    };
-    const fetchImpl = jest.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        elements: [
-          {
-            id: 22,
-            lat: TIP_QC_CAMPUS.latitude + 0.001,
-            lon: TIP_QC_CAMPUS.longitude,
-            tags: { name: "Live Carinderia", amenity: "canteen" },
-          },
-        ],
-      }),
-    }));
-    const result = await fetchNearbyEats({
-      origin: TIP_QC_CAMPUS,
-      fetchImpl,
-      persistentCache,
-      now: 20_000,
-    });
-    expect(result.source).toBe("overpass");
-    expect(persistentCache.set).toHaveBeenCalledTimes(1);
-    expect(persistentCache.set.mock.calls[0][1].places[0].name).toBe("Live Carinderia");
-    expect(persistentCache.set.mock.calls[0][1].expiresAt).toBeGreaterThan(20_000);
+    expect(result.source).toBe("unavailable");
+    expect(result.places).toEqual([]);
+    expect(result.errorMessage).toContain("disabled");
   });
 });

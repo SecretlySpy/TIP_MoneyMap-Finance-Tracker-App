@@ -190,6 +190,7 @@ export function formatDistance(meters) {
  */
 export function buildAnonymizedEatsPayload(input) {
   const places = (input.places ?? []).slice(0, 8).map((p) => ({
+    placeId: String(p.id ?? p.name).slice(0, 80),
     name: String(p.name).slice(0, 48),
     distanceBand:
       p.distanceM < 300 ? "very_near"
@@ -198,7 +199,7 @@ export function buildAnonymizedEatsPayload(input) {
             : "farther",
     priceLevel: p.priceLevel,
     rating: p.rating,
-    cuisine: p.cuisine ? String(p.cuisine).slice(0, 32) : null,
+    cuisine: p.cuisine ? String(p.cuisine).slice(0, 32) : (p.primaryType ? String(p.primaryType).slice(0, 32) : null),
     score: p.score,
   }));
   return {

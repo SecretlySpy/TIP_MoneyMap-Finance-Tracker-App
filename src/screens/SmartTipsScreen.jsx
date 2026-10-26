@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { AppText as Text } from "../components/AppText";
 import { EmptyState } from "../components/EmptyState";
@@ -16,16 +16,18 @@ function formatCopy(copy, currencySymbol) {
   if (typeof copy === "string") {
     return copy;
   }
-  const prefix = copy.approximate === true ? "~" : "";
-  return `${copy.before}${prefix}${formatMinor(copy.amountMinor, { currencySymbol, showCents: false })}${copy.after}`;
+  if (copy && typeof copy === "object" && typeof copy.amountMinor === "number") {
+    const prefix = copy.approximate === true ? "~" : "";
+    return `${copy.before || ""}${prefix}${formatMinor(copy.amountMinor, { currencySymbol, showCents: false })}${copy.after || ""}`;
+  }
+  return String(copy ?? "");
 }
 
-// Offline rules always available; optional Gemini layer when enabled + consented + online.
 export function SmartTipsScreen({ navigation }) {
   const theme = useTheme();
   const currencySymbol = useUiStore((state) => state.currencySymbol);
-  const smartTipsEnabled = useUiStore((state) => state.smartTipsEnabled);
-  const smartTipsConsentAccepted = useUiStore((state) => state.smartTipsConsentAccepted);
+  const onlinePersonalizationEnabled = useUiStore((state) => Boolean(state.onlinePersonalizationEnabled || state.smartTipsEnabled));
+  const onlinePersonalizationConsentAccepted = useUiStore((state) => Boolean(state.onlinePersonalizationConsentAccepted || state.smartTipsConsentAccepted));
   const budgets = useFinanceStore((state) => state.budgets);
   const categories = useFinanceStore((state) => state.categories);
   const transactions = useFinanceStore((state) => state.transactions);
@@ -39,6 +41,7 @@ export function SmartTipsScreen({ navigation }) {
     [categories],
   );
 
+  // Core offline financial calculations for monthly budget overview (retained)
   const offlineSnapshot = useMemo(
     () => deriveSmartTips({
       budgets,
@@ -49,49 +52,48 @@ export function SmartTipsScreen({ navigation }) {
     [budgets, transactions, categoriesById, selectedMonthYear],
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!smartTipsEnabled) {
+  const loadTips = useCallback(async () => {
+    if (!onlinePersonalizationEnabled) {
       setAiTips(null);
       setAiStatus("idle");
-      return undefined;
+      return;
     }
-    // Always start from offline tips; AI is additive/fallback merge.
-    setAiStatus(smartTipsConsentAccepted ? "loading" : "idle");
+
+    if (!onlinePersonalizationConsentAccepted) {
+      setAiTips(null);
+      setAiStatus("idle");
+      return;
+    }
+
+    setAiStatus("loading");
     setAiTips(null);
 
-    if (!smartTipsConsentAccepted) {
-      return undefined;
-    }
-
-    void (async () => {
+    try {
       const online = await loadOnlineSmartTips({
-        enabled: smartTipsEnabled,
-        consentAccepted: smartTipsConsentAccepted,
+        enabled: onlinePersonalizationEnabled,
+        consentAccepted: onlinePersonalizationConsentAccepted,
         monthYear: selectedMonthYear,
         currencySymbol,
         budgets,
         transactions,
         categoriesById,
       });
-      if (cancelled) {
-        return;
-      }
+
       if (online === null || online.length === 0) {
         setAiTips(null);
         setAiStatus("offline");
         return;
       }
+
       setAiTips(online);
       setAiStatus("ready");
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    } catch {
+      setAiTips(null);
+      setAiStatus("offline");
+    }
   }, [
-    smartTipsEnabled,
-    smartTipsConsentAccepted,
+    onlinePersonalizationEnabled,
+    onlinePersonalizationConsentAccepted,
     selectedMonthYear,
     currencySymbol,
     budgets,
@@ -99,7 +101,25 @@ export function SmartTipsScreen({ navigation }) {
     categoriesById,
   ]);
 
+  useEffect(() => {
+    void loadTips();
+  }, [loadTips]);
+
   const statusInfo = useMemo(() => {
+    if (!onlinePersonalizationEnabled || !onlinePersonalizationConsentAccepted) {
+      return {
+        badge: "Online personalization disabled",
+        emoji: "📱",
+        description: "Tips are computed from your own spending and stay on-device. Online personalization is optional.",
+      };
+    }
+    if (!isAiProxyConfigured()) {
+      return {
+        badge: "Online personalization not configured",
+        emoji: "⚙️",
+        description: "Offline recommendations available. Secure online personalization is not configured yet.",
+      };
+    }
     if (aiStatus === "ready") {
       return {
         badge: "Online recommendations available",
@@ -114,20 +134,6 @@ export function SmartTipsScreen({ navigation }) {
         description: "Connecting to secure online personalization…",
       };
     }
-    if (!smartTipsEnabled || !smartTipsConsentAccepted) {
-      return {
-        badge: "Online personalization disabled",
-        emoji: "📱",
-        description: "Tips are computed from your own spending and stay on-device. Online personalization is optional.",
-      };
-    }
-    if (!isAiProxyConfigured()) {
-      return {
-        badge: "Online personalization not configured",
-        emoji: "⚙️",
-        description: "Offline recommendations available. Secure online personalization is not configured yet.",
-      };
-    }
     if (aiStatus === "offline") {
       return {
         badge: "Online service unavailable",
@@ -136,11 +142,11 @@ export function SmartTipsScreen({ navigation }) {
       };
     }
     return {
-      badge: "Offline recommendations available",
-      emoji: "📱",
-      description: "Tips are computed from your own spending and stay on-device.",
+      badge: "Online recommendations available",
+      emoji: "✨",
+      description: "Personalized suggestions when online.",
     };
-  }, [aiStatus, smartTipsEnabled, smartTipsConsentAccepted]);
+  }, [aiStatus, onlinePersonalizationEnabled, onlinePersonalizationConsentAccepted]);
 
   const remainingMinor = offlineSnapshot.remainingMinor;
   const limitMinor = offlineSnapshot.limitMinor > 0 ? offlineSnapshot.limitMinor : Math.max(remainingMinor, 1);
@@ -151,17 +157,6 @@ export function SmartTipsScreen({ navigation }) {
   const progressPercent = limitMinor <= 0
     ? 0
     : Math.min(100, Math.round((spentMinor / limitMinor) * 100));
-
-  const displayTips = useMemo(() => {
-    const offline = offlineSnapshot.tips.filter((tip) => tip.id !== "empty-data");
-    if (aiTips && aiTips.length > 0) {
-      // Prefer AI cards first, then fill with offline rules (dedupe by title).
-      const seen = new Set(aiTips.map((tip) => String(tip.title).toLowerCase()));
-      const extras = offline.filter((tip) => !seen.has(String(tip.title).toLowerCase()));
-      return [...aiTips, ...extras].slice(0, 6);
-    }
-    return offlineSnapshot.tips;
-  }, [aiTips, offlineSnapshot.tips]);
 
   return (
     <ScreenContainer contentContainerStyle={{ gap: theme.spacing.xl }} testID="smart-tips-screen">
@@ -205,6 +200,7 @@ export function SmartTipsScreen({ navigation }) {
         </View>
       </View>
 
+      {/* Core offline financial calculations for monthly budget overview (retained) */}
       <View
         style={{
           backgroundColor: theme.colors.deepPrimary,
@@ -278,14 +274,46 @@ export function SmartTipsScreen({ navigation }) {
         Suggestions for you
       </Text>
 
-      {displayTips.length === 0 ? (
+      {/* Online-only recommendations: No offline fallback advice */}
+      {!onlinePersonalizationEnabled ? (
+        <EmptyState
+          actionLabel="Enable in Settings"
+          emoji="📱"
+          message="Online Personalization is turned off. Enable it in Settings to receive AI-powered budget tips and recommendations."
+          onAction={() => navigation.navigate("Settings")}
+          title="Online Personalization is off"
+        />
+      ) : !onlinePersonalizationConsentAccepted ? (
+        <EmptyState
+          actionLabel="Review Consent in Settings"
+          emoji="📋"
+          message="Review and accept Online Personalization consent in Settings to enable Gemini-powered budget recommendations."
+          onAction={() => navigation.navigate("Settings")}
+          title="Consent required"
+        />
+      ) : aiStatus === "loading" ? (
+        <View style={{ alignItems: "center", gap: theme.spacing.md, paddingVertical: theme.spacing.xl }}>
+          <ActivityIndicator accessibilityLabel="Loading personalized tips" color={theme.colors.primary} size="large" />
+          <Text style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.body }}>
+            Generating personalized budget tips…
+          </Text>
+        </View>
+      ) : aiStatus === "offline" ? (
+        <EmptyState
+          actionLabel="Retry"
+          emoji="⚠️"
+          message="Could not reach the online personalization service. Check your connection or try again."
+          onAction={() => void loadTips()}
+          title="Recommendations unavailable"
+        />
+      ) : (!aiTips || aiTips.length === 0) ? (
         <EmptyState
           emoji="✨"
-          message="Log transactions and budgets to unlock student-friendly suggestions. Everything stays on-device until you opt into online tips."
+          message="Set budgets and log transactions to receive student-friendly AI suggestions."
           title="No tips yet"
         />
       ) : (
-        displayTips.map((tip) => (
+        aiTips.map((tip) => (
           <SectionCard
             key={tip.id}
             padding={theme.spacing.lg}
@@ -310,6 +338,13 @@ export function SmartTipsScreen({ navigation }) {
               <Text numberOfLines={2} style={{ color: theme.colors.sub, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
                 {formatCopy(tip.meta, currencySymbol)}
               </Text>
+              {tip.amountMinor != null && (
+                <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.typeScale.small }}>
+                  {tip.isEstimate ? "~" : ""}
+                  {formatMinor(tip.amountMinor, { currencySymbol, showCents: false })}
+                  {tip.category ? ` · ${tip.category}` : ""}
+                </Text>
+              )}
             </View>
             <View
               style={{
@@ -347,7 +382,7 @@ export function SmartTipsScreen({ navigation }) {
       >
         <Text style={{ fontFamily: theme.fonts.regular, fontSize: theme.typeScale.label }}>🔀</Text>
         <Text style={{ color: theme.colors.sub, flex: 1, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small }}>
-          Online: AI-personalized from an anonymized budget summary. Offline: from your own spending. Raw transactions never leave this device.
+          Online: AI-personalized from an anonymized budget summary. Transaction notes and account details never leave this device.
         </Text>
       </View>
     </ScreenContainer>

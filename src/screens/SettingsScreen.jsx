@@ -75,16 +75,15 @@ export function SettingsScreen({ navigation }) {
     const remindersEnabled = useUiStore((state) => state.remindersEnabled);
     const notificationPermissionDenied = useUiStore((state) => state.notificationPermissionDenied);
     const notificationHint = useUiStore((state) => state.notificationHint);
-    const smartTipsEnabled = useUiStore((state) => state.smartTipsEnabled);
-    const currencySymbol = useUiStore((state) => state.currencySymbol);
     const hasPin = useUiStore((state) => state.hasPin);
     const setAppLockEnabled = useUiStore((state) => state.setAppLockEnabled);
     const setRemindersEnabled = useUiStore((state) => state.setRemindersEnabled);
-    const setSmartTipsEnabled = useUiStore((state) => state.setSmartTipsEnabled);
-    const smartTipsConsentAccepted = useUiStore((state) => state.smartTipsConsentAccepted);
-    const acceptSmartTipsConsent = useUiStore((state) => state.acceptSmartTipsConsent);
-    const declineSmartTipsConsent = useUiStore((state) => state.declineSmartTipsConsent);
-    const setCurrencySymbol = useUiStore((state) => state.setCurrencySymbol);
+    const onlinePersonalizationEnabled = useUiStore((state) => state.onlinePersonalizationEnabled ?? state.smartTipsEnabled);
+    const onlinePersonalizationConsentAccepted = useUiStore((state) => state.onlinePersonalizationConsentAccepted ?? state.smartTipsConsentAccepted);
+    const setOnlinePersonalizationEnabled = useUiStore((state) => state.setOnlinePersonalizationEnabled ?? state.setSmartTipsEnabled);
+    const acceptOnlinePersonalizationConsent = useUiStore((state) => state.acceptOnlinePersonalizationConsent ?? state.acceptSmartTipsConsent);
+    const declineOnlinePersonalizationConsent = useUiStore((state) => state.declineOnlinePersonalizationConsent ?? state.declineSmartTipsConsent);
+    const currencySymbol = useUiStore((state) => state.currencySymbol);
     const setThemePreference = useUiStore((state) => state.setThemePreference);
     const clearStoredPin = useUiStore((state) => state.clearStoredPin);
     const accounts = useFinanceStore((state) => state.accounts);
@@ -203,26 +202,38 @@ export function SettingsScreen({ navigation }) {
       </SettingsSection>
 
       <SettingsSection title="SMART FEATURES">
-        <SettingsRow emoji="✨" label="Offline tips + online personalization" onPress={() => {
+        <SettingsRow
+          emoji="✨"
+          label="Online Personalization"
+          onPress={() => {
             tabNavigation?.navigate("Home", { screen: "SmartTips" });
-        }} subtitle="Offline always available · online opt-in" trailing={<Toggle enabled={smartTipsEnabled} label="Budget-based tips" onChange={(enabled) => {
-            if (!enabled) {
-                void setSmartTipsEnabled(false);
-                return;
-            }
-            if (smartTipsConsentAccepted) {
-                void setSmartTipsEnabled(true);
-                return;
-            }
-            Alert.alert(
-                "Enable Smart Tips?",
-                "When online, MoneyMap may share category names, spend ratios, remaining budget amounts, and currency symbol with Google Gemini to generate suggestions. Notes, accounts, and individual transactions never leave your device. You can turn this off at any time to keep tips offline.",
-                [
-                    { text: "Not now", style: "cancel", onPress: () => { void declineSmartTipsConsent(); } },
-                    { text: "I understand", onPress: () => { void acceptSmartTipsConsent(); } },
-                ],
-            );
-        }}/>}/>
+          }}
+          subtitle="Get AI-powered budget tips and nearby food recommendations when online."
+          trailing={
+            <Toggle
+              enabled={onlinePersonalizationEnabled}
+              label="Online Personalization"
+              onChange={(enabled) => {
+                if (!enabled) {
+                  void setOnlinePersonalizationEnabled(false);
+                  return;
+                }
+                if (onlinePersonalizationConsentAccepted) {
+                  void setOnlinePersonalizationEnabled(true);
+                  return;
+                }
+                Alert.alert(
+                  "Enable Online Personalization?",
+                  "When online, MoneyMap uses Google Gemini to generate budget tips and personalized meal recommendations near campus, and Google Places to discover nearby eateries.\n\nData shared when online:\n• Aggregated financial summary (category names, spend ratios, remaining budget, currency) for Smart Tips.\n• Coarse eatery details (restaurant names, distance bands, price levels) for meal personalization.\n• Approximate search origin for Google Places eatery discovery. Precise device location requires separate permission.\n\nTransaction notes, full transaction histories, account identifiers, private financial records, and precise coordinates are NEVER transmitted to Gemini. You can disable this at any time.",
+                  [
+                    { text: "Not now", style: "cancel", onPress: () => { void declineOnlinePersonalizationConsent(); } },
+                    { text: "I understand", onPress: () => { void acceptOnlinePersonalizationConsent(); } },
+                  ],
+                );
+              }}
+            />
+          }
+        />
         <SettingsRow emoji="🔔" label="Recurring bill reminders" onPress={() => tabNavigation?.navigate("Budgets", { screen: "Recurring" })} trailing={<Toggle enabled={remindersEnabled} label="Recurring bill reminders" onChange={(enabled) => void setRemindersEnabled(enabled)}/>}/>
         {remindersEnabled && (notificationPermissionDenied || notificationHint) ? (
           <Text style={{ color: theme.colors.amberText, fontFamily: theme.fonts.regular, fontSize: theme.typeScale.small, marginTop: theme.spacing.sm }}>

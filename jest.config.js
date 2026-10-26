@@ -5,6 +5,7 @@ module.exports = {
   testMatch: ["**/*.test.js", "**/*.test.jsx"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
+    "^react-native-maps$": "<rootDir>/__mocks__/react-native-maps.js",
     "\\.svg$": "<rootDir>/__mocks__/svgMock.jsx",
   },
   collectCoverageFrom: [

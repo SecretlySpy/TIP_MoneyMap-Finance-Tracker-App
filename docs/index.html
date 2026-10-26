@@ -91,11 +91,11 @@ The Pages site is the polished setup guide: root <a href="https://github.com/Sec
 | Task 13 CSV + Excel import | Done |
 | Task 14 app lock (PIN + biometrics) | Implemented — attempt lockout plus device-authenticated PIN replacement and an explicit local-reset fallback; enrolled-device recovery remains release-gated |
 | Task 15 Smart Tips offline rules | Done |
-| Task 16 Smart Tips online Gemini (opt-in) | Done |
+| Task 16 Smart Tips online Gemini (opt-in) | Secure Cloud Run proxy integration staged on main; requires Firebase App Check registration and Cloud Run deployment before live online suggestions work |
 | Task 17 polish | Done |
 | Task 18 release prep docs | Done (EAS project ID still placeholder until <code>eas init</code>) |
 | Dark-mode theme consistency | Done (<code>useTheme</code> reads <code>themePreference</code>) |
-| Student Eats Near Me | Done (bundled TIP QC catalog offline; optional Overpass/Nominatim refresh + ranking + optional AI) |
+| Student Eats Near Me | Done (interactive Google Maps + Google Places discovery via secure Cloud Run proxy + grounded AI recommendations) |
 | Settings pickers + Dashboard polish | Done (theme/currency chips, empties, tips teaser) |
 | Safe-to-Spend + Savings Goals | Done (pure calc + schema v2 + Goals screen); goal deadlines added |
 | Entry quick chips + MoM trend | Done |
@@ -127,9 +127,9 @@ device behavior still requires the Android verification path below.
 <ol>
 <li>Install <strong>Node.js 22 LTS</strong>, <strong>JDK 21</strong>, Android SDK (API 35 recommended).</li>
 <li><code>npm ci</code></li>
-<li>Copy <code>.env.example</code> → <code>.env</code> (optional <code>GEMINI_API_KEY</code> for online tips).</li>
+<li>Copy <code>.env.example</code> → <code>.env</code> (optional PUBLIC Cloud Run URL only, after Firebase App Check is configured). Never bundle <code>GEMINI_API_KEY</code> in the app.</li>
 <li><code>npm test</code> (58 suites, 402 tests verified on 2026-10-19)</li>
-<li>Start an emulator/device, then <code>npm run android</code> (dev client required — <strong>Expo Go unsupported</strong> because of SQLCipher). Default <code>npm run android</code> clears app data on the first active device (<code>com.example.financetracker</code> in the checked-in native project). Use <code>npm run android:preserve</code> to keep the local ledger across launches.</li>
+<li>Start an emulator/device, then <code>npm run android</code> (dev client required — <strong>Expo Go unsupported</strong> because of SQLCipher). Scanning the Metro QR code in Expo Go shows an in-app explanation instead of a native-module crash. Default <code>npm run android</code> clears app data on the first active device (<code>com.example.financetracker</code> in the checked-in native project). Use <code>npm run android:preserve</code> to keep the local ledger across launches.</li>
 </ol>
 <h3>Android Studio run button</h3>
 <p>
@@ -154,23 +154,23 @@ Full walkthrough (Windows / macOS / Linux): <strong><a href="https://github.com/
 <li>Money is always <strong>integer minor units</strong> (<code>src/domain/services/money.js</code>)</li>
 <li>Theme tokens only (<code>src/theme/tokens.js</code>) — no hardcoded hex in screens</li>
 <li>Bare <code>useTheme()</code> reads <code>themePreference</code> from <code>uiStore</code> (shared components stay dark-mode correct)</li>
-<li>Outbound HTTPS only from <code>src/remote/*</code> (<code>smartTipsClient</code>, <code>placesClient</code>, <code>eatsTipsClient</code>); Student Eats listings also ship in <code>src/data/tipCampusEatsCatalog.js</code></li>
+<li>Outbound HTTPS only from <code>src/remote/*</code> (<code>smartTipsClient</code>, <code>placesClient</code>, <code>eatsTipsClient</code>) via stateless Cloud Run AI proxy.</li>
 </ul>
-<h2>Smart Tips privacy</h2>
+<h2>Online Personalization (Smart Tips &amp; Student Eats)</h2>
 <ul>
-<li>Default <strong>off</strong>. First enable shows a consent sheet.</li>
-<li>Offline: <code>deriveSmartTips</code> from local budgets/transactions.</li>
-<li>Online: anonymized summary only (period, totals, category ratios, currency) to Gemini.</li>
-<li>Never: raw transactions, notes, account names/IDs.</li>
+<li>Unified setting in <strong>Settings → Online Personalization</strong> with explicit informed consent.</li>
+<li>Default <strong>off</strong>. When disabled, all optional AI and online discovery calls cease, and recommendation cards are hidden.</li>
+<li>Core financial calculations (budgets, balances, ledger, safe-to-spend) remain 100% <strong>offline-first</strong>.</li>
+<li>Online Smart Tips: Minimized, anonymized summary (period, minor totals, spend ratios, currency) sent through Cloud Run proxy to Google Gemini with Firebase App Check. No raw ledger rows, notes, or account IDs are ever sent.</li>
+<li>Structured output validation ensures realistic, grounded amounts (minor unit handling) adapted to Metro Manila student budgeting.</li>
 </ul>
 <h2>Student Eats Near Me</h2>
 <ul>
-<li>Dashboard → <strong>Student Eats</strong>; rankings use the fixed TIP Quezon City campus origin and request no location permission.</li>
-<li>Core listings ship in the bundled campus catalog and work with no network. Google Maps is not used.</li>
-<li>Optional live refresh uses OpenStreetMap Overpass (Nominatim fallback). Last successful live results can be stored in encrypted <code>app_metadata</code> for a later offline session.</li>
-<li>Mini-map is an on-device relative plot (no map SDK).</li>
-<li>Origin: TIP Quezon City campus. The app does not read or persist device coordinates.</li>
-<li>Optional AI tips reuse Smart Tips consent; payload uses distance <strong>bands</strong> only (no lat/lon).</li>
+<li>Real-time nearby restaurant discovery using <strong>Google Places API (New)</strong> via Cloud Run proxy.</li>
+<li>Interactive <strong>Google Maps</strong> integration using <code>react-native-maps</code> on Android with actual street tiles, synchronized markers, and external directions links.</li>
+<li>Location: Optional foreground location permission. When permission is denied or undetermined, discovery defaults cleanly to the fixed TIP Quezon City campus origin with clear labeling. Coordinates are never continuously tracked or sent to Gemini.</li>
+<li>Grounded AI Recommendations: Gemini recommendations reference only verified places returned by Google Places.</li>
+<li>Provider Compliance: In-memory session caching (10 min TTL) complies with Google Maps Platform Terms of Service without long-term offline database persistence.</li>
 </ul>
 <h2>Release</h2>
 <ul>
