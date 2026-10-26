@@ -83,6 +83,40 @@ export function buildAnonymizedSmartTipsPayload(input) {
 }
 
 /**
+ * Build the legacy V1 payload for backward-compatibility fallback with deployed proxy instances.
+ * @param {object} input
+ * @returns {object}
+ */
+export function buildLegacySmartTipsPayload(input) {
+  const cards = buildBudgetCards(
+    input.budgets ?? [],
+    input.transactions ?? [],
+    input.categoriesById,
+    input.monthYear,
+  );
+  const summary = budgetSummary(cards);
+  const spending = spendingByCategory(
+    input.transactions ?? [],
+    input.categoriesById,
+    input.monthYear,
+  );
+  const total = spending.totalMinor > 0 ? spending.totalMinor : 1;
+  const categorySpendRatios = spending.segments.slice(0, 16).map((segment) => ({
+    category: String(segment.label ?? "Other").slice(0, 32),
+    ratio: Number((segment.spentMinor / total).toFixed(4)),
+  }));
+
+  return {
+    period: input.monthYear,
+    currencySymbol: String(input.currencySymbol ?? "₱").slice(0, 4),
+    remainingBudgetMinor: Math.max(0, summary.limitMinor - summary.spentMinor),
+    limitBudgetMinor: Math.max(0, summary.limitMinor),
+    spentBudgetMinor: Math.max(0, summary.spentMinor),
+    categorySpendRatios,
+  };
+}
+
+/**
  * Assert payload shape for tests and runtime guard before send.
  * @param {unknown} payload
  * @returns {{ ok: true } | { ok: false, reason: string }}
@@ -280,6 +314,7 @@ export async function fetchSmartTipsFromGemini(options) {
   const result = await requestAiProxyTips({
     path: "/v1/smart-tips",
     payload: options.payload,
+    fallbackPayload: options.fallbackPayload,
     enabled: options.enabled,
     consentAccepted: options.consentAccepted,
     fetchImpl: options.fetchImpl,
@@ -304,10 +339,12 @@ export async function loadOnlineSmartTips(input) {
     return null;
   }
   const payload = buildAnonymizedSmartTipsPayload(input);
+  const fallbackPayload = buildLegacySmartTipsPayload(input);
   return fetchSmartTipsFromGemini({
     enabled: input.enabled,
     consentAccepted: input.consentAccepted === true,
     payload,
+    fallbackPayload,
     fetchImpl: input.fetchImpl,
   });
 }

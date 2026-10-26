@@ -28,7 +28,7 @@ export function isAiProxyConfigured(customUrl) {
     && !!appCheckProvider;
 }
 
-export async function requestAiProxyTips({ path, payload, enabled, consentAccepted, fetchImpl, backendUrl, appCheckToken }) {
+export async function requestAiProxyTips({ path, payload, fallbackPayload, enabled, consentAccepted, fetchImpl, backendUrl, appCheckToken }) {
   if (!enabled || !consentAccepted) return null;
   const base = String(backendUrl || getAiProxyUrl()).replace(/\/+$/, "");
   if (!/^https:\/\/[^/\s]+$/.test(base) || !["/v1/smart-tips", "/v1/eats-tips"].includes(path)) return null;
@@ -56,6 +56,7 @@ export async function requestAiProxyTips({ path, payload, enabled, consentAccept
       try {
         const refreshedToken = await appCheckProvider(true);
         if (typeof refreshedToken === "string" && refreshedToken.length >= 16) {
+          token = refreshedToken;
           response = await (fetchImpl || globalThis.fetch)(base + path, {
             method: "POST",
             headers: {
@@ -69,6 +70,24 @@ export async function requestAiProxyTips({ path, payload, enabled, consentAccept
         }
       } catch {
         // Fall back cleanly to null
+      }
+    }
+
+    // If 422 (e.g. backend running legacy V1 centavos contract) and a fallback payload is provided, attempt legacy fallback
+    if (response.status === 422 && fallbackPayload) {
+      try {
+        response = await (fetchImpl || globalThis.fetch)(base + path, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-MoneyMap-Consent": "1",
+            "X-Firebase-AppCheck": token,
+          },
+          body: JSON.stringify(fallbackPayload),
+          signal: controller?.signal,
+        });
+      } catch {
+        // Fall through cleanly
       }
     }
 
