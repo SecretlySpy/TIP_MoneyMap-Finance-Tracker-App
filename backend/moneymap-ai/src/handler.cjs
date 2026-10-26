@@ -68,7 +68,7 @@ async function body(req) {
 function createHandler({apiKey,verifyAppCheck,fetchImpl=globalThis.fetch,model="gemini-3.5-flash-lite",expectedAppId,now=Date.now}) {
   const buckets=new Map();
   return async function(req,res) {
-    if(req.url==="/healthz" && req.method==="GET") return send(res,200,{status:"ok"});
+    if(req.url==="/health" && req.method==="GET") return send(res,200,{status:"ok"});
     if(req.method!=="POST" || !["/v1/smart-tips","/v1/eats-tips"].includes(req.url)) return send(res,404,{error:"not_found"});
     if(!apiKey || typeof verifyAppCheck!=="function" || !ALLOWED_FREE_TIER_MODELS.includes(model)) {
       return send(res,503,{error:"not_configured"});

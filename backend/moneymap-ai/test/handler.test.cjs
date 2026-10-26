@@ -56,13 +56,16 @@ test("rejects private fields and invalid responses", () => {
   assert.equal(output('[{"title":"Tip","meta":"Save daily","notes":"secret"}]'), null);
 });
 
-test("enforces healthz endpoint", async () => {
+test("enforces health endpoint", async () => {
   const handler = createHandler({ apiKey: "synthetic", verifyAppCheck: async () => ({ appId: "app" }) });
   await serve(handler, async (url) => {
-    const res = await fetch(url + "/healthz");
+    const res = await fetch(url + "/health");
     assert.equal(res.status, 200);
     const data = await res.json();
     assert.equal(data.status, "ok");
+
+    const oldRes = await fetch(url + "/healthz");
+    assert.equal(oldRes.status, 404);
   });
 });
 

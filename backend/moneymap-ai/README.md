@@ -19,8 +19,8 @@ No Gemini API credentials, private tokens, or transaction histories are shipped 
 
 ## 2. API Endpoints
 
-### `GET /healthz`
-- Returns HTTP 200 `{"status":"ok"}`. Used by Cloud Run readiness/liveness probes.
+### `GET /health`
+- Returns HTTP 200 `{"status":"ok"}`. Used by Cloud Run readiness, liveness, and startup health checks.
 
 ### `POST /v1/smart-tips`
 - **Headers Required:**
@@ -111,6 +111,10 @@ gcloud run deploy moneymap-ai-proxy \
 
 # 3. Copy the assigned Service URL and set it in your local mobile .env
 # EXPO_PUBLIC_MONEYMAP_AI_URL=https://moneymap-ai-proxy-<hash>-as.a.run.app
+
+# 4. Verify deployment health check
+curl -i https://moneymap-ai-proxy-<hash>-as.a.run.app/health
+# Expected: HTTP 200 {"status":"ok"}
 ```
 
 > [!WARNING]
