@@ -22,8 +22,8 @@
 | Background / reminders | expo-background-task / expo-notifications / expo-task-manager | Expo 54-compatible | Recurring catch-up + local bill reminders |
 | App lock | expo-local-authentication | Expo 54-compatible | Biometrics with PIN fallback |
 | Import | papaparse / xlsx / expo-document-picker / expo-file-system | `xlsx@0.20.3` from integrity-pinned SheetJS CDN tarball; other versions in `package.json` | CSV + Excel migration import; vendor-CDN dependency is not comprehensively assessed by npm audit |
-| Optional HTTPS | `src/remote/smartTipsClient.js`, `placesClient.js`, `eatsTipsClient.js` | Gemini key via Expo extra / EAS secrets only; `app.config.js` does not inject `.env` | Offline finance tips and the bundled Student Eats catalog always remain available |
-| Tests | Jest Expo / RNTL / better-sqlite3 | `~54.0.18` / `^14.0.1` / `^12.11.1` | 58 suites / 402 tests on 2026-10-19: SQL, transfers, money, tips, import, lock, store, UI, Student Eats offline catalog, and integration |
+| Optional HTTPS | `src/remote/smartTipsClient.js`, `placesClient.js`, `eatsTipsClient.js` | Cloud Run proxy endpoint via `EXPO_PUBLIC_MONEYMAP_AI_URL`, Maps API key via `GOOGLE_MAPS_API_KEY` (loaded by `app.config.js` via dotenv), Gemini key via EAS secrets / extra; offline finance tips and the bundled Student Eats catalog always remain available |
+| Tests | Jest Expo / RNTL / better-sqlite3 | `~54.0.18` / `^14.0.1` / `^12.11.1` | 68 suites / 500 tests on 2026-10-29: SQL, transfers, money, tips, import, lock, store, UI, Student Eats offline catalog, power tools, and integration |
 | Package manager | npm | 10 or newer (verified `10.9.8`) | Dependency installation and scripts |
 | Android tooling | Android SDK cmdline-tools / Studio, JDK | SDK platform 35, build-tools 35, NDK 27.1, Emulator, JDK 21 | API 26+ emulator/device builds; Java 25+ is unsupported by this Gradle stack |
 

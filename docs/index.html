@@ -127,8 +127,8 @@ device behavior still requires the Android verification path below.
 <ol>
 <li>Install <strong>Node.js 22 LTS</strong>, <strong>JDK 21</strong>, Android SDK (API 35 recommended).</li>
 <li><code>npm ci</code></li>
-<li>Copy <code>.env.example</code> → <code>.env</code> (optional PUBLIC Cloud Run URL only, after Firebase App Check is configured). Never bundle <code>GEMINI_API_KEY</code> in the app.</li>
-<li><code>npm test</code> (58 suites, 402 tests verified on 2026-10-19)</li>
+<li>Copy <code>.env.example</code> → <code>.env</code> (configure <code>EXPO_PUBLIC_MONEYMAP_AI_URL</code>, <code>GOOGLE_MAPS_API_KEY</code>, and optional <code>GEMINI_API_KEY</code> for development/proxy use). Never commit real keys or expose them in public release builds.</li>
+<li><code>npm test</code> (68 suites, 500 tests verified on 2026-10-29)</li>
 <li>Start an emulator/device, then <code>npm run android</code> (dev client required — <strong>Expo Go unsupported</strong> because of SQLCipher). Scanning the Metro QR code in Expo Go shows an in-app explanation instead of a native-module crash. Default <code>npm run android</code> clears app data on the first active device (<code>com.example.financetracker</code> in the checked-in native project). Use <code>npm run android:preserve</code> to keep the local ledger across launches.</li>
 </ol>
 <h3>Android Studio run button</h3>

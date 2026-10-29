@@ -1,5 +1,27 @@
 # Decisions and Handover
 
+## Environment configuration, runtime setup & test suite expansion (2026-10-29)
+
+**Outcome:** Resolved environment bootstrap blockers, installed missing Firebase App Check native plugin dependencies, created compatible local Android Virtual Devices (MoneyMap_API_35 and MoneyMap_API_34), verified that the Expo Go runtime guard correctly protects against unbundled SQLCipher crashes, and verified that the full test suite now stands at **68 test suites and 500 tests** (100% passing).
+
+**Key Actions & Technical Decisions:**
+1. **Environment Configuration (.env & app.config.js)**:
+   - Updated app.config.js to load .env variables via dotenv.
+   - Wired GOOGLE_MAPS_API_KEY through to android.config.googleMaps.apiKey for native Google Maps street tiles and marker rendering in Student Eats Near Me.
+   - Configured EXPO_PUBLIC_MONEYMAP_AI_URL to point to the active Cloud Run proxy revision (https://placesfix---moneymap-ai-proxy-wjflkziz2q-as.a.run.app).
+   - Installed missing native dependencies @react-native-firebase/app and @react-native-firebase/app-check, fixing plugin resolution errors during expo config and Metro bundler startup.
+2. **Android Emulator & Tooling Provisioning**:
+   - Created Android Virtual Device MoneyMap_API_35 (Pixel 8, Google APIs x86_64, Android 15.0) matching the primary AVD preference in scripts/emulator.mjs.
+   - Provisioned fallback AVD MoneyMap_API_34 (Pixel 8, Google APIs x86_64, Android 14.0).
+   - Patched CLI toolchain integration paths to handle directory paths with spaces reliably.
+3. **Expo Go vs Native Android Dev Client Boundary**:
+   - Confirmed architecture constraint: MoneyMap relies on @op-engineering/op-sqlite with compiled SQLCipher C/C++ libraries for local encrypted database storage.
+   - Verified that running via Expo Go correctly triggers the isExpoGoRuntime() detection in App.js and renders ExpoGoUnsupportedScreen with installation instructions instead of an uncaught native module crash.
+   - Verified that the Metro Development Server serves the local network properly on port 8081 (packager-status:running).
+4. **Verification & Evidence**:
+   - `npm test`: **68/68 test suites, 500/500 tests passed**.
+   - `npx expo config` --type public: Clean JSON configuration export with all plugins resolved and environment variables loaded.
+
 ## Whole-peso presentation (2026-10-26)
 
 **ADR:** Keep SQLCipher minor-unit storage. Do not migrate historical centavos.
