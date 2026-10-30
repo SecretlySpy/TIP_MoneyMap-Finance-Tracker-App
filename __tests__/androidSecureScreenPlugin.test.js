@@ -1,5 +1,7 @@
 const {
   injectIntoOnCreate,
+  removeFromOnCreate,
+  isSecureScreenEnabled,
   MARKER,
 } = require("../plugins/withAndroidSecureScreen");
 
@@ -50,5 +52,26 @@ describe("withAndroidSecureScreen", () => {
 
   it("fails loudly when MainActivity has no recognizable onCreate", () => {
     expect(() => injectIntoOnCreate("class MainActivity {}", "kt")).toThrow(/onCreate/);
+  });
+
+  it("removes FLAG_SECURE from Kotlin activities when disabled", () => {
+    const injected = injectIntoOnCreate(KOTLIN_ACTIVITY, "kt");
+    const cleaned = removeFromOnCreate(injected);
+    expect(cleaned).not.toContain("FLAG_SECURE");
+    expect(cleaned).not.toContain(MARKER);
+    expect(cleaned.trim()).toBe(KOTLIN_ACTIVITY.trim());
+  });
+
+  it("removes FLAG_SECURE from Java activities when disabled", () => {
+    const injected = injectIntoOnCreate(JAVA_ACTIVITY, "java");
+    const cleaned = removeFromOnCreate(injected);
+    expect(cleaned).not.toContain("FLAG_SECURE");
+    expect(cleaned).not.toContain(MARKER);
+    expect(cleaned.trim()).toBe(JAVA_ACTIVITY.trim());
+  });
+
+  it("respects options and environment variable overrides", () => {
+    expect(isSecureScreenEnabled({ enabled: true })).toBe(true);
+    expect(isSecureScreenEnabled({ enabled: false })).toBe(false);
   });
 });

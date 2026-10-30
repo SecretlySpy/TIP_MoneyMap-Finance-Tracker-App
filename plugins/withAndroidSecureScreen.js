@@ -10,7 +10,7 @@ const { withMainActivity } = require("@expo/config-plugins");
  * Trade-off: this also blocks the user's own screenshots. That is the standard
  * posture for finance apps; flip SECURE_SCREEN_ENABLED to false to opt out.
  */
-const SECURE_SCREEN_ENABLED = true;
+const SECURE_SCREEN_ENABLED = false;
 
 // Doubles as the idempotency marker across repeated Expo prebuilds.
 const MARKER = "MoneyMap FLAG_SECURE";
@@ -44,18 +44,48 @@ function injectIntoOnCreate(contents, language) {
   return contents.replace(pattern, `$1${snippet}`);
 }
 
-module.exports = function withAndroidSecureScreen(config) {
-  if (!SECURE_SCREEN_ENABLED) {
-    return config;
+function removeFromOnCreate(contents) {
+  if (!contents.includes(MARKER)) {
+    return contents;
   }
-  return withMainActivity(config, (modConfig) => {
-    modConfig.modResults.contents = injectIntoOnCreate(
-      modConfig.modResults.contents,
-      modConfig.modResults.language,
+  const pattern = new RegExp(
+    `[ \\t]*\\/\\/\\s*${MARKER}[^\\r\\n]*\\r?\\n[ \\t]*(?:window|getWindow\\(\\))\\.setFlags\\([\\s\\S]*?FLAG_SECURE\\s*\\);?\\r?\\n?`,
+    "g"
+  );
+  return contents.replace(pattern, "");
+}
+
+function isSecureScreenEnabled(options) {
+  if (options && typeof options.enabled === "boolean") {
+    return options.enabled;
+  }
+  if (process.env.SECURE_SCREEN_ENABLED !== undefined) {
+    return (
+      process.env.SECURE_SCREEN_ENABLED === "true" ||
+      process.env.SECURE_SCREEN_ENABLED === "1"
     );
+  }
+  return SECURE_SCREEN_ENABLED;
+}
+
+module.exports = function withAndroidSecureScreen(config, options) {
+  return withMainActivity(config, (modConfig) => {
+    if (isSecureScreenEnabled(options)) {
+      modConfig.modResults.contents = injectIntoOnCreate(
+        modConfig.modResults.contents,
+        modConfig.modResults.language,
+      );
+    } else {
+      modConfig.modResults.contents = removeFromOnCreate(
+        modConfig.modResults.contents,
+      );
+    }
     return modConfig;
   });
 };
 
 module.exports.injectIntoOnCreate = injectIntoOnCreate;
+module.exports.removeFromOnCreate = removeFromOnCreate;
+module.exports.isSecureScreenEnabled = isSecureScreenEnabled;
 module.exports.MARKER = MARKER;
+
