@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="NONE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="dcbc9ed0-c88b-4f0a-bc43-749ba98499d7" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/__tests__/androidSecureScreenPlugin.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/__tests__/androidSecureScreenPlugin.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugins/withAndroidSecureScreen.js" beforeDir="false" afterPath="$PROJECT_DIR$/plugins/withAndroidSecureScreen.js" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;SecretlySpy&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/SecretlySpy/TIP_MoneyMap-Finance-Tracker-App.git&quot;,
+    &quot;accountId&quot;: &quot;40d416cb-35b5-47c8-909c-125a1afb4cef&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 6,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3He8AmQYj1Ob7FFnHCsUa8ZZ6HG" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "CidrDebugProfileConversion": "true",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "Shell Script.MoneyMap: Reset Clean State.executor": "Run",
+    "Shell Script.MoneyMap: Run Tests.executor": "Run",
+    "Shell Script.MoneyMap: Run on Android.executor": "Run",
+    "Shell Script.MoneyMap: Start Metro.executor": "Run",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "git-widget-placeholder": "main",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "/home/kakashi70-0/Documents/GitHub/TIP_MoneyMap-Finance-Tracker-App",
+    "settings.editor.selected.configurable": "com.android.studio.ml.AcpConfigurable"
+  }
+}]]></component>
+  <component name="RunManager" selected="Shell Script.MoneyMap: Run on Android" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="dcbc9ed0-c88b-4f0a-bc43-749ba98499d7" name="Changes" comment="" />
+      <created>1786217033526</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1786217033526</updated>
+    </task>
+    <servers />
+  </component>
+</project>
