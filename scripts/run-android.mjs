@@ -294,6 +294,13 @@ function createAndroidEnvironment() {
     delete environment.ANDROID_PREFS_ROOT;
   }
 
+  // Default packager hostname to localhost so Expo Development Client uses
+  // ADB reverse port forwarding. This prevents java.net.ConnectException when
+  // devices are connected via USB/ADB and have an active VPN or host firewall.
+  if (!environment.REACT_NATIVE_PACKAGER_HOSTNAME) {
+    environment.REACT_NATIVE_PACKAGER_HOSTNAME = "localhost";
+  }
+
   const pathKey =
     Object.keys(environment).find((key) => key.toLowerCase() === "path") ?? "PATH";
   environment[pathKey] = [
@@ -330,7 +337,7 @@ function printCheckResult(configuration) {
   }
 }
 
-export const PACKAGE_NAME = "com.example.financetracker";
+export const PACKAGE_NAME = "com.moneymap.financetracker";
 
 // Check if a local port is already accepting connections (e.g. active Metro bundler).
 export function isPortInUse(port = 8081, host = "127.0.0.1") {
@@ -470,7 +477,14 @@ async function run() {
 
     let reversed = false;
     // Set up ADB reverse port forwarding so Metro connections always succeed.
-    if (targetSerial) {
+    if (devices.length > 0) {
+      for (const device of devices.filter((d) => d.state === "device")) {
+        const ok = reverseMetroPort(adbPath, device.serial, 8081);
+        if (device.serial === targetSerial) {
+          reversed = ok;
+        }
+      }
+    } else if (targetSerial) {
       reversed = reverseMetroPort(adbPath, targetSerial, 8081);
     }
 

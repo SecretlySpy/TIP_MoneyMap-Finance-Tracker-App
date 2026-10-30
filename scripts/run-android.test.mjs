@@ -8,6 +8,7 @@ import {
   androidSdkCandidates,
   decodeGradleProperty,
   javaHomeCandidates,
+  PACKAGE_NAME,
   parseLauncherOptions,
 } from "./run-android.mjs";
 
@@ -86,5 +87,9 @@ test("parseLauncherOptions defaults to clean state unless preserve-data is speci
   const cleanOnlyRun = parseLauncherOptions(["--clean-only", "-d", "emulator-5554"]);
   assert.equal(cleanOnlyRun.cleanOnly, true);
   assert.deepEqual(cleanOnlyRun.expoForwardedArgs, ["-d", "emulator-5554"]);
+});
+
+test("PACKAGE_NAME matches the Android package in app.json", () => {
+  assert.equal(PACKAGE_NAME, "com.moneymap.financetracker");
 });
 
